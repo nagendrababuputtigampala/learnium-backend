@@ -9,7 +9,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.io.IOException;
-import java.io.InputStream;
 
 @Configuration
 public class FirebaseConfig {
@@ -17,22 +16,25 @@ public class FirebaseConfig {
 
     @Bean
     public FirebaseApp firebaseApp() {
-        try (InputStream serviceAccount = getClass().getClassLoader().getResourceAsStream("firebase-service-account.json")) {
-            if (serviceAccount == null) {
-                throw new IllegalStateException("firebase-service-account.json not found in resources");
-            }
+        try {
+            // Uses Application Default Credentials:
+            // - if GOOGLE_APPLICATION_CREDENTIALS is set, it reads that JSON file
+            // - otherwise uses the environment’s default (e.g., GCP workload identity)
+            GoogleCredentials credentials = GoogleCredentials.getApplicationDefault();
+
             FirebaseOptions options = FirebaseOptions.builder()
-                    .setCredentials(GoogleCredentials.fromStream(serviceAccount))
+                    .setCredentials(credentials)
                     .build();
+
             if (FirebaseApp.getApps().isEmpty()) {
                 FirebaseApp app = FirebaseApp.initializeApp(options);
-                logger.info("FirebaseApp initialized successfully");
+                logger.info("FirebaseApp initialized using Application Default Credentials");
                 return app;
             } else {
                 return FirebaseApp.getInstance();
             }
         } catch (IOException e) {
-            logger.error("Failed to initialize FirebaseApp", e);
+            logger.error("Failed to initialize FirebaseApp. Set GOOGLE_APPLICATION_CREDENTIALS to your service account JSON path.", e);
             throw new RuntimeException(e);
         }
     }
