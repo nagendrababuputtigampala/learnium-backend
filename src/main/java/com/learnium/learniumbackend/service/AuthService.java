@@ -1,16 +1,20 @@
 package com.learnium.learniumbackend.service;
 
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseToken;
-import com.learnium.learniumbackend.entity.AuthRequest;
-import com.learnium.learniumbackend.entity.AuthResponse;
+import com.learnium.learniumbackend.entity.request.AuthRequest;
+import com.learnium.learniumbackend.entity.response.AuthResponse;
 import com.learnium.learniumbackend.model.User;
 import com.learnium.learniumbackend.repository.UserRepository;
+import com.learnium.learniumbackend.util.Claims;
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Map;
+
+import static com.learnium.learniumbackend.util.Constants.DEFAULT_GRADE;
 
 @Service
 public class AuthService {
@@ -24,20 +28,16 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthResponse signIn(AuthRequest request) {
-        String idToken = request.getIdToken();
-        if (idToken == null || idToken.isEmpty()) {
-            logger.warn("Missing or invalid idToken: {}", idToken);
-            throw new IllegalArgumentException("Missing or invalid idToken");
-        }
+    public AuthResponse signIn(AuthRequest authRequest) {
+        Map<String, Object> claims = Claims.getClaimsFromToken();
         try {
             logger.info("Verifying Firebase token");
-            FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(idToken);
-            String uid = decodedToken.getUid();
-            String email = decodedToken.getEmail();
-            String name = decodedToken.getName();
+            String uid = String.valueOf(claims.get("user_id"));
+            String email = String.valueOf(claims.getOrDefault("email", ObjectUtils.isNotEmpty(authRequest) ? authRequest.getEmail() : StringUtils.EMPTY));
+            String name = String.valueOf(claims.getOrDefault("name", ObjectUtils.isNotEmpty(authRequest) ? authRequest.getDisplayName() : StringUtils.EMPTY));
+            Integer grade = ObjectUtils.isNotEmpty(authRequest) && ObjectUtils.isNotEmpty(authRequest.getGradeLevel()) ? authRequest.getGradeLevel() : DEFAULT_GRADE;
             logger.info("Provisioning user: {}", email);
-            User user = userService.provisionUser(uid, email, name);
+            User user = userService.provisionUser(uid, email, name, grade);
             logger.info("User provisioned: {} (onboardingRequired={})", email, user.isOnboardingDone());
             return new AuthResponse(user, user.isOnboardingDone());
         } catch (Exception e) {

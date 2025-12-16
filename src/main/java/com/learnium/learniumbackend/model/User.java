@@ -24,6 +24,9 @@ public class User {
     @Column(name = "email", columnDefinition = "citext")
     private String email;
 
+    @Column(name = "password")
+    private String password;
+
     @Column(name = "display_name")
     private String displayName;
 

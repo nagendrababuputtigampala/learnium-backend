@@ -1,4 +1,4 @@
-package com.learnium.learniumbackend.entity;
+package com.learnium.learniumbackend.entity.response;
 
 import com.learnium.learniumbackend.model.User;
 import lombok.AllArgsConstructor;
