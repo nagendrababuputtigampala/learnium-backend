@@ -9,6 +9,9 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.WebRequest;
 
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -36,4 +39,11 @@ public class GlobalExceptionHandler {
         logger.warn("Bad request: {}", ex.getMessage());
         return buildErrorResponse(ex, HttpStatus.BAD_REQUEST);
     }
+
+    @ExceptionHandler({AuthenticationCredentialsNotFoundException.class, AccessDeniedException.class})
+    public ResponseEntity<Object> handleUnauthorized(Exception ex, WebRequest request) {
+        logger.warn("Unauthorized: {}", ex.getMessage());
+        return buildErrorResponse(ex, HttpStatus.UNAUTHORIZED);
+    }
+
 }
