@@ -1,19 +1,21 @@
 package com.learnium.learniumbackend.entity.response;
 
-import com.learnium.learniumbackend.model.User;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
+import java.util.UUID;
 
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
-public class AuthResponse implements Serializable {
+public class Grades implements Serializable {
+
     private static final long serialVersionUID = 1L;
-    private UserDetails userProfile;
-    private boolean onboardingRequired;
 
+    private Integer gradeId;
+
+    private String gradeName;
 }
-

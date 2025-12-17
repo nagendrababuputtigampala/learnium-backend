@@ -14,6 +14,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import java.util.Arrays;
+import java.util.stream.Stream;
+
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -23,6 +26,14 @@ public class SecurityConfig {
     @Value("${security.whitelist.urls}")
     private String[] whitelistUrls;
 
+    private static final String[] SWAGGER_WHITELIST = {
+            "/v3/api-docs/**",
+            "/swagger-ui/**",
+            "/swagger-ui.html",
+            "/swagger-ui/index.html"
+    };
+
+
     public SecurityConfig(FirebaseAuthenticationFilter firebaseAuthenticationFilter,
                           LoggingContextFilter loggingContextFilter) {
         this.firebaseAuthenticationFilter = firebaseAuthenticationFilter;
@@ -31,11 +42,13 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) {
+        String[] mergedWhitelist = Stream.concat(Arrays.stream(whitelistUrls), Arrays.stream(SWAGGER_WHITELIST))
+                .toArray(String[]::new);
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(whitelistUrls).permitAll()
+                        .requestMatchers(mergedWhitelist).permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(loggingContextFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(firebaseAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
