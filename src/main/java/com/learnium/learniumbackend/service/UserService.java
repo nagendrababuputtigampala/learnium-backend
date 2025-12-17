@@ -9,8 +9,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 
-import static com.learnium.learniumbackend.util.Constants.DEFAULT_GRADE;
-
 @Service
 public class UserService {
     @Autowired

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "users")
@@ -13,10 +14,11 @@ import java.time.OffsetDateTime;
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class User {
+
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(columnDefinition = "uuid", updatable = false, nullable = false)
-    private java.util.UUID id;
+    private UUID id;
 
     @Column(name = "firebase_uid", unique = true, nullable = false)
     private String firebaseUid;
@@ -30,8 +32,19 @@ public class User {
     @Column(name = "display_name")
     private String displayName;
 
-    @Column(name = "grade_level", nullable = false)
+    /**
+     * Legacy column for migration purposes.
+     * Use only temporarily. Prefer grade relationship.
+     */
+    @Column(name = "grade_level")
     private Integer gradeLevel;
+
+    /**
+     * Normalized grade relationship
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "grade_id", nullable = false)
+    private Grade grade;
 
     @Column(name = "onboarding_done", nullable = false)
     private boolean onboardingDone = false;
@@ -84,18 +97,28 @@ public class User {
     @Column(name = "completion_percentage", nullable = false)
     private int completionPercentage = 0;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
+    @PrePersist
+    public void prePersist() {
+        createdAt = OffsetDateTime.now();
+        updatedAt = OffsetDateTime.now();
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = OffsetDateTime.now();
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        User user = (User) o;
-        return id != null && id.equals(user.id);
+        if (!(o instanceof User)) return false;
+        return id != null && id.equals(((User) o).id);
     }
 
     @Override

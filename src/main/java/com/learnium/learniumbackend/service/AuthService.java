@@ -2,6 +2,7 @@ package com.learnium.learniumbackend.service;
 
 import com.learnium.learniumbackend.entity.request.AuthRequest;
 import com.learnium.learniumbackend.entity.response.AuthResponse;
+import com.learnium.learniumbackend.mapper.UserDetailsMapper;
 import com.learnium.learniumbackend.model.User;
 import com.learnium.learniumbackend.repository.UserRepository;
 import com.learnium.learniumbackend.util.Claims;
@@ -21,25 +22,24 @@ public class AuthService {
     private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
     private final UserRepository userRepository;
     private final UserService userService;
+    private final UserDetailsMapper userDetailsMapper;
 
-    public AuthService(UserRepository userRepository, UserService userService) {
+    public AuthService(UserRepository userRepository, UserService userService,UserDetailsMapper userDetailsMapper) {
         this.userRepository = userRepository;
         this.userService = userService;
+        this.userDetailsMapper = userDetailsMapper;
     }
 
     @Transactional
     public AuthResponse signIn(AuthRequest authRequest) {
         Map<String, Object> claims = Claims.getClaimsFromToken();
         try {
-            logger.info("Verifying Firebase token");
             String uid = String.valueOf(claims.get("user_id"));
             String email = String.valueOf(claims.getOrDefault("email", ObjectUtils.isNotEmpty(authRequest) ? authRequest.getEmail() : StringUtils.EMPTY));
             String name = String.valueOf(claims.getOrDefault("name", ObjectUtils.isNotEmpty(authRequest) ? authRequest.getDisplayName() : StringUtils.EMPTY));
             Integer grade = ObjectUtils.isNotEmpty(authRequest) && ObjectUtils.isNotEmpty(authRequest.getGradeLevel()) ? authRequest.getGradeLevel() : DEFAULT_GRADE;
-            logger.info("Provisioning user: {}", email);
             User user = userService.provisionUser(uid, email, name, grade);
-            logger.info("User provisioned: {} (onboardingRequired={})", email, user.isOnboardingDone());
-            return new AuthResponse(user, user.isOnboardingDone());
+            return new AuthResponse( userDetailsMapper.toUserDetails(user), user.isOnboardingDone());
         } catch (Exception e) {
             logger.error("Invalid Firebase token", e);
             throw new RuntimeException("Invalid Firebase token", e);
