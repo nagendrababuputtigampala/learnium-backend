@@ -33,6 +33,6 @@ public class AuthRequest implements Serializable {
 
     @NotNull
     @Schema(description = "user grade level", example = "10")
-    private Integer gradeLevel;
+    private Integer gradeId;
 }
 
