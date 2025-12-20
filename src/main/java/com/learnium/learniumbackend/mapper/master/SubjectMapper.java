@@ -2,13 +2,15 @@ package com.learnium.learniumbackend.mapper.master;
 
 import com.learnium.learniumbackend.entity.response.master.SubjectResponse;
 import com.learnium.learniumbackend.model.v1.content.GradeSubject;
-import com.learnium.learniumbackend.model.v1.master.Subject;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.NullValuePropertyMappingStrategy;
+import org.mapstruct.ReportingPolicy;
 
 import java.util.List;
 
-@Mapper(componentModel = "spring")
+@Mapper(unmappedTargetPolicy = ReportingPolicy.IGNORE, nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
+        componentModel = "spring")
 public interface SubjectMapper {
 
     @Mapping(target = "subjectId", source = "subject.subjectId")
