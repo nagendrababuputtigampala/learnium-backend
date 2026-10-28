@@ -127,6 +127,8 @@
   locally: SKIPPED (3/3) without the env var, default suite unaffected.
   CI gains a `postgres-migration` job (postgres:16 service with health
   check, JDK 17, runs only that test class). Workflow YAML validated.
-- CODEX REVIEW FIXES COMPLETE (S1–S6). Remaining before this branch is
-  re-bundled for Nagendra: final full `mvn verify` + coverage gate.
+- CODEX REVIEW FIXES COMPLETE (S1–S6). Final full `mvn -o verify` green:
+  86 tests run (83 executed, 3 skipped — the env-gated PostgresMigrationTest),
+  0 failures; JaCoCo LINE 100% (283/283), BRANCH 100% (20/20), all coverage
+  checks met. Ready to re-bundle for Nagendra's push; PR #7 updates in place.
 - Failing tests: none.
