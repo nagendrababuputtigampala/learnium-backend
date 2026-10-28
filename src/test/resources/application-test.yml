@@ -1,8 +1,8 @@
-# Test profile: run against in-memory H2 so tests need no real PostgreSQL.
-# Flyway is disabled; Hibernate creates/drops the (empty) schema instead.
+# Test profile: run against in-memory H2 (PostgreSQL mode) so tests need no real
+# PostgreSQL. Flyway is disabled; Hibernate creates/drops the schema instead.
 spring:
   datasource:
-    url: jdbc:h2:mem:learnium-test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=false
+    url: jdbc:h2:mem:learnium-test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=false;INIT=CREATE SCHEMA IF NOT EXISTS learnium
     username: sa
     password:
     driver-class-name: org.h2.Driver

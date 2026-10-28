@@ -15,3 +15,8 @@
 - Env note: JVM network blocked in this sandbox — Maven runs offline against
   the curl-seeded ~/.m2 (see ~/workspace/tools/seed_repo.py). Standard pom;
   plain `mvn verify` works on a normal machine / CI.
+- M1 S1 done: tenancy core (Centre, UserAccount+roles, StudentProfile, Batch,
+  BatchMembership roster, Grade/Subject/GradeSubject) + Flyway V2 with
+  fixed-UUID master seed (G1..G12, 5 subjects, 60 pairings) + JpaAuditingConfig.
+  Targeted persistence tests green (incl. centre-scoping proof). Migration
+  test asserts V1..V4, so it goes green only at S3.

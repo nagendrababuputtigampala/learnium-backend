@@ -1,0 +1,76 @@
+package com.learnium.model.user;
+
+import com.learnium.model.common.AuditableEntity;
+import com.learnium.model.common.UserStatus;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
+import java.util.UUID;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+/**
+ * One login/person inside a centre. Admins and teachers authenticate with
+ * email + password hash; students have neither — their credential is the roster
+ * PIN on {@link BatchMembership}. (The legacy Firebase auth_provider/auth_uid
+ * columns are dropped: v0.1.0 uses its own JWT.)
+ */
+@Entity
+@Table(
+        name = "user_account",
+        schema = "learnium",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uq_user_account_centre_email",
+                    columnNames = {"centre_id", "email"})
+        },
+        indexes = {
+            @Index(name = "idx_user_account_centre", columnList = "centre_id"),
+            @Index(name = "idx_user_account_email", columnList = "email")
+        })
+@Getter
+@Setter
+@NoArgsConstructor
+public class UserAccount extends AuditableEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "user_id", nullable = false, updatable = false)
+    private UUID userId;
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "centre_id", nullable = false)
+    private Centre centre;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 20)
+    private UserRole role;
+
+    @Column(name = "email", length = 255)
+    private String email;
+
+    @Column(name = "display_name", length = 150)
+    private String displayName;
+
+    @Column(name = "password_hash", length = 255)
+    private String passwordHash;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private UserStatus status = UserStatus.ACTIVE;
+
+    @Column(name = "last_login_at")
+    private Instant lastLoginAt;
+}
