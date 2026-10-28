@@ -46,3 +46,5 @@
   (221/221), BRANCH 100% (14/14), gate checks met. Slices: S1 tenancy core,
   S2 content, S3 exam chain + gamification, S4 demo seeder, S5 PageResponse,
   S6 OTel export. Next: M2 (auth & roles). Failing tests: none.
+
+- PR fix (2026-10-28): dev root merged into this branch (--allow-unrelated-histories) so GitHub accepts the PR; dev tree was empty, no content change.
