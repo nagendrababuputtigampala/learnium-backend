@@ -132,3 +132,26 @@
   0 failures; JaCoCo LINE 100% (283/283), BRANCH 100% (20/20), all coverage
   checks met. Ready to re-bundle for Nagendra's push; PR #7 updates in place.
 - Failing tests: none.
+- CODEX FOLLOW-UP ROUND 2 (2026-10-28): Nagendra approved fixing ONLY
+  finding #2 (content tenancy) from the follow-up review; the remaining
+  items are deferred by his decision — repository-access discipline becomes
+  an M2 build rule, malformed-body log redaction + the 405 Allow header go
+  to M2, and the OTLP signal paths (/v1/traces, /v1/metrics) go to Release
+  hardening. M0/M1 foundation reviews are closed after this round.
+  Fix done (e29ecc4): Flyway V6__content_tenancy_fks.sql —
+  UNIQUE (centre_id, material_id) on materials; composite FK
+  questions (centre_id, material_id) -> materials (centre_id, material_id);
+  composite FK materials (centre_id, uploaded_by) -> user_account
+  (centre_id, user_id). V3 single-column FKs kept, as in V5; no entity
+  changes (the associations already existed; enforcement is DB-level).
+  Tests: TenancyInvariantTest gains cross-centre question->material and
+  material->uploader negatives (both fail at flush) plus the same-centre
+  positives (11/11 green); MigrationTest now expects V1–V6;
+  PostgresMigrationTest gains a raw cross-centre question INSERT negative
+  for real-PostgreSQL CI coverage and its migration-count floor rises to 6
+  (class still env-gated: 4 skipped locally). Final full `mvn -o verify`
+  green: 91 tests run (87 executed, 4 skipped — the env-gated
+  PostgresMigrationTest), 0 failures; JaCoCo LINE 100% (283/283),
+  BRANCH 100% (20/20). Ready to re-bundle for Nagendra's push; PR #7
+  updates in place.
+- Failing tests: none.
