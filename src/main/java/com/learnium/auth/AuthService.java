@@ -67,7 +67,12 @@ public class AuthService {
         return buildResponse(user, refreshTokenService.issue(user));
     }
 
-    @Transactional
+    /**
+     * Deliberately NOT transactional: {@link RefreshTokenService#rotate} and
+     * {@link RefreshTokenService#revokeAllForUser} manage their own committed
+     * boundaries, and the inactive-account rejection below must not roll the
+     * rotation (or the revocation) back.
+     */
     public AuthResponse refresh(String rawRefreshToken) {
         RefreshTokenService.Rotation rotation = refreshTokenService.rotate(rawRefreshToken);
         UserAccount user = rotation.user();

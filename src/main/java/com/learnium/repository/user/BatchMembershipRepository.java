@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -97,6 +98,23 @@ public interface BatchMembershipRepository extends JpaRepository<BatchMembership
                     + " where m.centreId = :centreId and m.membershipId = :membershipId")
     Optional<BatchMembership> findByCentreIdAndMembershipId(
             @Param("centreId") UUID centreId, @Param("membershipId") UUID membershipId);
+
+    /**
+     * Atomically records one failed PIN attempt: the counter increments and
+     * the lock flips in the same statement, decided on the POST-increment
+     * value. Runs in the caller's transaction — the student-session service
+     * invokes it inside an independent (REQUIRES_NEW) transaction so a failed
+     * attempt is committed even though the request itself is rejected.
+     */
+    @Modifying
+    @Query(
+            "update BatchMembership m"
+                    + " set m.pinFailedAttempts = m.pinFailedAttempts + 1,"
+                    + " m.pinLocked = case when m.pinFailedAttempts + 1 >= :maxFailures"
+                    + " then true else m.pinLocked end"
+                    + " where m.membershipId = :membershipId")
+    int incrementPinFailures(
+            @Param("membershipId") UUID membershipId, @Param("maxFailures") int maxFailures);
 
     /** Batches a user serves in the given role (a teacher's batch list). */
     @Query(

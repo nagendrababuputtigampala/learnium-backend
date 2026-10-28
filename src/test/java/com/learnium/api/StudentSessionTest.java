@@ -26,17 +26,21 @@ import com.learnium.repository.user.BatchRepository;
 import com.learnium.repository.user.CentreRepository;
 import com.learnium.repository.user.UserAccountRepository;
 import com.learnium.testsupport.AuthFixtures;
+import com.learnium.testsupport.CommittedDataCleanup;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -45,11 +49,15 @@ import tools.jackson.databind.ObjectMapper;
  * The student door: batch + name + PIN. Covers the happy path, the generic
  * 401 (never revealing which part failed), attempt counting, the 5-strike
  * lock, the locked 403, reset-unlock, and same-name disambiguation by PIN.
+ *
+ * <p>Committed-state class (no wrapping test transaction): the PIN lockout
+ * only exists if failed attempts are committed by separate requests, which
+ * is exactly what a class-level {@code @Transactional} cannot observe.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Transactional
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class StudentSessionTest {
 
     private static final String PASSWORD = "Passw0rd1";
@@ -64,10 +72,16 @@ class StudentSessionTest {
     @Autowired private SubjectRepository subjectRepository;
     @Autowired private GradeSubjectRepository gradeSubjectRepository;
     @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     private Centre centre;
     private Batch batch;
     private String adminToken;
+
+    @AfterEach
+    void cleanUp() {
+        CommittedDataCleanup.clearAll(jdbcTemplate);
+    }
 
     @BeforeEach
     void setUp() throws Exception {

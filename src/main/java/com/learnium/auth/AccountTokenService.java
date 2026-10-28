@@ -41,9 +41,10 @@ public class AccountTokenService {
 
     /**
      * Redeems a token: it must exist for the given purpose, be unused and be
-     * unexpired. Consumption (marking {@code usedAt}) happens in the same
-     * transaction as the caller's password change, so a token can never be
-     * replayed after a successful use.
+     * unexpired. Consumption is a single conditional update inside the
+     * caller's transaction (the same transaction as the password change), so
+     * exactly one of any number of concurrent redemptions can win — the
+     * winner's {@code usedAt} stamp is what every other attempt observes.
      *
      * @throws BusinessException {@code LRN-AUTH-004} for every rejection — the
      *     caller cannot tell unknown, used and expired tokens apart.
@@ -55,11 +56,21 @@ public class AccountTokenService {
                         .findByTokenHashAndPurpose(TokenHashing.sha256Hex(rawToken), purpose)
                         .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_ACCOUNT_TOKEN_INVALID));
         Instant now = Instant.now();
-        if (token.getUsedAt() != null || token.getExpiresAt().isBefore(now)) {
+        int consumed = accountTokenRepository.consumeIfRedeemable(token.getAccountTokenId(), now);
+        if (consumed == 0) {
             throw new BusinessException(ErrorCode.AUTH_ACCOUNT_TOKEN_INVALID);
         }
         token.setUsedAt(now);
-        accountTokenRepository.save(token);
         return token.getUser();
+    }
+
+    /**
+     * Invalidates every outstanding (unused) token of one purpose for a user,
+     * in the caller's transaction. Resend-invite uses it so a superseded link
+     * dies in the same commit that issues its replacement.
+     */
+    @Transactional
+    public void invalidateOutstanding(UserAccount user, AccountTokenPurpose purpose) {
+        accountTokenRepository.invalidateOutstanding(user.getUserId(), purpose, Instant.now());
     }
 }

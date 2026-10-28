@@ -15,7 +15,10 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * The student door: batch id + roster name + 4-digit PIN. The batch id is
@@ -25,6 +28,12 @@ import org.springframework.transaction.annotation.Transactional;
  * unknown name and wrong PIN are the same 401; only a fully locked match
  * set earns the distinct 403. Five wrong PINs lock a membership (an admin
  * or teacher reset unlocks it).
+ *
+ * <p>Failed attempts are recorded in an independent REQUIRES_NEW transaction
+ * per membership: the rejection thrown afterwards must never roll the
+ * counter back. (The previous implementation incremented inside the request
+ * transaction and then threw — the rollback reset the counter, so the
+ * lockout could never actually engage across separate requests.)
  */
 @Service
 public class StudentSessionService {
@@ -35,16 +44,21 @@ public class StudentSessionService {
     private final BatchMembershipRepository batchMembershipRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final TransactionTemplate requiresNewTemplate;
 
     public StudentSessionService(
             BatchRepository batchRepository,
             BatchMembershipRepository batchMembershipRepository,
             PasswordEncoder passwordEncoder,
-            JwtService jwtService) {
+            JwtService jwtService,
+            PlatformTransactionManager transactionManager) {
         this.batchRepository = batchRepository;
         this.batchMembershipRepository = batchMembershipRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        TransactionTemplate requiresNew = new TransactionTemplate(transactionManager);
+        requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.requiresNewTemplate = requiresNew;
     }
 
     @Transactional
@@ -102,13 +116,13 @@ public class StudentSessionService {
                                 batch.getCentre().getCentreId()));
             }
         }
+        // No match accepted the PIN: record the failure on every matched
+        // membership, each in its own committed transaction, THEN reject.
         for (BatchMembership membership : matches) {
-            int attempts = membership.getPinFailedAttempts() + 1;
-            membership.setPinFailedAttempts(attempts);
-            if (attempts >= MAX_PIN_FAILURES) {
-                membership.setPinLocked(true);
-            }
-            batchMembershipRepository.save(membership);
+            requiresNewTemplate.executeWithoutResult(
+                    status ->
+                            batchMembershipRepository.incrementPinFailures(
+                                    membership.getMembershipId(), MAX_PIN_FAILURES));
         }
         throw new BusinessException(ErrorCode.AUTH_STUDENT_REJECTED);
     }

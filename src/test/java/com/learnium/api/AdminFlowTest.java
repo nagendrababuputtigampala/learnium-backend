@@ -26,25 +26,36 @@ import com.learnium.repository.user.BatchRepository;
 import com.learnium.repository.user.CentreRepository;
 import com.learnium.repository.user.UserAccountRepository;
 import com.learnium.testsupport.AuthFixtures;
+import com.learnium.testsupport.CommittedDataCleanup;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Admin-lite over HTTP: teachers, batches + assignment, centre profile, catalogues. */
+/**
+ * Admin-lite over HTTP: teachers, batches + assignment, centre profile,
+ * catalogues.
+ *
+ * <p>Committed-state class (no wrapping test transaction): deactivation
+ * revokes sessions in an independent transaction, which a class-level
+ * {@code @Transactional} would render invisible to the requests under test.
+ */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Transactional
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class AdminFlowTest {
 
     private static final String PASSWORD = "Passw0rd1";
@@ -59,6 +70,7 @@ class AdminFlowTest {
     @Autowired private SubjectRepository subjectRepository;
     @Autowired private GradeSubjectRepository gradeSubjectRepository;
     @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     private Centre centreA;
     private Centre centreB;
@@ -66,6 +78,11 @@ class AdminFlowTest {
     private UserAccount teacherA1;
     private UserAccount teacherA2;
     private GradeSubject gradeSubject;
+
+    @AfterEach
+    void cleanUp() {
+        CommittedDataCleanup.clearAll(jdbcTemplate);
+    }
 
     @BeforeEach
     void setUp() {

@@ -15,26 +15,38 @@ import com.learnium.repository.user.CentreRepository;
 import com.learnium.repository.user.UserAccountRepository;
 import com.learnium.security.TokenHashing;
 import com.learnium.testsupport.AuthFixtures;
+import com.learnium.testsupport.CommittedDataCleanup;
 import java.time.Instant;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** End-to-end staff auth: login, /me, refresh rotation + reuse detection, logout. */
+/**
+ * End-to-end staff auth: login, /me, refresh rotation + reuse detection,
+ * logout.
+ *
+ * <p>Committed-state class (no wrapping test transaction): rotation,
+ * replay detection and revocation are cross-request, cross-transaction
+ * behaviours — inside a class-level {@code @Transactional} they only ever
+ * observed uncommitted state, which is how the rollback bugs shipped.
+ */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Transactional
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class AuthFlowTest {
 
     private static final String ADMIN_EMAIL = "admin@auth.test";
@@ -46,8 +58,14 @@ class AuthFlowTest {
     @Autowired private UserAccountRepository userAccountRepository;
     @Autowired private RefreshTokenRepository refreshTokenRepository;
     @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     private Centre centre;
+
+    @AfterEach
+    void cleanUp() {
+        CommittedDataCleanup.clearAll(jdbcTemplate);
+    }
 
     @BeforeEach
     void setUp() {

@@ -286,3 +286,23 @@
   LearniumApplicationTests.
 - Next: F2 transaction correctness (PIN lockout, refresh rotation/replay,
   account-token atomic consume). Failing tests: none.
+
+- FIX ROUND F2 done: transaction correctness (Codex P1-2..P1-5). PIN
+  failures now commit via a REQUIRES_NEW atomic increment+lock update, so
+  the lockout persists across requests; refresh rotation consumes the
+  presented token with one conditional update (a concurrent loser is
+  treated exactly like a replay) and family revocation — on replay, on
+  race loss, and from revokeAllForUser — always commits in an independent
+  transaction, so a following rejection can no longer roll it back;
+  invite/reset tokens are consumed by a conditional update inside the
+  password-change transaction (exactly one concurrent winner). AuthService
+  .refresh is deliberately non-transactional (orchestrates the above).
+  Test rework started (rest lands in F4): AuthFlowTest, AdminFlowTest and
+  StudentSessionTest converted to committed-state (NOT_SUPPORTED +
+  CommittedDataCleanup) — their lockout/replay/deactivation assertions now
+  observe production transaction behaviour. Targeted green: AuthFlowTest
+  (19), AdminFlowTest (21), StudentSessionTest (10), AccountTokenServiceTest
+  (5). One find along the way: the rotation read must fetch-join the user's
+  centre as well, or it arrives as an uninitialized proxy.
+- Next: F3 P2 batch (V8 email uniqueness, outbox claim + payload cipher,
+  filter status checks, resend invite). Failing tests: none.
