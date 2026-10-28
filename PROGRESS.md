@@ -368,3 +368,18 @@
   0b9e812 (F1), 502eee3 (F2), e93689d (F3), ca79880 (F4), a26dad8
   (coverage hardening). Not pushed — bundle handoff per the working
   agreement; backend PR #8 updates in place once Nagendra pushes.
+
+## Fix round 2 (Codex rerun, 2026-10-28)
+- R2-S1 done: secret audit of the configuration. spring.mail.password was a
+  hardcoded literal (and contradicted the README, which documents
+  MAIL_PASSWORD as blank-default) — now bound as ${MAIL_PASSWORD:}.
+  spring.datasource.password was env-bound but carried the published local
+  credential as its default — now ${DB_PASSWORD:} with no default, so a
+  forgotten value fails fast (the README run-locally flow exports it and
+  docker compose passes it to the backend service, so local flows are
+  unchanged). Rest of the audit: JWT secret, outbox encryption key and the
+  platform provisioning key were already env-bound with empty defaults;
+  MAIL_USERNAME already empty-default; DB_USERNAME/host/port/URL/from
+  defaults are non-secret local-dev values; the test-profile YAMLs hold
+  only H2/test-fixture credentials by design.
+- Next: R2-S2 security version (reset/login race). Failing tests: none.
