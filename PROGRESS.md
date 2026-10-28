@@ -234,4 +234,23 @@
   BatchAccessGuard centralises batch tenancy (404) + teacher assignment
   (403). Targeted green: AdminFlowTest (17), PlatformOnboardingTest (4),
   PlatformOnboardingDisabledTest (2).
-- Next: M2 S4 — roster management + student PIN session.
+- M2 S4 done: roster management under /api/v1/batches/{batchId}/students
+  (BatchAccessGuard on every call: admin any centre batch, teacher assigned
+  only). Add creates UserAccount (STUDENT, no email/password) + StudentProfile
+  (grade from the batch's GradeSubject) + ACTIVE membership with a BCrypt
+  hash of a SecureRandom 4-digit PIN; the raw PIN is returned once in the
+  response DTO only. Bulk add is one transaction, request order preserved,
+  names trimmed, blank names -> 400 via element Bean Validation. Reset-pin
+  issues a fresh PIN and clears attempts/lock; deactivate flips the
+  membership to INACTIVE (the roster list still shows it, with status).
+  Student session: batch id is the door key (global batch lookup by design;
+  everything after is scoped to that batch); ACTIVE roster matched by
+  trim + case-insensitive display name; unknown name and wrong PIN share
+  the generic 401 LRN-AUTH-007; wrong PINs increment attempts on every
+  matched membership and the 5th failure locks; a fully locked match set
+  gets 403 LRN-AUTH-006 even with the correct PIN; success resets the
+  counters and issues the 12-h student JWT (batchId + membershipId claims).
+  Same-name students are disambiguated by PIN. Targeted green:
+  RosterFlowTest (8), StudentSessionTest (9).
+- Next: cross-cutting (docker-compose env + README), then the full
+  `mvn -o verify` gate for M2.

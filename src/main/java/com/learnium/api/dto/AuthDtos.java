@@ -2,6 +2,7 @@ package com.learnium.api.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import java.time.Instant;
 import java.util.UUID;
@@ -59,4 +60,20 @@ public final class AuthDtos {
 
     public record TeacherDto(
             UUID userId, String email, String displayName, boolean active, Instant createdAt) {}
+
+    public record StudentSessionRequest(
+            @NotNull(message = "must not be null") UUID batchId,
+            @NotBlank(message = "must not be blank") String fullName,
+            @NotBlank(message = "must not be blank") String pin) {}
+
+    public record StudentSummary(
+            UUID userId,
+            String displayName,
+            UUID membershipId,
+            UUID batchId,
+            String batchName,
+            UUID centreId) {}
+
+    public record StudentSessionResponse(
+            String accessToken, String tokenType, long expiresInSeconds, StudentSummary student) {}
 }

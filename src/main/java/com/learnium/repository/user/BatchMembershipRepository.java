@@ -68,6 +68,18 @@ public interface BatchMembershipRepository extends JpaRepository<BatchMembership
             @Param("memberRole") MemberRole memberRole,
             @Param("status") MembershipStatus status);
 
+    /** Full roster slice by role, any status (the roster screen shows INACTIVE rows too). */
+    @Query(
+            "select m from BatchMembership m"
+                    + " where m.centreId = :centreId"
+                    + " and m.batch.batchId = :batchId"
+                    + " and m.memberRole = :memberRole"
+                    + " order by m.createdAt asc")
+    List<BatchMembership> findByCentreIdAndBatchIdAndMemberRole(
+            @Param("centreId") UUID centreId,
+            @Param("batchId") UUID batchId,
+            @Param("memberRole") MemberRole memberRole);
+
     @Query(
             "select count(m) from BatchMembership m"
                     + " where m.centreId = :centreId"
