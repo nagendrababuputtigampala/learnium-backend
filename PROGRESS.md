@@ -252,5 +252,15 @@
   counters and issues the 12-h student JWT (batchId + membershipId claims).
   Same-name students are disambiguated by PIN. Targeted green:
   RosterFlowTest (8), StudentSessionTest (9).
-- Next: cross-cutting (docker-compose env + README), then the full
-  `mvn -o verify` gate for M2.
+- M2 COMPLETE: cross-cutting done (docker-compose backend env gains a
+  clearly-labelled dev-only JWT_SECRET, APP_PUBLIC_BASE_URL and MAIL_HOST
+  pointing at the Mailpit service; README documents the M2 env vars and the
+  now-working demo login admin@demo.learnium.local / Demo@123 + roster PIN
+  1234). Final full verify from a clean target: 202 tests run, 0 failures,
+  4 skipped (env-gated PostgresMigrationTest), JaCoCo LINE 100% (587/587),
+  BRANCH 100% (171/171), all coverage checks met. NOTE: the sandbox's
+  accumulated target/jacoco.exec from targeted runs made an incremental
+  verify report phantom misses (98.98%); with target removed the gate is
+  fully green — on a normal machine/CI this never arises. Failing tests:
+  none. Ready for Nagendra's review; do not push (bundle handoff per the
+  working agreement).
