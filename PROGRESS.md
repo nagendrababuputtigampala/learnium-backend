@@ -155,3 +155,20 @@
   BRANCH 100% (20/20). Ready to re-bundle for Nagendra's push; PR #7
   updates in place.
 - Failing tests: none.
+
+## M2 — auth & roles (feature/auth-roles)
+- M2 S0 done: carried warm-up fixes from the Codex follow-up review.
+  (a) GlobalExceptionHandler's malformed-body handler no longer logs the
+  parser exception message (Jackson messages quote the submitted body);
+  it logs only the error code, trace id and exception class name. New
+  MalformedBodyLoggingTest (OutputCaptureExtension) posts a malformed body
+  carrying a sensitive marker and asserts the marker never reaches the
+  logs while the 400/LRN-VAL-002 envelope still returns.
+  (b) The 405 handler now preserves the framework headers from
+  HttpRequestMethodNotSupportedException (Allow: <supported methods>);
+  asserted in both the handler unit test and the MockMvc 405 test.
+  Targeted tests green: GlobalExceptionHandlerTest + SystemControllerTest
+  + MalformedBodyLoggingTest (23 tests).
+- Next: M2 S1 — auth core (Flyway V7 auth tables, JWT service + filter,
+  refresh-token rotation, login/refresh/logout/me).
+- Failing tests: none.
