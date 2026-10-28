@@ -9,6 +9,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface UserBadgesRepository extends JpaRepository<UserBadges, UUID> {
 
-    @Query("select ub from UserBadges ub where ub.user.userId = :userId")
-    List<UserBadges> findByUserId(@Param("userId") UUID userId);
+    @Query(
+            "select ub from UserBadges ub"
+                    + " where ub.centreId = :centreId and ub.user.userId = :userId")
+    List<UserBadges> findByCentreIdAndUserId(
+            @Param("centreId") UUID centreId, @Param("userId") UUID userId);
 }

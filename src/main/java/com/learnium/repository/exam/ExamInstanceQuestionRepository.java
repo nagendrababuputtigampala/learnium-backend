@@ -11,8 +11,9 @@ public interface ExamInstanceQuestionRepository extends JpaRepository<ExamInstan
 
     @Query(
             "select iq from ExamInstanceQuestion iq"
-                    + " where iq.examInstance.examInstanceId = :examInstanceId"
+                    + " where iq.centreId = :centreId"
+                    + " and iq.examInstance.examInstanceId = :examInstanceId"
                     + " order by iq.questionOrder asc")
-    List<ExamInstanceQuestion> findByExamInstanceIdOrderByQuestionOrderAsc(
-            @Param("examInstanceId") UUID examInstanceId);
+    List<ExamInstanceQuestion> findByCentreIdAndExamInstanceIdOrderByQuestionOrderAsc(
+            @Param("centreId") UUID centreId, @Param("examInstanceId") UUID examInstanceId);
 }

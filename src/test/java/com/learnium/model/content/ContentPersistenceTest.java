@@ -159,6 +159,32 @@ class ContentPersistenceTest {
                         beta.centre().getCentreId(), QuestionStatus.DRAFT, PageRequest.of(0, 10));
         assertThat(betaDrafts.getTotalElements()).isEqualTo(1);
         assertThat(betaDrafts.getContent().get(0).getPayload().get("prompt").asText()).isEqualTo("B1");
+
+        // Every returned row is owned by the queried centre, and the two
+        // centres' pages share no question ids at all.
+        assertThat(page0.getContent())
+                .allSatisfy(
+                        q ->
+                                assertThat(q.getCentre().getCentreId())
+                                        .isEqualTo(alpha.centre().getCentreId()));
+        assertThat(page1.getContent())
+                .allSatisfy(
+                        q ->
+                                assertThat(q.getCentre().getCentreId())
+                                        .isEqualTo(alpha.centre().getCentreId()));
+        assertThat(betaDrafts.getContent())
+                .allSatisfy(
+                        q ->
+                                assertThat(q.getCentre().getCentreId())
+                                        .isEqualTo(beta.centre().getCentreId()));
+        java.util.Set<java.util.UUID> alphaIds = new java.util.HashSet<>();
+        page0.getContent().forEach(q -> alphaIds.add(q.getQuestionId()));
+        page1.getContent().forEach(q -> alphaIds.add(q.getQuestionId()));
+        java.util.Set<java.util.UUID> betaIds = new java.util.HashSet<>();
+        betaDrafts.getContent().forEach(q -> betaIds.add(q.getQuestionId()));
+        assertThat(alphaIds).hasSize(3);
+        assertThat(betaIds).hasSize(1);
+        assertThat(alphaIds).doesNotContainAnyElementsOf(betaIds);
     }
 
     @Test

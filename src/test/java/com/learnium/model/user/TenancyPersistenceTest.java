@@ -104,8 +104,8 @@ class TenancyPersistenceTest {
         entityManager.clear();
 
         List<BatchMembership> roster =
-                membershipRepository.findByBatchIdAndStatus(
-                        batch.getBatchId(), MembershipStatus.ACTIVE);
+                membershipRepository.findByCentreIdAndBatchIdAndStatus(
+                        centre.getCentreId(), batch.getBatchId(), MembershipStatus.ACTIVE);
         assertThat(roster).hasSize(2);
         assertThat(roster)
                 .extracting(m -> m.getUser().getUserId())
@@ -117,17 +117,51 @@ class TenancyPersistenceTest {
                                 .orElseThrow()
                                 .getPinHash())
                 .isEqualTo("hashed-pin");
-        assertThat(membershipRepository.findByBatchIdAndStatus(
-                        batch.getBatchId(), MembershipStatus.INACTIVE))
+        assertThat(
+                        membershipRepository.findByCentreIdAndBatchIdAndStatus(
+                                centre.getCentreId(), batch.getBatchId(), MembershipStatus.INACTIVE))
                 .isEmpty();
-        assertThat(membershipRepository.existsByBatchIdAndUserId(batch.getBatchId(), student.getUserId()))
+        assertThat(
+                        membershipRepository.existsByCentreIdAndBatchIdAndUserId(
+                                centre.getCentreId(), batch.getBatchId(), student.getUserId()))
                 .isTrue();
-        assertThat(membershipRepository.existsByBatchIdAndUserId(batch.getBatchId(), teacher.getUserId()))
+        assertThat(
+                        membershipRepository.existsByCentreIdAndBatchIdAndUserId(
+                                centre.getCentreId(), batch.getBatchId(), teacher.getUserId()))
                 .isTrue();
-        // A user from another centre is not on this roster.
-        UserAccount outsider = saveUser(saveCentre("Beta Tutoring"), UserRole.STUDENT, null, "Outsider");
-        assertThat(membershipRepository.existsByBatchIdAndUserId(batch.getBatchId(), outsider.getUserId()))
+
+        // A student of another centre, rostered in their OWN centre's batch, is
+        // still invisible here: the centre predicate, not the absence of a row,
+        // is what isolates the roster.
+        Centre beta = saveCentre("Beta Tutoring");
+        UserAccount outsider = saveUser(beta, UserRole.STUDENT, null, "Outsider");
+        Batch betaBatch = new Batch();
+        betaBatch.setCentre(beta);
+        betaBatch.setGradeSubject(gradeSubject);
+        betaBatch.setName("Beta Batch");
+        betaBatch = batchRepository.save(betaBatch);
+        BatchMembership outsiderMembership = new BatchMembership();
+        outsiderMembership.setBatch(betaBatch);
+        outsiderMembership.setCentreId(beta.getCentreId());
+        outsiderMembership.setUser(outsider);
+        outsiderMembership.setMemberRole(MemberRole.STUDENT);
+        membershipRepository.save(outsiderMembership);
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(
+                        membershipRepository.existsByCentreIdAndBatchIdAndUserId(
+                                centre.getCentreId(), batch.getBatchId(), outsider.getUserId()))
                 .isFalse();
+        assertThat(
+                        membershipRepository.findByCentreIdAndBatchIdAndStatus(
+                                beta.getCentreId(), batch.getBatchId(), MembershipStatus.ACTIVE))
+                .isEmpty();
+        assertThat(
+                        membershipRepository.findByCentreIdAndBatchIdAndStatus(
+                                beta.getCentreId(), betaBatch.getBatchId(), MembershipStatus.ACTIVE))
+                .extracting(m -> m.getUser().getUserId())
+                .containsExactly(outsider.getUserId());
     }
 
     @Test
@@ -145,7 +179,28 @@ class TenancyPersistenceTest {
                 .extracting(UserAccount::getUserId)
                 .containsExactly(alphaTeacher.getUserId());
         assertThat(userAccountRepository.findByCentreId(beta.getCentreId())).hasSize(2);
-        assertThat(batchRepository.findByCentreId(alpha.getCentreId())).isEmpty();
+
+        // Batches seeded in BOTH centres: each centre sees exactly its own.
+        GradeSubject gradeSubject = saveGradeSubject();
+        Batch alphaBatch = new Batch();
+        alphaBatch.setCentre(alpha);
+        alphaBatch.setGradeSubject(gradeSubject);
+        alphaBatch.setName("Alpha Batch");
+        alphaBatch = batchRepository.save(alphaBatch);
+        Batch betaBatch = new Batch();
+        betaBatch.setCentre(beta);
+        betaBatch.setGradeSubject(gradeSubject);
+        betaBatch.setName("Beta Batch");
+        betaBatch = batchRepository.save(betaBatch);
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(batchRepository.findByCentreId(alpha.getCentreId()))
+                .extracting(Batch::getBatchId)
+                .containsExactly(alphaBatch.getBatchId());
+        assertThat(batchRepository.findByCentreId(beta.getCentreId()))
+                .extracting(Batch::getBatchId)
+                .containsExactly(betaBatch.getBatchId());
         assertThat(centreRepository.existsByName("Alpha Tutoring")).isTrue();
         assertThat(centreRepository.existsByName("No Such Centre")).isFalse();
     }

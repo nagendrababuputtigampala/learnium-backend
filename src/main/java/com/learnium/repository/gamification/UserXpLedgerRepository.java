@@ -9,6 +9,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface UserXpLedgerRepository extends JpaRepository<UserXpLedger, UUID> {
 
-    @Query("select x from UserXpLedger x where x.user.userId = :userId")
-    List<UserXpLedger> findByUserId(@Param("userId") UUID userId);
+    @Query(
+            "select x from UserXpLedger x"
+                    + " where x.centreId = :centreId and x.user.userId = :userId")
+    List<UserXpLedger> findByCentreIdAndUserId(
+            @Param("centreId") UUID centreId, @Param("userId") UUID userId);
 }

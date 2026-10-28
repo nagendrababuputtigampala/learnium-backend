@@ -11,8 +11,9 @@ public interface ExamTemplateQuestionRepository extends JpaRepository<ExamTempla
 
     @Query(
             "select tq from ExamTemplateQuestion tq"
-                    + " where tq.examTemplate.examTemplateId = :examTemplateId"
+                    + " where tq.centreId = :centreId"
+                    + " and tq.examTemplate.examTemplateId = :examTemplateId"
                     + " order by tq.displayOrder asc")
-    List<ExamTemplateQuestion> findByExamTemplateIdOrderByDisplayOrderAsc(
-            @Param("examTemplateId") UUID examTemplateId);
+    List<ExamTemplateQuestion> findByCentreIdAndExamTemplateIdOrderByDisplayOrderAsc(
+            @Param("centreId") UUID centreId, @Param("examTemplateId") UUID examTemplateId);
 }

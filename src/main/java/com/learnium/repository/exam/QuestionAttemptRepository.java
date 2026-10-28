@@ -9,6 +9,10 @@ import org.springframework.data.repository.query.Param;
 
 public interface QuestionAttemptRepository extends JpaRepository<QuestionAttempt, UUID> {
 
-    @Query("select qa from QuestionAttempt qa where qa.attempt.attemptId = :attemptId")
-    List<QuestionAttempt> findByAttemptId(@Param("attemptId") UUID attemptId);
+    /** Centre-scoped: a foreign centre's attempt id returns nothing, never its answers. */
+    @Query(
+            "select qa from QuestionAttempt qa"
+                    + " where qa.centreId = :centreId and qa.attempt.attemptId = :attemptId")
+    List<QuestionAttempt> findByCentreIdAndAttemptId(
+            @Param("centreId") UUID centreId, @Param("attemptId") UUID attemptId);
 }

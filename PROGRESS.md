@@ -59,6 +59,18 @@
   schema (cross-centre writes rejected, cross-centre template names coexist,
   same-centre duplicate rejected, duplicate mode type rejected). Targeted
   tests green: migration + invariant + tenancy/content/exam/seeder suites.
-- Next: Fix S2 — centre-scope every tenant repository finder + negative read
-  tests; strengthen TenancyPersistenceTest.
+- Fix S2 done: every tenant repository finder is centre-scoped
+  (findByCentreIdAnd…): roster finders/counts, template questions, instance
+  questions, attempts, question attempts, topic stats, badges, XP ledger.
+  findByJoinCode stays global BY DESIGN (join-code discovery; tenancy is
+  established from the returned instance before any further read — javadoc
+  says so). Batch/UserAccount/Question/Material/ExamTemplate finders were
+  already scoped; Topic finders key on global curriculum (grade-subject), not
+  tenant data. TenancyPersistenceTest de-vacuumed: the foreign student now
+  holds a membership in their OWN centre, and batches are seeded in both
+  centres with disjoint assertions. ContentPersistenceTest page test now
+  asserts every row's owner + disjoint ID sets across centres.
+  ExamChainPersistenceTest gains answersAreInvisibleAcrossCentres (real
+  foreign attempt id under the caller's centre → empty). Targeted tests green.
+- Next: Fix S3 — OpenTelemetry Boot 4 property names (metadata-verified).
 - Failing tests: none.

@@ -11,7 +11,10 @@ public interface UserTopicStatRepository extends JpaRepository<UserTopicStat, UU
 
     @Query(
             "select s from UserTopicStat s"
-                    + " where s.user.userId = :userId and s.topic.topicId = :topicId")
-    Optional<UserTopicStat> findByUserIdAndTopicId(
-            @Param("userId") UUID userId, @Param("topicId") UUID topicId);
+                    + " where s.centreId = :centreId"
+                    + " and s.user.userId = :userId and s.topic.topicId = :topicId")
+    Optional<UserTopicStat> findByCentreIdAndUserIdAndTopicId(
+            @Param("centreId") UUID centreId,
+            @Param("userId") UUID userId,
+            @Param("topicId") UUID topicId);
 }

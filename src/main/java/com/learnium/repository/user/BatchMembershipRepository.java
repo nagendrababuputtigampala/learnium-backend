@@ -10,14 +10,22 @@ import org.springframework.data.repository.query.Param;
 
 public interface BatchMembershipRepository extends JpaRepository<BatchMembership, UUID> {
 
+    /** Centre-scoped roster read: the centre predicate is mandatory, not caller discipline. */
     @Query(
             "select m from BatchMembership m"
-                    + " where m.batch.batchId = :batchId and m.status = :status")
-    List<BatchMembership> findByBatchIdAndStatus(
-            @Param("batchId") UUID batchId, @Param("status") MembershipStatus status);
+                    + " where m.centreId = :centreId"
+                    + " and m.batch.batchId = :batchId and m.status = :status")
+    List<BatchMembership> findByCentreIdAndBatchIdAndStatus(
+            @Param("centreId") UUID centreId,
+            @Param("batchId") UUID batchId,
+            @Param("status") MembershipStatus status);
 
     @Query(
             "select case when count(m) > 0 then true else false end from BatchMembership m"
-                    + " where m.batch.batchId = :batchId and m.user.userId = :userId")
-    boolean existsByBatchIdAndUserId(@Param("batchId") UUID batchId, @Param("userId") UUID userId);
+                    + " where m.centreId = :centreId"
+                    + " and m.batch.batchId = :batchId and m.user.userId = :userId")
+    boolean existsByCentreIdAndBatchIdAndUserId(
+            @Param("centreId") UUID centreId,
+            @Param("batchId") UUID batchId,
+            @Param("userId") UUID userId);
 }

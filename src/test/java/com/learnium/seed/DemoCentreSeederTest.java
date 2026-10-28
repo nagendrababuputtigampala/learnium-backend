@@ -78,7 +78,8 @@ class DemoCentreSeederTest {
                 .isPresent();
 
         List<BatchMembership> roster =
-                membershipRepository.findByBatchIdAndStatus(batch.getBatchId(), MembershipStatus.ACTIVE);
+                membershipRepository.findByCentreIdAndBatchIdAndStatus(
+                                centre.getCentreId(), batch.getBatchId(), MembershipStatus.ACTIVE);
         assertThat(roster).hasSize(6);
         BatchMembership teacherMembership =
                 roster.stream()
@@ -112,8 +113,8 @@ class DemoCentreSeederTest {
         assertThat(userAccountRepository.findByCentreId(centre.getCentreId())).hasSize(7);
         Batch batch = batchRepository.findByCentreId(centre.getCentreId()).get(0);
         assertThat(
-                        membershipRepository.findByBatchIdAndStatus(
-                                batch.getBatchId(), MembershipStatus.ACTIVE))
+                        membershipRepository.findByCentreIdAndBatchIdAndStatus(
+                                centre.getCentreId(), batch.getBatchId(), MembershipStatus.ACTIVE))
                 .hasSize(6);
     }
 }

@@ -263,11 +263,12 @@ class ExamChainPersistenceTest {
         entityManager.clear();
 
         assertThat(
-                        examTemplateQuestionRepository.findByExamTemplateIdOrderByDisplayOrderAsc(
-                                template.getExamTemplateId()))
+                        examTemplateQuestionRepository
+                                .findByCentreIdAndExamTemplateIdOrderByDisplayOrderAsc(
+                                        centre.getCentreId(), template.getExamTemplateId()))
                 .extracting(ExamTemplateQuestion::getDisplayOrder)
                 .containsExactly(1, 2);
-        assertThat(examInstanceRepository.findByBatchId(batch.getBatchId()))
+        assertThat(examInstanceRepository.findByCentreIdAndBatchId(centre.getCentreId(), batch.getBatchId()))
                 .extracting(ExamInstance::getJoinCode)
                 .containsExactly("FRAC-4821");
         ExamInstance reloadedInstance = examInstanceRepository.findByJoinCode("FRAC-4821").orElseThrow();
@@ -276,14 +277,19 @@ class ExamChainPersistenceTest {
         assertThat(reloadedInstance.getStatus()).isEqualTo(ExamInstanceStatus.PUBLISHED);
         assertThat(examInstanceRepository.findByJoinCode("NOPE-0000")).isEmpty();
         assertThat(
-                        examInstanceQuestionRepository.findByExamInstanceIdOrderByQuestionOrderAsc(
-                                instance.getExamInstanceId()))
+                        examInstanceQuestionRepository
+                                .findByCentreIdAndExamInstanceIdOrderByQuestionOrderAsc(
+                                        centre.getCentreId(), instance.getExamInstanceId()))
                 .extracting(ExamInstanceQuestion::getQuestionOrder)
                 .containsExactly(1, 2);
-        assertThat(examAttemptRepository.findByExamInstanceId(instance.getExamInstanceId()))
+        assertThat(
+                        examAttemptRepository.findByCentreIdAndExamInstanceId(
+                                centre.getCentreId(), instance.getExamInstanceId()))
                 .hasSize(2);
 
-        var answers = questionAttemptRepository.findByAttemptId(attempt.getAttemptId());
+        var answers =
+                questionAttemptRepository.findByCentreIdAndAttemptId(
+                        centre.getCentreId(), attempt.getAttemptId());
         assertThat(answers).hasSize(2);
         QuestionAttempt reloadedWritten =
                 answers.stream()
@@ -299,6 +305,135 @@ class ExamChainPersistenceTest {
                         .findFirst()
                         .orElseThrow();
         assertThat(reloadedObjective.getCorrect()).isTrue();
+    }
+
+    private record AttemptFixture(java.util.UUID centreId, java.util.UUID attemptId) {}
+
+    /** Builds one centre with a published instance, one attempt and one answer. */
+    private AttemptFixture centreWithOneAnswer(
+            String name,
+            String joinCode,
+            ExamMode mode,
+            QuestionType type,
+            GradeSubject gradeSubject,
+            Topic topic)
+            throws Exception {
+        Centre centre = new Centre();
+        centre.setName(name);
+        centre = centreRepository.save(centre);
+
+        UserAccount teacher = new UserAccount();
+        teacher.setCentre(centre);
+        teacher.setRole(UserRole.TEACHER);
+        teacher.setEmail("teacher@" + name + ".example.com");
+        teacher = userAccountRepository.save(teacher);
+
+        UserAccount student = new UserAccount();
+        student.setCentre(centre);
+        student.setRole(UserRole.STUDENT);
+        student = userAccountRepository.save(student);
+
+        Question question = new Question();
+        question.setCentre(centre);
+        question.setTopic(topic);
+        question.setQuestionType(type);
+        question.setPayload(objectMapper.readTree("{\"prompt\":\"q\"}"));
+        question.setCorrectRef("options[0]");
+        question = questionRepository.save(question);
+
+        ExamTemplate template = new ExamTemplate();
+        template.setCentre(centre);
+        template.setGrade(gradeSubject.getGrade());
+        template.setSubject(gradeSubject.getSubject());
+        template.setTopic(topic);
+        template.setExamMode(mode);
+        template.setTemplateName(name + " Template");
+        template.setRules(objectMapper.readTree("{}"));
+        template = examTemplateRepository.save(template);
+
+        Batch batch = new Batch();
+        batch.setCentre(centre);
+        batch.setGradeSubject(gradeSubject);
+        batch.setName(name + " Batch");
+        batch = batchRepository.save(batch);
+
+        ExamInstance instance = new ExamInstance();
+        instance.setCentreId(centre.getCentreId());
+        instance.setExamTemplate(template);
+        instance.setBatch(batch);
+        instance.setPublishedBy(teacher);
+        instance.setJoinCode(joinCode);
+        instance = examInstanceRepository.save(instance);
+
+        ExamAttempt attempt = new ExamAttempt();
+        attempt.setCentreId(centre.getCentreId());
+        attempt.setExamInstance(instance);
+        attempt.setUser(student);
+        attempt.setStartedAt(Instant.parse("2026-10-28T15:05:00Z"));
+        attempt = examAttemptRepository.save(attempt);
+
+        QuestionAttempt answer = new QuestionAttempt();
+        answer.setCentreId(centre.getCentreId());
+        answer.setAttempt(attempt);
+        answer.setQuestion(question);
+        answer.setQuestionVersion(1);
+        answer.setAnswerPayload(objectMapper.readTree("{\"selected\":\"options[0]\"}"));
+        questionAttemptRepository.save(answer);
+
+        return new AttemptFixture(centre.getCentreId(), attempt.getAttemptId());
+    }
+
+    @Test
+    void answersAreInvisibleAcrossCentres() throws Exception {
+        Grade grade = new Grade();
+        grade.setCode("G8");
+        grade.setName("Grade 8");
+        grade = gradeRepository.save(grade);
+        Subject subject = new Subject();
+        subject.setSubjectName("Mathematics");
+        subject = subjectRepository.save(subject);
+        GradeSubject gradeSubject = new GradeSubject();
+        gradeSubject.setGrade(grade);
+        gradeSubject.setSubject(subject);
+        gradeSubject = gradeSubjectRepository.save(gradeSubject);
+        Topic topic = new Topic();
+        topic.setGradeSubject(gradeSubject);
+        topic.setTopicName("Fractions");
+        topic = topicRepository.save(topic);
+        QuestionType mcq = new QuestionType();
+        mcq.setCode("MCQ");
+        mcq.setName("Multiple Choice");
+        mcq = questionTypeRepository.save(mcq);
+        ExamMode mode = new ExamMode();
+        mode.setTestType(ExamModeType.quiz);
+        mode.setTitle("Quiz");
+        mode = examModeRepository.save(mode);
+
+        AttemptFixture alpha = centreWithOneAnswer("Alpha", "ALPHA-1", mode, mcq, gradeSubject, topic);
+        AttemptFixture beta = centreWithOneAnswer("Beta", "BETA-1", mode, mcq, gradeSubject, topic);
+
+        entityManager.flush();
+        entityManager.clear();
+
+        // Each centre reads its own answers…
+        assertThat(
+                        questionAttemptRepository.findByCentreIdAndAttemptId(
+                                alpha.centreId(), alpha.attemptId()))
+                .hasSize(1);
+        assertThat(
+                        questionAttemptRepository.findByCentreIdAndAttemptId(
+                                beta.centreId(), beta.attemptId()))
+                .hasSize(1);
+        // …but a REAL foreign attempt id under the caller's centre returns
+        // nothing — the centre predicate, not the id's existence, gates reads.
+        assertThat(
+                        questionAttemptRepository.findByCentreIdAndAttemptId(
+                                alpha.centreId(), beta.attemptId()))
+                .isEmpty();
+        assertThat(
+                        questionAttemptRepository.findByCentreIdAndAttemptId(
+                                beta.centreId(), alpha.attemptId()))
+                .isEmpty();
     }
 
     @Test
@@ -365,21 +500,27 @@ class ExamChainPersistenceTest {
 
         UserTopicStat reloaded =
                 userTopicStatRepository
-                        .findByUserIdAndTopicId(student.getUserId(), topic.getTopicId())
+                        .findByCentreIdAndUserIdAndTopicId(
+                                centre.getCentreId(), student.getUserId(), topic.getTopicId())
                         .orElseThrow();
         assertThat(reloaded.getAttempts()).isEqualTo(10);
         assertThat(reloaded.getCorrect()).isEqualTo(7);
         assertThat(
-                        userTopicStatRepository.findByUserIdAndTopicId(
-                                student.getUserId(), badge.getBadgeId()))
+                        userTopicStatRepository.findByCentreIdAndUserIdAndTopicId(
+                                centre.getCentreId(), student.getUserId(), badge.getBadgeId()))
                 .isEmpty();
         assertThat(badgeRepository.findByCode("FRACTION_STAR")).isPresent();
         assertThat(badgeRepository.findByCode("NOPE")).isEmpty();
-        assertThat(userBadgesRepository.findByUserId(student.getUserId())).hasSize(1);
-        assertThat(userXpLedgerRepository.findByUserId(student.getUserId()))
+        assertThat(userBadgesRepository.findByCentreIdAndUserId(centre.getCentreId(), student.getUserId()))
+                .hasSize(1);
+        assertThat(userXpLedgerRepository.findByCentreIdAndUserId(centre.getCentreId(), student.getUserId()))
                 .extracting(UserXpLedger::getXpDelta)
                 .containsExactly(25);
-        assertThat(userXpLedgerRepository.findByUserId(student.getUserId()).get(0).getSourceType())
+        assertThat(
+                        userXpLedgerRepository
+                                .findByCentreIdAndUserId(centre.getCentreId(), student.getUserId())
+                                .get(0)
+                                .getSourceType())
                 .isEqualTo(XpSourceType.exam);
     }
 }
