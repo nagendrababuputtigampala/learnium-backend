@@ -193,3 +193,25 @@
   thymeleaf starters (S2 uses the latter two). Targeted green: JwtServiceTest,
   CurrentPrincipalTest, AuthFlowTest (18), MigrationTest, ErrorCodeTest.
 - Next: M2 S2 — account tokens + email outbox + invite/reset flows.
+- M2 S2 done: account tokens + email outbox + invite/reset flows.
+  AccountTokenService issues single-use tokens (raw returned once, SHA-256
+  hash stored) and consumes them (unknown/used/expired -> LRN-AUTH-004, same
+  response for all). EmailOutboxService.enqueue writes a PENDING row inside
+  the caller's transaction; OutboxDispatcher (@Scheduled, 5s default)
+  renders + sends in one transaction, retrying FAILED rows until 3 attempts;
+  last_error stores the exception class name only. Mail renders via a
+  standalone Thymeleaf engine — DEVIATION: SpringTemplateEngine (SpringEL),
+  because the standalone engine's OGNL evaluator is not on the classpath
+  (NoClassDefFoundError ognl/PropertyAccessor). Templates invite/reset link
+  to {APP_PUBLIC_BASE_URL}/set-password?token=..&purpose=..; HTML + derived
+  plain-text bodies; transport behind EmailSender (SMTP impl; tests use a
+  stub). forgot-password always 202 (unknown/inactive/student stay silent);
+  reset revokes ALL refresh tokens of the user; accept-invite sets the
+  first password. BUG CAUGHT BY TESTS: the refresh-token bulk revoke uses
+  clearAutomatically, which discarded a caller's unflushed password change
+  during reset (old password kept working) — the @Modifying query now also
+  sets flushAutomatically=true. Targeted green: AccountTokenServiceTest,
+  AccountFlowTest (9), OutboxDispatcherTest, MailTemplateRendererTest,
+  SmtpEmailSenderTest.
+- Next: M2 S3 — admin-lite (teachers/batches), centre profile, onboarding,
+  master + public lists, BatchAccessGuard.

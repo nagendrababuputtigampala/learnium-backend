@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<p>Hello <span th:text="${displayName}">there</span>,</p>
+<p>
+  You have been invited to join <strong th:text="${centreName}">your centre</strong>
+  on Learnium as a teacher.
+</p>
+<p>
+  <a th:href="${link}">Set your password</a> to activate your account.
+  This link expires in <span th:text="${expiresHours}">48</span> hours and can
+  only be used once.
+</p>
+<p>If the link above does not work, copy this address into your browser:<br/>
+  <span th:text="${link}">https://example.invalid/set-password</span>
+</p>
+<p>If you were not expecting this invitation, you can ignore this email.</p>
+</body>
+</html>

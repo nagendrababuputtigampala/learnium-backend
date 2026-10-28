@@ -18,8 +18,11 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
      * paths). {@code clearAutomatically} matters: a bulk update bypasses the
      * persistence context, and callers must never act on a stale, still-live
      * in-memory token afterwards (the reuse-detection check depends on it).
+     * {@code flushAutomatically} matters just as much: without it, a caller's
+     * pending change on the user (e.g. a new password hash set moments
+     * earlier) would be discarded by the clear instead of flushed first.
      */
-    @Modifying(clearAutomatically = true)
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(
             "update RefreshToken t set t.revokedAt = :now"
                     + " where t.centreId = :centreId and t.user.userId = :userId"
