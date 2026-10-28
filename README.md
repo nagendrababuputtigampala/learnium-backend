@@ -79,6 +79,18 @@ and in error bodies. Log levels: ERROR = needs human attention (always with an
 error code), WARN = recoverable/business rejection, INFO = lifecycle events.
 Never log passwords, tokens, or raw student answer text — IDs only.
 
+### Observability
+
+Micrometer + OpenTelemetry (via `spring-boot-starter-opentelemetry`): traces and
+metrics are produced in-process and exported over OTLP only when
+`OTEL_EXPORTER_OTLP_ENDPOINT` is set (see `application.yml` —
+`management.otlp.tracing.endpoint`, `management.otlp.metrics.export.url`,
+`TRACING_SAMPLING`, `OTEL_METRICS_STEP`). Point it at Grafana Cloud today or at
+Datadog/Splunk/Dynatrace later: the vendor is configuration, never code. Error
+counters per LRN code will be incremented by the metrics-aware exception
+handling in a later task; the tracing side already propagates the same
+`traceId` the logs carry.
+
 ### Layering
 
 `controller → service → repository`, DTOs at the API boundary, MapStruct for

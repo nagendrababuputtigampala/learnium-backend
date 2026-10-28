@@ -37,3 +37,7 @@
   1234; BCrypt PasswordEncoder bean added to SecurityConfig. Seeder tests
   green against the migrated schema.
 - M1 S5 done: PageResponse<T> API envelope (tracker task 55) with unit tests.
+- M1 S5/S6 done: OTel instrumentation (tracker task 54) — Boot 4
+  spring-boot-starter-opentelemetry, env-driven OTLP tracing/metrics export
+  (empty endpoint = no export), verified by a context test with the endpoint
+  set. Note: @SpringBootTest disables metrics export by default in tests.

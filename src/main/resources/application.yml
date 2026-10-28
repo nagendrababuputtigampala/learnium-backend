@@ -23,3 +23,16 @@ management:
     web:
       exposure:
         include: health,info
+  # Vendor-neutral OpenTelemetry export: set OTEL_EXPORTER_OTLP_ENDPOINT to any
+  # OTLP collector (Grafana Cloud, Datadog, ...) and traces + metrics flow there.
+  # Empty (the default) means no export — instrumentation still runs in-process.
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:}
+    metrics:
+      export:
+        url: ${OTEL_EXPORTER_OTLP_ENDPOINT:}
+        step: ${OTEL_METRICS_STEP:1m}
