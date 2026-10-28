@@ -96,6 +96,21 @@
   (http://host:4318); exporters append their signal paths. Verified
   end-to-end with the packaged jar on H2: no env → healthy, zero OTLP
   activity; env set → OtlpMeterRegistry publishes to the base URL.
-- Next: Fix S4 — security error envelope (401/403 JSON) + TraceIdFilter
-  ordered before the security chain.
+- Fix S4 done: security rejections now return the standard envelope.
+  TraceIdFilter is @Order(HIGHEST_PRECEDENCE) so it precedes the security
+  chain (rejected requests get trace ids + echoed X-Request-Id — verified
+  through the full MockMvc chain with supplied and generated ids).
+  ApiAuthenticationEntryPoint (LRN-AUTH-001) and ApiAccessDeniedHandler
+  (LRN-AUTH-003) write ApiErrorResponse JSON via a shared
+  SecurityErrorResponseWriter using the context ObjectMapper (Jackson 3 in
+  Boot 4) and the MDC trace id; HttpStatusEntryPoint removed;
+  @EnableMethodSecurity on. Two findings while testing: (1) @PreAuthorize
+  denials surface inside the DispatcherServlet, past ExceptionTranslation
+  Filter, so GlobalExceptionHandler also translates AccessDeniedException
+  to the same 403 envelope; (2) once the tracing bridge starts a server
+  span it owns the MDC "traceId" slot, so an envelope's traceId is the
+  active span id (uniform with controller errors) while X-Request-Id
+  remains the client correlation id echoed in the header.
+- Next: Fix S5 — framework exception mapping (malformed JSON 400,
+  405, 415) in GlobalExceptionHandler.
 - Failing tests: none.

@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -44,6 +45,20 @@ public class GlobalExceptionHandler {
         }
         log.warn("Validation error {}: {}", ErrorCode.VAL_FAILED.getCode(), fieldErrors);
         return buildResponse(ErrorCode.VAL_FAILED, ErrorCode.VAL_FAILED.getDefaultMessage(), fieldErrors);
+    }
+
+    /**
+     * Method-security denials ({@code @PreAuthorize}) surface inside the
+     * DispatcherServlet, past the security filter chain, so the chain's
+     * AccessDeniedHandler never sees them — translate them here to the same
+     * {@code LRN-AUTH-003} envelope. Filter-level denials are handled by
+     * {@code ApiAccessDeniedHandler} before dispatch and never reach this advice.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiErrorResponse> handleAccessDeniedException(AccessDeniedException ex) {
+        log.warn("Access denied {}: {}", ErrorCode.AUTH_FORBIDDEN.getCode(), ex.getMessage());
+        return buildResponse(
+                ErrorCode.AUTH_FORBIDDEN, ErrorCode.AUTH_FORBIDDEN.getDefaultMessage(), null);
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

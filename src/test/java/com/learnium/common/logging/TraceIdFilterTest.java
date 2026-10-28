@@ -7,6 +7,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.OrderUtils;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
@@ -17,6 +19,14 @@ class TraceIdFilterTest {
     @AfterEach
     void clearMdc() {
         MDC.clear();
+    }
+
+    @Test
+    void filterRunsAtHighestPrecedenceSoItPrecedesTheSecurityChain() {
+        // Security rejections (401/403) must still be traced: this filter has to
+        // be ordered before the springSecurityFilterChain registration.
+        assertThat(OrderUtils.getOrder(TraceIdFilter.class))
+                .isEqualTo(Ordered.HIGHEST_PRECEDENCE);
     }
 
     @Test

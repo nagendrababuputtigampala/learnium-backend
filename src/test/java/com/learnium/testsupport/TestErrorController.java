@@ -5,6 +5,7 @@ import com.learnium.common.error.ErrorCode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -29,6 +30,13 @@ public class TestErrorController {
     @GetMapping("/business")
     public ResponseEntity<String> business() {
         throw new BusinessException(ErrorCode.AUTH_FORBIDDEN, "Custom forbidden message");
+    }
+
+    /** Role-guarded endpoint: only CENTRE_ADMIN may pass; everyone else gets a 403. */
+    @GetMapping("/admin-only")
+    @PreAuthorize("hasRole('CENTRE_ADMIN')")
+    public ResponseEntity<String> adminOnly() {
+        return ResponseEntity.ok("admin");
     }
 
     @GetMapping("/boom")

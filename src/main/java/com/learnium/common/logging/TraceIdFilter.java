@@ -7,6 +7,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.UUID;
 import org.slf4j.MDC;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -15,8 +17,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * Reuses the caller's {@code X-Request-Id} header when present, otherwise generates a
  * UUID. The value is exposed in MDC under {@code traceId}/{@code requestId}, echoed back
  * in the {@code X-Request-Id} response header, and always cleared after the request.
+ *
+ * <p>Ordered at the highest precedence so it runs BEFORE the Spring Security
+ * filter chain: requests that security rejects (401/403) must still carry a
+ * trace id in their error envelope, headers and logs.
  */
 @Component
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class TraceIdFilter extends OncePerRequestFilter {
 
     public static final String REQUEST_ID_HEADER = "X-Request-Id";
