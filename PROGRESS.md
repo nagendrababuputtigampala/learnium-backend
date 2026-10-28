@@ -398,3 +398,15 @@
   TeacherAdminServiceTest (2).
 - Next: R2-S3 committed-state proofs for the security version. Failing
   tests: none.
+- R2-S3 done: CommittedSecurityVersionTest (committed state, real
+  services) proves the version behaviour: (a) a token row persisted
+  AFTER a committed reset, stamped with the pre-reset version — the
+  deterministic form of the racing login — is refused at refresh and
+  the refusal itself revokes it in committed state; (b) login +
+  repeated rotation are unaffected while versions match (all rows carry
+  the current stamp); (c) after a reset the old password fails, a new
+  login works and its token is stamped with the post-reset version and
+  refreshes; (d) deactivation bumps the version on top of the existing
+  revoke-all, and a stale-stamped token landing after it is refused the
+  same way. 4/4 green.
+- Next: final from-scratch verify for the round. Failing tests: none.
