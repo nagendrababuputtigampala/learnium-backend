@@ -409,6 +409,56 @@ class AdminFlowTest {
                 .andExpect(jsonPath("$.code").value("LRN-CTR-002"));
     }
 
+    @Test
+    void reassignAfterUnassignReactivatesTheSameMembership() throws Exception {
+        String admin = tokenFor("admin@alpha.test");
+        JsonNode batch = createBatch(admin, "Batch B");
+        String batchId = batch.get("batchId").asString();
+        String assignBody = "{\"userId\":\"" + teacherA1.getUserId() + "\"}";
+
+        mockMvc.perform(
+                        put("/api/v1/admin/batches/" + batchId + "/teacher")
+                                .header("Authorization", "Bearer " + admin)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(assignBody))
+                .andExpect(status().isOk());
+        mockMvc.perform(
+                        delete("/api/v1/admin/batches/" + batchId + "/teacher/" + teacherA1.getUserId())
+                                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isNoContent());
+        // Re-assigning reactivates the INACTIVE membership instead of duplicating it.
+        mockMvc.perform(
+                        put("/api/v1/admin/batches/" + batchId + "/teacher")
+                                .header("Authorization", "Bearer " + admin)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(assignBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.teacherUserId").value(teacherA1.getUserId().toString()));
+        String tess = tokenFor("tess@alpha.test");
+        mockMvc.perform(get("/api/v1/batches").header("Authorization", "Bearer " + tess))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    void assignDeactivatedTeacherReturns404() throws Exception {
+        String admin = tokenFor("admin@alpha.test");
+        JsonNode batch = createBatch(admin, "Batch B");
+        String batchId = batch.get("batchId").asString();
+        mockMvc.perform(
+                        delete("/api/v1/admin/teachers/" + teacherA2.getUserId())
+                                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(
+                        put("/api/v1/admin/batches/" + batchId + "/teacher")
+                                .header("Authorization", "Bearer " + admin)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"userId\":\"" + teacherA2.getUserId() + "\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("LRN-USR-002"));
+    }
+
     // ---------- centre profile + catalogues ----------
 
     @Test

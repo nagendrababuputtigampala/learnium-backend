@@ -302,6 +302,60 @@ class RosterFlowTest {
     }
 
     @Test
+    void resetPinForMembershipOfAnotherBatchReturns404() throws Exception {
+        JsonNode added = addStudent(adminToken, "Other Batch Otto");
+        UUID membershipId = UUID.fromString(added.get("membershipId").asString());
+        // A second batch in the same centre: the membership does not belong to it.
+        String created =
+                mockMvc.perform(
+                                post("/api/v1/admin/batches")
+                                        .header("Authorization", "Bearer " + adminToken)
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                "{\"name\":\"Batch C\",\"gradeSubjectId\":\""
+                                                        + batchRepositoryGradeSubjectId()
+                                                        + "\"}"))
+                        .andExpect(status().isCreated())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        String otherBatchId = objectMapper.readTree(created).get("batchId").asString();
+
+        mockMvc.perform(
+                        post("/api/v1/batches/" + otherBatchId + "/students/" + membershipId + "/reset-pin")
+                                .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("LRN-CTR-002"));
+    }
+
+    @Test
+    void resetPinForTeacherMembershipReturns404() throws Exception {
+        UUID teacherMembershipId =
+                batchMembershipRepository
+                        .findByCentreIdAndBatchIdAndMemberRole(
+                                centreA.getCentreId(), batchId, com.learnium.model.user.MemberRole.TEACHER)
+                        .get(0)
+                        .getMembershipId();
+
+        mockMvc.perform(
+                        post("/api/v1/batches/" + batchId + "/students/" + teacherMembershipId + "/reset-pin")
+                                .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("LRN-CTR-002"));
+    }
+
+    private String batchRepositoryGradeSubjectId() {
+        return batchMembershipRepository
+                .findByCentreIdAndBatchIdAndMemberRole(
+                        centreA.getCentreId(), batchId, com.learnium.model.user.MemberRole.TEACHER)
+                .get(0)
+                .getBatch()
+                .getGradeSubject()
+                .getGradeSubjectId()
+                .toString();
+    }
+
+    @Test
     void deactivateStudentMarksMembershipInactive() throws Exception {
         JsonNode added = addStudent(adminToken, "Leaving Lisa");
         UUID membershipId = UUID.fromString(added.get("membershipId").asString());

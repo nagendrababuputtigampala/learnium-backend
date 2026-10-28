@@ -296,6 +296,36 @@ class StudentSessionTest {
     }
 
     @Test
+    void lockedSameNameStudentDoesNotBlockTheUnlockedOne() throws Exception {
+        JsonNode first = addStudent("Sam Lee");
+        JsonNode second = addStudent("Sam Lee");
+        UUID firstId = UUID.fromString(first.get("membershipId").asString());
+        UUID secondId = UUID.fromString(second.get("membershipId").asString());
+        BatchMembership m1 = membership(firstId);
+        m1.setPinHash(passwordEncoder.encode("1111"));
+        m1.setPinFailedAttempts(5);
+        m1.setPinLocked(true);
+        batchMembershipRepository.save(m1);
+        BatchMembership m2 = membership(secondId);
+        m2.setPinHash(passwordEncoder.encode("2222"));
+        batchMembershipRepository.save(m2);
+
+        // The unlocked Sam can still sign in with their own PIN.
+        String body =
+                session(batch.getBatchId(), "Sam Lee", "2222")
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        assertThat(objectMapper.readTree(body).get("student").get("membershipId").asString())
+                .isEqualTo(secondId.toString());
+        // The locked Sam's correct PIN does not authenticate through the lock.
+        session(batch.getBatchId(), "Sam Lee", "1111")
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("LRN-AUTH-007"));
+    }
+
+    @Test
     void deactivatedStudentCannotOpenSession() throws Exception {
         JsonNode added = addStudent("Simran Kaur");
         UUID membershipId = UUID.fromString(added.get("membershipId").asString());
