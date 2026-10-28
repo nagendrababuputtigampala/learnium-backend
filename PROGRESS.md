@@ -31,3 +31,8 @@
   passes against the migrated schema. Also fixed an M0 gap the migration test
   caught: Boot 4 needs spring-boot-starter-flyway (bare flyway-core registers
   no auto-configuration, so migrations never ran in-app).
+- M1 S4 done: DemoCentreSeeder (@Profile demo, idempotent) — Demo Tutoring
+  Centre, admin + Mrs. Patel (Demo@123), G8 Mathematics pairing from master
+  data, Fractions topic, Batch B, 5 students (Simran first) with BCrypt PIN
+  1234; BCrypt PasswordEncoder bean added to SecurityConfig. Seeder tests
+  green against the migrated schema.
