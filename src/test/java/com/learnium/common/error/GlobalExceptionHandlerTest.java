@@ -10,8 +10,14 @@ import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mock.http.MockHttpInputMessage;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindingResult;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -151,6 +157,62 @@ class GlobalExceptionHandlerTest {
     }
 
     @SuppressWarnings("unused")
+    @Test
+    void malformedBodyReturnsVal002() {
+        HttpMessageNotReadableException ex =
+                new HttpMessageNotReadableException(
+                        "JSON parse error", new MockHttpInputMessage("{not json".getBytes()));
+
+        ResponseEntity<ApiErrorResponse> response = handler.handleMalformedBody(ex);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        ApiErrorResponse body = response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.getCode()).isEqualTo("LRN-VAL-002");
+        assertThat(body.getMessage()).isEqualTo("Malformed request body");
+    }
+
+    @Test
+    void methodNotSupportedReturnsSys405() {
+        HttpRequestMethodNotSupportedException ex =
+                new HttpRequestMethodNotSupportedException("GET", java.util.List.of("POST"));
+
+        ResponseEntity<ApiErrorResponse> response = handler.handleMethodNotSupported(ex);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        ApiErrorResponse body = response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.getCode()).isEqualTo("LRN-SYS-405");
+        assertThat(body.getMessage()).isEqualTo("Method not allowed");
+    }
+
+    @Test
+    void mediaTypeNotSupportedReturnsSys415() {
+        HttpMediaTypeNotSupportedException ex =
+                new HttpMediaTypeNotSupportedException(
+                        MediaType.TEXT_PLAIN, java.util.List.of(MediaType.APPLICATION_JSON));
+
+        ResponseEntity<ApiErrorResponse> response = handler.handleMediaTypeNotSupported(ex);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        ApiErrorResponse body = response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.getCode()).isEqualTo("LRN-SYS-415");
+        assertThat(body.getMessage()).isEqualTo("Unsupported media type");
+    }
+
+    @Test
+    void accessDeniedReturnsAuth003() {
+        ResponseEntity<ApiErrorResponse> response =
+                handler.handleAccessDeniedException(new AccessDeniedException("wrong role"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        ApiErrorResponse body = response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.getCode()).isEqualTo("LRN-AUTH-003");
+        assertThat(body.getMessage()).isEqualTo("Access denied");
+    }
+
     private void dummyEndpoint(String payload) {
         // Only used to obtain a MethodParameter for exception construction.
     }

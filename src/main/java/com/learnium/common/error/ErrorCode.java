@@ -16,7 +16,11 @@ public enum ErrorCode {
 
     SYS_UNEXPECTED("LRN-SYS-001", HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected server error"),
     SYS_NOT_FOUND("LRN-SYS-404", HttpStatus.NOT_FOUND, "Resource not found"),
+    SYS_METHOD_NOT_ALLOWED("LRN-SYS-405", HttpStatus.METHOD_NOT_ALLOWED, "Method not allowed"),
+    SYS_UNSUPPORTED_MEDIA_TYPE(
+            "LRN-SYS-415", HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Unsupported media type"),
     VAL_FAILED("LRN-VAL-001", HttpStatus.BAD_REQUEST, "Validation failed"),
+    VAL_MALFORMED_BODY("LRN-VAL-002", HttpStatus.BAD_REQUEST, "Malformed request body"),
     AUTH_UNAUTHENTICATED("LRN-AUTH-001", HttpStatus.UNAUTHORIZED, "Authentication required"),
     AUTH_FORBIDDEN("LRN-AUTH-003", HttpStatus.FORBIDDEN, "Access denied");
 

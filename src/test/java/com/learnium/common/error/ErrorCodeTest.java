@@ -29,6 +29,30 @@ class ErrorCodeTest {
     }
 
     @Test
+    void valMalformedBodyHasRegisteredValues() {
+        assertThat(ErrorCode.VAL_MALFORMED_BODY.getCode()).isEqualTo("LRN-VAL-002");
+        assertThat(ErrorCode.VAL_MALFORMED_BODY.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.VAL_MALFORMED_BODY.getDefaultMessage()).isEqualTo("Malformed request body");
+    }
+
+    @Test
+    void sysMethodNotAllowedHasRegisteredValues() {
+        assertThat(ErrorCode.SYS_METHOD_NOT_ALLOWED.getCode()).isEqualTo("LRN-SYS-405");
+        assertThat(ErrorCode.SYS_METHOD_NOT_ALLOWED.getStatus())
+                .isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(ErrorCode.SYS_METHOD_NOT_ALLOWED.getDefaultMessage()).isEqualTo("Method not allowed");
+    }
+
+    @Test
+    void sysUnsupportedMediaTypeHasRegisteredValues() {
+        assertThat(ErrorCode.SYS_UNSUPPORTED_MEDIA_TYPE.getCode()).isEqualTo("LRN-SYS-415");
+        assertThat(ErrorCode.SYS_UNSUPPORTED_MEDIA_TYPE.getStatus())
+                .isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        assertThat(ErrorCode.SYS_UNSUPPORTED_MEDIA_TYPE.getDefaultMessage())
+                .isEqualTo("Unsupported media type");
+    }
+
+    @Test
     void authUnauthenticatedHasRegisteredValues() {
         assertThat(ErrorCode.AUTH_UNAUTHENTICATED.getCode()).isEqualTo("LRN-AUTH-001");
         assertThat(ErrorCode.AUTH_UNAUTHENTICATED.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED);

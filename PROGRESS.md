@@ -111,6 +111,13 @@
   span it owns the MDC "traceId" slot, so an envelope's traceId is the
   active span id (uniform with controller errors) while X-Request-Id
   remains the client correlation id echoed in the header.
-- Next: Fix S5 — framework exception mapping (malformed JSON 400,
-  405, 415) in GlobalExceptionHandler.
+- Fix S5 done: framework request exceptions keep their real status in the
+  standard envelope instead of collapsing to 500/LRN-SYS-001 —
+  HttpMessageNotReadableException → 400 LRN-VAL-002 (WARN, no stack),
+  HttpRequestMethodNotSupportedException → 405 LRN-SYS-405,
+  HttpMediaTypeNotSupportedException → 415 LRN-SYS-415. New ErrorCode
+  entries follow the registry pattern; covered by handler unit tests and
+  MockMvc tests through the test-support controller (malformed JSON /
+  wrong method / wrong content type, all authenticated).
+- Next: Fix S6 — real-PostgreSQL migration test (env-gated) + CI job.
 - Failing tests: none.

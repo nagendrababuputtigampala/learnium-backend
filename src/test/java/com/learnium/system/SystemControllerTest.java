@@ -69,6 +69,40 @@ class SystemControllerTest {
     }
 
     @Test
+    void malformedJsonReturns400WithVal002() throws Exception {
+        mockMvc.perform(post("/test-support/validated")
+                        .with(user("tester"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{not json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LRN-VAL-002"))
+                .andExpect(jsonPath("$.message").value("Malformed request body"))
+                .andExpect(jsonPath("$.traceId").value(Matchers.not(Matchers.isEmptyOrNullString())))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
+    }
+
+    @Test
+    void wrongMethodReturns405WithSys405() throws Exception {
+        mockMvc.perform(get("/test-support/validated").with(user("tester")))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.code").value("LRN-SYS-405"))
+                .andExpect(jsonPath("$.message").value("Method not allowed"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
+    }
+
+    @Test
+    void wrongContentTypeReturns415WithSys415() throws Exception {
+        mockMvc.perform(post("/test-support/validated")
+                        .with(user("tester"))
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("name"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("LRN-SYS-415"))
+                .andExpect(jsonPath("$.message").value("Unsupported media type"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
+    }
+
+    @Test
     void businessExceptionReturnsStandardErrorBody() throws Exception {
         mockMvc.perform(get("/test-support/business").with(user("tester")))
                 .andExpect(status().isForbidden())
