@@ -256,11 +256,22 @@
   clearly-labelled dev-only JWT_SECRET, APP_PUBLIC_BASE_URL and MAIL_HOST
   pointing at the Mailpit service; README documents the M2 env vars and the
   now-working demo login admin@demo.learnium.local / Demo@123 + roster PIN
-  1234). Final full verify from a clean target: 202 tests run, 0 failures,
-  4 skipped (env-gated PostgresMigrationTest), JaCoCo LINE 100% (587/587),
-  BRANCH 100% (171/171), all coverage checks met. NOTE: the sandbox's
-  accumulated target/jacoco.exec from targeted runs made an incremental
-  verify report phantom misses (98.98%); with target removed the gate is
-  fully green — on a normal machine/CI this never arises. Failing tests:
-  none. Ready for Nagendra's review; do not push (bundle handoff per the
-  working agreement).
+  1234). Final full verify from a clean target: 214 tests run, 0 failures,
+  4 skipped (env-gated PostgresMigrationTest), JaCoCo LINE 100% and BRANCH
+  100% (zero missed lines/branches in the report), all coverage checks met.
+  Getting there took a coverage-hardening pass after the first clean verify
+  exposed real gaps the slice-level targeted runs had hidden (198 tests,
+  branches 94%): the two @SneakyThrows SHA-256 helpers (JwtService.deriveKey,
+  TokenHashing.sha256Hex) were replaced with explicit try/catch ->
+  IllegalStateException, exercised by tests that remove the SUN security
+  provider; LearniumPrincipal.isStudent, the services' centre-not-found
+  orElseThrow suppliers (mock-based unit tests), AuthService.me's missing-
+  account path, PlatformService's null-key path, JwtService's null-secret
+  fallback and half-scoped student tokens, the inactive-teacher DTO branch,
+  unassign-for-a-student 404, and double-logout all gained tests (+16).
+  NOTE: incremental verifies in this sandbox are unreliable for coverage —
+  target/jacoco.exec accumulates sessions across recompiles and both
+  phantom misses and phantom passes appear; only a from-scratch verify
+  (rm -rf target first; mvn clean is unavailable offline) is authoritative.
+  Failing tests: none. Ready for Nagendra's review; do not push (bundle
+  handoff per the working agreement).

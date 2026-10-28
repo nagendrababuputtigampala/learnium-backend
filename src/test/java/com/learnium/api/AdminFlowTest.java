@@ -268,6 +268,32 @@ class AdminFlowTest {
                 .andExpect(jsonPath("$.code").value("LRN-USR-002"));
     }
 
+    @Test
+    void deactivatedTeacherIsListedAsInactive() throws Exception {
+        String admin = tokenFor("admin@alpha.test");
+        mockMvc.perform(
+                        delete("/api/v1/admin/teachers/" + teacherA2.getUserId())
+                                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isNoContent());
+
+        String body =
+                mockMvc.perform(
+                                get("/api/v1/admin/teachers?page=0&size=20")
+                                        .header("Authorization", "Bearer " + admin))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        JsonNode content = objectMapper.readTree(body).get("content");
+        boolean foundInactiveTim = false;
+        for (JsonNode teacher : content) {
+            if (teacher.get("userId").asString().equals(teacherA2.getUserId().toString())) {
+                foundInactiveTim = !teacher.get("active").asBoolean();
+            }
+        }
+        assertThat(foundInactiveTim).isTrue();
+    }
+
     // ---------- batches ----------
 
     @Test
@@ -457,6 +483,31 @@ class AdminFlowTest {
                                 .content("{\"userId\":\"" + teacherA2.getUserId() + "\"}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("LRN-USR-002"));
+    }
+
+    @Test
+    void unassignTeacherForAStudentMembershipReturns404() throws Exception {
+        String admin = tokenFor("admin@alpha.test");
+        JsonNode batch = createBatch(admin, "Batch B");
+        String batchId = batch.get("batchId").asString();
+        String addedBody =
+                mockMvc.perform(
+                                post("/api/v1/batches/" + batchId + "/students")
+                                        .header("Authorization", "Bearer " + admin)
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content("{\"fullName\":\"Stu One\"}"))
+                        .andExpect(status().isCreated())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        String studentUserId = objectMapper.readTree(addedBody).get("userId").asString();
+
+        // The student holds a STUDENT membership, not a teacher assignment.
+        mockMvc.perform(
+                        delete("/api/v1/admin/batches/" + batchId + "/teacher/" + studentUserId)
+                                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("LRN-CTR-002"));
     }
 
     // ---------- centre profile + catalogues ----------

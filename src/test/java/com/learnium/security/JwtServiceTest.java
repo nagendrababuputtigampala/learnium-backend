@@ -123,6 +123,50 @@ class JwtServiceTest {
     }
 
     @Test
+    void nullSecretFallsBackToDevelopmentSecret() {
+        JwtService fallback = new JwtService(null);
+        UserAccount user = staffUser(UserRole.TEACHER);
+
+        String token = fallback.issueStaffToken(user);
+
+        assertThat(fallback.validate(token)).isPresent();
+    }
+
+    @Test
+    void studentTokenWithoutMembershipClaimIsRejected() throws Exception {
+        UserAccount user = staffUser(UserRole.STUDENT);
+        SecretKey key = keyFor(SECRET);
+        String batchOnly =
+                Jwts.builder()
+                        .subject(user.getUserId().toString())
+                        .claim("centreId", user.getCentre().getCentreId().toString())
+                        .claim("role", "STUDENT")
+                        .claim("typ", "access")
+                        .claim("batchId", UUID.randomUUID().toString())
+                        .issuedAt(new Date())
+                        .expiration(Date.from(Instant.now().plusSeconds(600)))
+                        .signWith(key)
+                        .compact();
+
+        assertThat(jwtService.validate(batchOnly)).isEmpty();
+    }
+
+    @Test
+    void constructorFailsWhenSha256IsUnavailable() {
+        // SHA-256 comes from the SUN provider; removing it simulates a broken
+        // runtime so the defensive catch in deriveKey is exercised for real.
+        java.security.Provider sun = java.security.Security.getProvider("SUN");
+        java.security.Security.removeProvider("SUN");
+        try {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> new JwtService(SECRET))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("SHA-256");
+        } finally {
+            java.security.Security.addProvider(sun);
+        }
+    }
+
+    @Test
     void studentTokenWithoutBatchScopeIsRejected() throws Exception {
         UserAccount user = staffUser(UserRole.STUDENT);
         SecretKey key = keyFor(SECRET);

@@ -236,6 +236,28 @@ class AuthFlowTest {
     }
 
     @Test
+    void logoutTwiceWithTheSameTokenStillReturns204() throws Exception {
+        JsonNode body = login(ADMIN_EMAIL, PASSWORD);
+        String accessToken = body.get("accessToken").asString();
+        String refreshToken = body.get("refreshToken").asString();
+        String logoutBody = "{\"refreshToken\":\"" + refreshToken + "\"}";
+
+        mockMvc.perform(
+                        post("/api/v1/auth/logout")
+                                .header("Authorization", "Bearer " + accessToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(logoutBody))
+                .andExpect(status().isNoContent());
+        // The token is already revoked; logging out again is a no-op, not an error.
+        mockMvc.perform(
+                        post("/api/v1/auth/logout")
+                                .header("Authorization", "Bearer " + accessToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(logoutBody))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
     void logoutWithUnknownTokenStillReturns204() throws Exception {
         String accessToken = login(ADMIN_EMAIL, PASSWORD).get("accessToken").asString();
 

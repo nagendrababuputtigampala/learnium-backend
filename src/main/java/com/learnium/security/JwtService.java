@@ -8,13 +8,14 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.Optional;
 import java.util.UUID;
 import javax.crypto.SecretKey;
-import lombok.SneakyThrows;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -53,10 +54,15 @@ public class JwtService {
      * >= 256-bit key, and hashing makes any operator-supplied secret length
      * produce a full-strength key instead of failing (or silently weakening).
      */
-    @SneakyThrows
     private static SecretKey deriveKey(String secret) {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        return Keys.hmacShaKeyFor(digest.digest(secret.getBytes(StandardCharsets.UTF_8)));
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return Keys.hmacShaKeyFor(digest.digest(secret.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            // SHA-256 is guaranteed present on every JVM; reaching this catch
+            // means a broken runtime, not bad input.
+            throw new IllegalStateException("SHA-256 MessageDigest is unavailable", e);
+        }
     }
 
     /** Staff access token for an admin/teacher (15 min). */

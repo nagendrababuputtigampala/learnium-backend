@@ -2,10 +2,10 @@ package com.learnium.security;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.HexFormat;
-import lombok.SneakyThrows;
 
 /**
  * Raw-token generation and hashing shared by refresh tokens and account
@@ -26,11 +26,14 @@ public final class TokenHashing {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    @SneakyThrows
     public static String sha256Hex(String rawToken) {
-        // SHA-256 is guaranteed present on every JVM, so getInstance cannot
-        // actually fail; @SneakyThrows keeps that fiction out of the API.
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        return HexFormat.of().formatHex(digest.digest(rawToken.getBytes(StandardCharsets.UTF_8)));
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(rawToken.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            // SHA-256 is guaranteed present on every JVM; reaching this catch
+            // means a broken runtime, not bad input.
+            throw new IllegalStateException("SHA-256 MessageDigest is unavailable", e);
+        }
     }
 }
