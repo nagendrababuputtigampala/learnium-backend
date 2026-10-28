@@ -29,6 +29,9 @@ services:
   backend:
     build: .
     environment:
+      # Local dev stack runs with the demo profile so the seeded demo
+      # centre + logins exist (admin@demo.learnium.local / Demo@123).
+      SPRING_PROFILES_ACTIVE: demo
       DB_URL: jdbc:postgresql://postgres:5432/learnium
       DB_USERNAME: learnium
       DB_PASSWORD: learnium
