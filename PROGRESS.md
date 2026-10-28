@@ -72,5 +72,30 @@
   asserts every row's owner + disjoint ID sets across centres.
   ExamChainPersistenceTest gains answersAreInvisibleAcrossCentres (real
   foreign attempt id under the caller's centre → empty). Targeted tests green.
-- Next: Fix S3 — OpenTelemetry Boot 4 property names (metadata-verified).
+- Fix S3 done: OTel export properties are the real Boot 4 ones, verified
+  against spring-configuration-metadata.json inside the installed Boot
+  4.0.0 jars — tracing binds
+  `management.opentelemetry.tracing.export.otlp.endpoint` (the old
+  `management.otlp.tracing.endpoint` is an unbound deprecation relocation;
+  the exporter auto-config conditions on the new name), metrics binds
+  `management.otlp.metrics.export.url` (+ step). ObservabilityConfigTest
+  now proves BINDING (OtlpTracingProperties + OtlpTracingConnectionDetails
+  URL + OtlpConfig URL), and a new ObservabilityNoExportTest proves
+  endpoint-unset creates no connection details/exporter.
+  DEVIATION (evidence-driven): the endpoint is no longer a YAML placeholder.
+  Binding the corrected property name to `${...:}` (empty) — or to any
+  literal placeholder — makes @ConditionalOnProperty treat it as present
+  and the OTLP exporter dies at startup ("Invalid endpoint"). Instead,
+  OtelEndpointEnvironmentPostProcessor (registered via META-INF/
+  spring.factories — the .imports file is NOT consulted for this factory
+  type in Boot 4.0.0; proven by loader probes) maps
+  OTEL_EXPORTER_OTLP_ENDPOINT to both export properties only when set,
+  and explicitly sets management.otlp.metrics.export.enabled=false when
+  unset (otherwise the meter registry falls back to localhost:4318 and
+  "no export" is false for metrics). Endpoint value is the collector BASE
+  (http://host:4318); exporters append their signal paths. Verified
+  end-to-end with the packaged jar on H2: no env → healthy, zero OTLP
+  activity; env set → OtlpMeterRegistry publishes to the base URL.
+- Next: Fix S4 — security error envelope (401/403 JSON) + TraceIdFilter
+  ordered before the security chain.
 - Failing tests: none.

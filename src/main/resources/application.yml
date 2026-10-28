@@ -26,13 +26,24 @@ management:
   # Vendor-neutral OpenTelemetry export: set OTEL_EXPORTER_OTLP_ENDPOINT to any
   # OTLP collector (Grafana Cloud, Datadog, ...) and traces + metrics flow there.
   # Empty (the default) means no export — instrumentation still runs in-process.
+  # Property names are the Spring Boot 4 ones, verified against the Boot 4.0.0
+  # configuration metadata: tracing export binds
+  # management.opentelemetry.tracing.export.otlp.endpoint (the pre-4
+  # management.otlp.tracing.endpoint is a deprecated relocation and is NOT
+  # bound by the exporter); Micrometer's OTLP meter registry binds
+  # management.otlp.metrics.export.*. The env value feeds both exporters
+  # verbatim; if a collector needs per-signal URLs, override the two
+  # properties separately (…/v1/traces and …/v1/metrics).
   tracing:
     sampling:
       probability: ${TRACING_SAMPLING:1.0}
+  # The endpoint properties themselves are deliberately NOT declared here:
+  # OtelEndpointEnvironmentPostProcessor maps OTEL_EXPORTER_OTLP_ENDPOINT to
+  # management.opentelemetry.tracing.export.otlp.endpoint and
+  # management.otlp.metrics.export.url only when the variable is set (an
+  # always-present placeholder would bind an invalid endpoint and the
+  # exporter would reject it at startup).
   otlp:
-    tracing:
-      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:}
     metrics:
       export:
-        url: ${OTEL_EXPORTER_OTLP_ENDPOINT:}
         step: ${OTEL_METRICS_STEP:1m}
