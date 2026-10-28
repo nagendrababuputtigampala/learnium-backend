@@ -41,3 +41,8 @@
   spring-boot-starter-opentelemetry, env-driven OTLP tracing/metrics export
   (empty endpoint = no export), verified by a context test with the endpoint
   set. Note: @SpringBootTest disables metrics export by default in tests.
+
+- M1 COMPLETE: full `mvn -o verify` green — 50 tests, JaCoCo LINE 100%
+  (221/221), BRANCH 100% (14/14), gate checks met. Slices: S1 tenancy core,
+  S2 content, S3 exam chain + gamification, S4 demo seeder, S5 PageResponse,
+  S6 OTel export. Next: M2 (auth & roles). Failing tests: none.
