@@ -50,7 +50,9 @@ Additional environment variables:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `JWT_SECRET` | *(blank → labelled dev-only fallback)* | HS256 signing secret for access tokens. **Always set in production.** |
+| `JWT_SECRET` | *(blank)* | HS256 signing secret for access tokens. **Always set a real secret in production.** When blank (or set to the published development literal), startup fails unless a development gate is open: the `demo`/`dev` Spring profile or `JWT_DEV_SECRET_ALLOWED=true`. |
+| `JWT_DEV_SECRET_ALLOWED` | `false` | Local development only: permits the published dev-only JWT fallback secret when no `JWT_SECRET` is set. Never enable in production. |
+| `OUTBOX_ENCRYPTION_KEY` | *(blank → derived from the JWT secret)* | Key material for encrypting email-outbox payloads at rest (they carry raw set-password tokens until delivery). |
 | `APP_PUBLIC_BASE_URL` | `http://localhost:5173` | Frontend origin used to build emailed set-password links. |
 | `MAIL_HOST` / `MAIL_PORT` | `localhost` / `1025` | SMTP server for invite/reset mail (Mailpit locally). |
 | `MAIL_USERNAME` / `MAIL_PASSWORD` | *(blank)* | SMTP credentials, when the server requires them. |

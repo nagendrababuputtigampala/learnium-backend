@@ -25,9 +25,18 @@ spring:
 
 learnium:
   jwt:
-    # HS256 signing secret for access tokens. Production MUST set JWT_SECRET;
-    # blank falls back to a labelled development-only secret (JwtService).
-    secret: <redacted>
+    # HS256 signing secret for access tokens, bound from the JWT_SECRET
+    # environment variable. Production MUST set a real secret: when the value
+    # is blank (or equals the published development literal), JwtService only
+    # falls back to the development secret if a demo/dev profile is active or
+    # JWT_DEV_SECRET_ALLOWED=true — otherwise startup fails fast.
+    secret: ${JWT_SECRET:}
+    dev-secret-allowed: ${JWT_DEV_SECRET_ALLOWED:false}
+  outbox:
+    # Key material for encrypting email-outbox payloads at rest (they carry
+    # raw set-password tokens). Blank derives the key from the JWT secret
+    # material instead; set OUTBOX_ENCRYPTION_KEY to decouple the two.
+    encryption-key: ${OUTBOX_ENCRYPTION_KEY:}
   app:
     # Public origin of the frontend, used to build emailed set-password links.
     public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:5173}

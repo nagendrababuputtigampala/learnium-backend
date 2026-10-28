@@ -2,7 +2,7 @@
 # PostgreSQL. Flyway is disabled; Hibernate creates/drops the schema instead.
 spring:
   datasource:
-    url: jdbc:h2:mem:learnium-test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=false;INIT=CREATE SCHEMA IF NOT EXISTS learnium
+    url: jdbc:h2:mem:learnium-test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=false;LOCK_TIMEOUT=10000;INIT=CREATE SCHEMA IF NOT EXISTS learnium
     username: sa
     password:
     driver-class-name: org.h2.Driver
@@ -11,3 +11,9 @@ spring:
       ddl-auto: create-drop
   flyway:
     enabled: false
+
+# A test-only signing secret so the context satisfies the JWT gate without a
+# demo/dev profile or the development fallback.
+learnium:
+  jwt:
+    secret: <redacted>

@@ -17,15 +17,23 @@ import java.util.UUID;
 import javax.crypto.SecretKey;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Service;
 
 /**
  * Issues and validates Learnium access tokens (HS256). Staff tokens live 15
  * minutes; a student session token lives 12 hours and is additionally scoped
  * to one batch + roster membership. The signing secret comes from
- * {@code JWT_SECRET}; when it is blank (tests set their own), a deterministic
- * development fallback keeps the app startable — production must set the env
- * var (docker-compose ships a labelled dev-only value).
+ * {@code JWT_SECRET}.
+ *
+ * <p>The development fallback secret is public knowledge (it is printed in
+ * this file), so it must never silently sign production tokens: it is used
+ * ONLY when no real secret is configured AND a development gate is open — an
+ * active {@code demo} or {@code dev} Spring profile, or the explicit
+ * {@code learnium.jwt.dev-secret-allowed} flag ({@code JWT_DEV_SECRET_ALLOWED}).
+ * With no real secret and no gate, startup fails fast. A configured value
+ * equal to the development literal counts as "no real secret".
  */
 @Service
 public class JwtService {
@@ -39,14 +47,42 @@ public class JwtService {
     private static final String CLAIM_BATCH_ID = "batchId";
     private static final String CLAIM_MEMBERSHIP_ID = "membershipId";
     private static final String TYPE_ACCESS = "access";
-    private static final String DEV_FALLBACK_SECRET =
+
+    /**
+     * The labelled development-only signing secret. Public by design (anyone
+     * can read it), which is exactly why {@link #JwtService} refuses to use it
+     * outside an explicit development gate. Also used as last-resort key
+     * material for outbox payload encryption in local development.
+     */
+    public static final String DEV_FALLBACK_SECRET =
             "learnium-dev-only-jwt-secret-not-for-production-use-0123456789";
 
     private final SecretKey signingKey;
 
-    public JwtService(@Value("${learnium.jwt.secret:}") String secret) {
-        String effective = (secret == null || secret.isBlank()) ? DEV_FALLBACK_SECRET : secret;
-        this.signingKey = deriveKey(effective);
+    public JwtService(
+            @Value("${learnium.jwt.secret:}") String secret,
+            @Value("${learnium.jwt.dev-secret-allowed:false}") boolean devSecretAllowed,
+            Environment environment) {
+        this.signingKey = deriveKey(resolveSecret(secret, devSecretAllowed, environment));
+    }
+
+    private static String resolveSecret(
+            String secret, boolean devSecretAllowed, Environment environment) {
+        boolean noRealSecret =
+                secret == null || secret.isBlank() || DEV_FALLBACK_SECRET.equals(secret);
+        if (!noRealSecret) {
+            return secret;
+        }
+        boolean developmentGateOpen =
+                devSecretAllowed || environment.acceptsProfiles(Profiles.of("demo", "dev"));
+        if (developmentGateOpen) {
+            return DEV_FALLBACK_SECRET;
+        }
+        throw new IllegalStateException(
+                "No JWT signing secret is configured. Set the JWT_SECRET environment variable"
+                        + " to a real secret, or — for local development only — open the"
+                        + " development fallback by activating the demo/dev Spring profile or"
+                        + " setting JWT_DEV_SECRET_ALLOWED=true.");
     }
 
     /**

@@ -275,3 +275,14 @@
   (rm -rf target first; mvn clean is unavailable offline) is authoritative.
   Failing tests: none. Ready for Nagendra's review; do not push (bundle
   handoff per the working agreement).
+
+- FIX ROUND (Codex M2 review, request changes) F1 done: JWT secret is now
+  bound from JWT_SECRET in application.yml (was a hardcoded dev literal);
+  JwtService uses the dev fallback ONLY behind a gate — demo/dev profile or
+  JWT_DEV_SECRET_ALLOWED=true — and fails startup otherwise (a configured
+  value equal to the dev literal counts as no real secret). Test profiles
+  carry a test-only secret. README env table updated. Targeted green:
+  JwtServiceTest (16, incl. gate matrix), MigrationTest, DemoCentreSeederTest,
+  LearniumApplicationTests.
+- Next: F2 transaction correctness (PIN lockout, refresh rotation/replay,
+  account-token atomic consume). Failing tests: none.

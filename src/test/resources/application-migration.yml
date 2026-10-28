@@ -12,3 +12,9 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+
+# A test-only signing secret so the context satisfies the JWT gate without a
+# demo/dev profile or the development fallback.
+learnium:
+  jwt:
+    secret: <redacted>

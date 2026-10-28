@@ -18,7 +18,15 @@ class JwtServiceTest {
 
     private static final String SECRET = "test-secret-test-secret-test-secret-0123456789";
 
-    private final JwtService jwtService = new JwtService(SECRET);
+    private final JwtService jwtService = service(SECRET, false);
+
+    /** Builds a service with an explicit gate configuration (flag + active profiles). */
+    private static JwtService service(String secret, boolean devSecretAllowed, String... profiles) {
+        org.springframework.mock.env.MockEnvironment environment =
+                new org.springframework.mock.env.MockEnvironment();
+        environment.setActiveProfiles(profiles);
+        return new JwtService(secret, devSecretAllowed, environment);
+    }
 
     /** Mirrors JwtService's key derivation (SHA-256 of the secret) for forging test tokens. */
     private static SecretKey keyFor(String secret) throws Exception {
@@ -65,8 +73,8 @@ class JwtServiceTest {
     }
 
     @Test
-    void blankSecretFallsBackToDevelopmentSecret() {
-        JwtService fallback = new JwtService("");
+    void blankSecretFallsBackToDevelopmentSecretOnDemoProfile() {
+        JwtService fallback = service("", false, "demo");
         UserAccount user = staffUser(UserRole.CENTRE_ADMIN);
 
         String token = fallback.issueStaffToken(user);
@@ -74,6 +82,61 @@ class JwtServiceTest {
         assertThat(fallback.validate(token)).isPresent();
         // A token from the fallback-secret service must not validate elsewhere.
         assertThat(jwtService.validate(token)).isEmpty();
+    }
+
+    @Test
+    void blankSecretFallsBackToDevelopmentSecretOnDevProfile() {
+        JwtService fallback = service("", false, "dev");
+
+        String token = fallback.issueStaffToken(staffUser(UserRole.TEACHER));
+
+        assertThat(fallback.validate(token)).isPresent();
+    }
+
+    @Test
+    void blankSecretFallsBackWhenDevSecretFlagIsEnabled() {
+        JwtService fallback = service("", true, "prod");
+
+        String token = fallback.issueStaffToken(staffUser(UserRole.TEACHER));
+
+        assertThat(fallback.validate(token)).isPresent();
+    }
+
+    @Test
+    void blankSecretWithoutAnyGateFailsStartup() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service("", false, "prod"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("JWT_SECRET")
+                .hasMessageContaining("JWT_DEV_SECRET_ALLOWED");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service("", false))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void developmentLiteralCountsAsNoRealSecretAndFailsWithoutGate() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> service(JwtService.DEV_FALLBACK_SECRET, false, "prod"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("JWT_SECRET");
+    }
+
+    @Test
+    void developmentLiteralWithGateOpenUsesTheFallback() {
+        JwtService fallback = service(JwtService.DEV_FALLBACK_SECRET, false, "demo");
+
+        String token = fallback.issueStaffToken(staffUser(UserRole.TEACHER));
+
+        assertThat(fallback.validate(token)).isPresent();
+    }
+
+    @Test
+    void realSecretIsUsedAsIsEvenWithGateClosed() {
+        JwtService prod = service(SECRET, false, "prod");
+        UserAccount user = staffUser(UserRole.TEACHER);
+
+        String token = prod.issueStaffToken(user);
+
+        assertThat(prod.validate(token)).isPresent();
     }
 
     @Test
@@ -123,8 +186,8 @@ class JwtServiceTest {
     }
 
     @Test
-    void nullSecretFallsBackToDevelopmentSecret() {
-        JwtService fallback = new JwtService(null);
+    void nullSecretFallsBackToDevelopmentSecretWhenFlagIsEnabled() {
+        JwtService fallback = service(null, true);
         UserAccount user = staffUser(UserRole.TEACHER);
 
         String token = fallback.issueStaffToken(user);
@@ -158,7 +221,7 @@ class JwtServiceTest {
         java.security.Provider sun = java.security.Security.getProvider("SUN");
         java.security.Security.removeProvider("SUN");
         try {
-            org.assertj.core.api.Assertions.assertThatThrownBy(() -> new JwtService(SECRET))
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> service(SECRET, false))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("SHA-256");
         } finally {
