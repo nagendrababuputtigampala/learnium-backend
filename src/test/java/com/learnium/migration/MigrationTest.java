@@ -37,7 +37,7 @@ class MigrationTest {
         assertThat(applied)
                 .extracting(MigrationInfo::getVersion)
                 .extracting(Object::toString)
-                .containsExactly("1", "2", "3", "4", "5");
+                .containsExactly("1", "2", "3", "4", "5", "6");
         assertThat(applied)
                 .extracting(MigrationInfo::getState)
                 .containsOnly(MigrationState.SUCCESS);

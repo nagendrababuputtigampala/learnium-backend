@@ -18,7 +18,7 @@ import org.springframework.test.context.DynamicPropertySource;
 /**
  * The H2 suite proves migrations in PostgreSQL MODE; this test proves them
  * against a real PostgreSQL — the dialect gaps H2 cannot see (constraint
- * enforcement, jsonb, timestamptz) are exactly what the V5 tenancy
+ * enforcement, jsonb, timestamptz) are exactly what the V5/V6 tenancy
  * invariants rely on. It runs ONLY where {@code LEARINUM_PG_TEST=true} (the
  * CI {@code postgres-migration} job provides a postgres:16 service); locally
  * and in the default CI build it is skipped, never failed.
@@ -53,7 +53,7 @@ class PostgresMigrationTest {
                 jdbcTemplate.queryForObject(
                         "SELECT COUNT(*) FROM learnium.flyway_schema_history WHERE success = true",
                         Long.class);
-        assertThat(applied).isGreaterThanOrEqualTo(5L);
+        assertThat(applied).isGreaterThanOrEqualTo(6L);
     }
 
     @Test
@@ -91,6 +91,19 @@ class PostgresMigrationTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    @Test
+    void crossCentreQuestionInsertViolatesCompositeFkOnRealPostgres() {
+        UUID centreA = insertCentre("PG Content Centre A");
+        UUID centreB = insertCentre("PG Content Centre B");
+        UUID userB = insertUser(centreB);
+        UUID materialB = insertMaterial(centreB, userB);
+
+        // The question claims centre A but references B's material: the V6
+        // (centre_id, material_id) composite FK must reject it on real PG.
+        assertThatThrownBy(() -> insertQuestion(centreA, materialB))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
     private UUID insertCentre(String name) {
         UUID id = UUID.randomUUID();
         jdbcTemplate.update(
@@ -109,6 +122,53 @@ class PostgresMigrationTest {
                 id,
                 centreId);
         return id;
+    }
+
+    private UUID insertMaterial(UUID centreId, UUID uploaderId) {
+        UUID gradeSubjectId =
+                jdbcTemplate.queryForObject(
+                        "SELECT grade_subject_id FROM learnium.grade_subjects LIMIT 1", UUID.class);
+        UUID id = UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO learnium.materials"
+                        + " (material_id, centre_id, uploaded_by, grade_subject_id, title,"
+                        + " source_type, created_at, updated_at)"
+                        + " VALUES (?, ?, ?, ?, 'PG Material', 'PDF',"
+                        + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                id,
+                centreId,
+                uploaderId,
+                gradeSubjectId);
+        return id;
+    }
+
+    private void insertQuestion(UUID centreId, UUID materialId) {
+        UUID gradeSubjectId =
+                jdbcTemplate.queryForObject(
+                        "SELECT grade_subject_id FROM learnium.grade_subjects LIMIT 1", UUID.class);
+        UUID topicId = UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO learnium.topics"
+                        + " (topic_id, grade_subject_id, topic_name, created_at, updated_at)"
+                        + " VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                topicId,
+                gradeSubjectId,
+                "PG Topic " + topicId);
+        UUID questionTypeId =
+                jdbcTemplate.queryForObject(
+                        "SELECT question_type_id FROM learnium.question_types LIMIT 1", UUID.class);
+        jdbcTemplate.update(
+                "INSERT INTO learnium.questions"
+                        + " (question_id, centre_id, topic_id, question_type_id, material_id,"
+                        + " payload, correct_ref, created_at, updated_at)"
+                        + " VALUES (?, ?, ?, ?, ?, CAST(? AS jsonb), 'options[0]',"
+                        + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                UUID.randomUUID(),
+                centreId,
+                topicId,
+                questionTypeId,
+                materialId,
+                "{\"prompt\":\"1/2 + 1/4?\"}");
     }
 
     private UUID insertBatch(UUID centreId) {

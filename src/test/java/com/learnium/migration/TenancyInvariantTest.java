@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.learnium.model.common.ExamModeType;
+import com.learnium.model.content.Material;
+import com.learnium.model.content.MaterialSourceType;
 import com.learnium.model.content.Question;
 import com.learnium.model.content.Topic;
 import com.learnium.model.exam.ExamAttempt;
@@ -19,6 +21,7 @@ import com.learnium.model.user.Centre;
 import com.learnium.model.user.MemberRole;
 import com.learnium.model.user.UserAccount;
 import com.learnium.model.user.UserRole;
+import com.learnium.repository.content.MaterialRepository;
 import com.learnium.repository.content.QuestionRepository;
 import com.learnium.repository.content.TopicRepository;
 import com.learnium.repository.exam.ExamAttemptRepository;
@@ -43,10 +46,12 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Proves the V5 database-level tenancy invariants on the real migrated schema:
- * cross-centre links cannot be stored at all (composite FKs), template
- * uniqueness is per centre, and exam modes are unique per test type. Each test
- * rolls back, so the shared master data seeded by V2/V3 is reused read-only.
+ * Proves the V5/V6 database-level tenancy invariants on the real migrated
+ * schema: cross-centre links cannot be stored at all (composite FKs) —
+ * including the content chain (question → material, material → uploader)
+ * closed by V6 — template uniqueness is per centre, and exam modes are
+ * unique per test type. Each test rolls back, so the shared master data
+ * seeded by V2/V3 is reused read-only.
  */
 @SpringBootTest
 @ActiveProfiles("migration")
@@ -63,6 +68,7 @@ class TenancyInvariantTest {
     @Autowired private SubjectRepository subjectRepository;
     @Autowired private GradeSubjectRepository gradeSubjectRepository;
     @Autowired private TopicRepository topicRepository;
+    @Autowired private MaterialRepository materialRepository;
     @Autowired private QuestionTypeRepository questionTypeRepository;
     @Autowired private QuestionRepository questionRepository;
     @Autowired private ExamModeRepository examModeRepository;
@@ -161,6 +167,17 @@ class TenancyInvariantTest {
         question.setPayload(objectMapper.readTree("{\"prompt\":\"1/2 + 1/4?\"}"));
         question.setCorrectRef("options[0]");
         return questionRepository.save(question);
+    }
+
+    private Material saveMaterial(Centre centre, UserAccount uploader, Fixture f, String title) {
+        Material material = new Material();
+        material.setCentre(centre);
+        material.setUploadedBy(uploader);
+        material.setGradeSubject(f.gradeSubject());
+        material.setTopic(f.topic());
+        material.setTitle(title);
+        material.setSourceType(MaterialSourceType.PDF);
+        return materialRepository.save(material);
     }
 
     @Test
@@ -265,6 +282,54 @@ class TenancyInvariantTest {
         saveTemplate(f.centreA(), f, mode, "Fractions Check");
         assertThatThrownBy(() -> examTemplateRepository.flush())
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void questionCannotReferenceAnotherCentresMaterial() throws Exception {
+        Fixture f = fixture();
+        Material materialB = saveMaterial(f.centreB(), f.studentB(), f, "Beta Chapter");
+        materialRepository.flush();
+
+        Question bad = saveQuestion(f.centreA(), f);
+        bad.setMaterial(materialB); // material belongs to centre B
+        questionRepository.save(bad);
+
+        assertThatThrownBy(() -> questionRepository.flush())
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void questionCanReferenceOwnCentresMaterial() throws Exception {
+        Fixture f = fixture();
+        Material materialA = saveMaterial(f.centreA(), f.teacherA(), f, "Alpha Chapter");
+
+        Question ok = saveQuestion(f.centreA(), f);
+        ok.setMaterial(materialA);
+        questionRepository.save(ok);
+        questionRepository.flush();
+
+        assertThat(questionRepository.findById(ok.getQuestionId()))
+                .get()
+                .extracting(q -> q.getMaterial().getMaterialId())
+                .isEqualTo(materialA.getMaterialId());
+    }
+
+    @Test
+    void materialCannotNameAnotherCentresUserAsUploader() {
+        Fixture f = fixture();
+        saveMaterial(f.centreA(), f.studentB(), f, "Alpha Chapter"); // uploader belongs to centre B
+
+        assertThatThrownBy(() -> materialRepository.flush())
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void materialCanNameOwnCentresUserAsUploader() {
+        Fixture f = fixture();
+        Material ok = saveMaterial(f.centreA(), f.teacherA(), f, "Alpha Chapter");
+        materialRepository.flush();
+
+        assertThat(materialRepository.findById(ok.getMaterialId())).isPresent();
     }
 
     @Test
