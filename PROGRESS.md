@@ -360,5 +360,11 @@
   provider-removal tests mirroring the TokenHashing pattern, and the
   mock-based OutboxDispatcherClaimTest (claim lost -> no delivery;
   claimed row vanished -> skipped). Targeted green.
-- Next: re-run the from-scratch verify to confirm the gate. Failing
-  tests: none.
+- FIX ROUND COMPLETE: final from-scratch verify (rm -rf target +
+  mvn -o verify) BUILD SUCCESS — 265 tests run, 0 failures, 0 errors,
+  4 skipped (env-gated PostgresMigrationTest); JaCoCo LINE 100%
+  (1208/1208), BRANCH 100% (195/195), INSTRUCTION 100% (5145/5145),
+  zero missed in jacoco.csv totals. Commits on feature/auth-roles:
+  0b9e812 (F1), 502eee3 (F2), e93689d (F3), ca79880 (F4), a26dad8
+  (coverage hardening). Not pushed — bundle handoff per the working
+  agreement; backend PR #8 updates in place once Nagendra pushes.
