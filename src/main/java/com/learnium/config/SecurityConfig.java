@@ -61,6 +61,7 @@ public class SecurityConfig {
                                                 "/api/v1/auth/reset-password",
                                                 "/api/v1/auth/accept-invite",
                                                 "/api/v1/auth/student-session",
+                                                "/api/v1/platform/**",
                                                 "/api/v1/public/**")
                                         .permitAll()
                                         .anyRequest()

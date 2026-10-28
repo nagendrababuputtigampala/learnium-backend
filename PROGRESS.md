@@ -213,5 +213,25 @@
   sets flushAutomatically=true. Targeted green: AccountTokenServiceTest,
   AccountFlowTest (9), OutboxDispatcherTest, MailTemplateRendererTest,
   SmtpEmailSenderTest.
-- Next: M2 S3 — admin-lite (teachers/batches), centre profile, onboarding,
-  master + public lists, BatchAccessGuard.
+- M2 S3 done: teacher admin (global email uniqueness -> 409 LRN-USR-001;
+  create with null password + INVITE + outbox row; paged centre-scoped list;
+  deactivate = DISABLED + refresh-token revocation; foreign/non-teacher ids
+  -> 404 LRN-USR-002). Batches: create (unknown gradeSubjectId -> 400),
+  gradeLabel "Grade 8 · Mathematics"; TEACHER ASSIGNMENT MODELLED AS A
+  BatchMembership ROW with memberRole=TEACHER (the M1 model already had the
+  role field) — reactivation supported, a STUDENT membership for the same
+  user/batch blocks assignment with 400; unassign requires an ACTIVE teacher
+  membership else 404 LRN-CTR-002; GET /batches: admin sees all centre
+  batches, teacher only assigned ones; studentCount = ACTIVE STUDENT
+  memberships. Centre profile GET (staff) / PUT (admin, @URL logoUrl +
+  @Email contactEmail validated, nulls allowed). Platform onboarding:
+  POST /api/v1/platform/centres is permit-listed with the X-Provisioning-Key
+  header as the credential — no key configured -> 404 LRN-SYS-404,
+  wrong/missing key -> 401 LRN-AUTH-001 (constant-time compare), correct ->
+  centre + CENTRE_ADMIN + INVITE enqueued, duplicate admin email -> 409.
+  Master grade-subjects (staff) and public centres/batches (names only,
+  batches active + name-sorted, unknown centre -> empty list by design).
+  BatchAccessGuard centralises batch tenancy (404) + teacher assignment
+  (403). Targeted green: AdminFlowTest (17), PlatformOnboardingTest (4),
+  PlatformOnboardingDisabledTest (2).
+- Next: M2 S4 — roster management + student PIN session.

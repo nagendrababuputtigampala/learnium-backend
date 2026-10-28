@@ -34,6 +34,10 @@ learnium:
   mail:
     from: ${MAIL_FROM:no-reply@learnium.local}
     dispatch-delay-ms: ${MAIL_DISPATCH_DELAY_MS:5000}
+  platform:
+    # Shared secret for the platform onboarding endpoint. Blank (the default)
+    # disables POST /api/v1/platform/centres entirely (it answers 404).
+    provisioning-key: ${PLATFORM_PROVISIONING_KEY:}
 
 server:
   port: ${PORT:8080}
