@@ -36,3 +36,4 @@
   data, Fractions topic, Batch B, 5 students (Simran first) with BCrypt PIN
   1234; BCrypt PasswordEncoder bean added to SecurityConfig. Seeder tests
   green against the migrated schema.
+- M1 S5 done: PageResponse<T> API envelope (tracker task 55) with unit tests.
