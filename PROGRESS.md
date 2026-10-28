@@ -119,5 +119,14 @@
   entries follow the registry pattern; covered by handler unit tests and
   MockMvc tests through the test-support controller (malformed JSON /
   wrong method / wrong content type, all authenticated).
-- Next: Fix S6 — real-PostgreSQL migration test (env-gated) + CI job.
+- Fix S6 done: PostgresMigrationTest (env-gated on LEARINUM_PG_TEST=true;
+  datasource from LEARINUM_PG_URL/USERNAME/PASSWORD with localhost
+  defaults) asserts ≥5 successful Flyway migrations on real PostgreSQL, a
+  Centre JPA round-trip under ddl-auto=validate, and that a raw
+  cross-centre membership INSERT violates the V5 composite FK. Verified
+  locally: SKIPPED (3/3) without the env var, default suite unaffected.
+  CI gains a `postgres-migration` job (postgres:16 service with health
+  check, JDK 17, runs only that test class). Workflow YAML validated.
+- CODEX REVIEW FIXES COMPLETE (S1–S6). Remaining before this branch is
+  re-bundled for Nagendra: final full `mvn verify` + coverage gate.
 - Failing tests: none.
