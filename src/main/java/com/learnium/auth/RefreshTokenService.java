@@ -28,6 +28,13 @@ import org.springframework.transaction.support.TransactionTemplate;
  * REQUIRES_NEW transaction so the 401 thrown afterwards can never roll it
  * back. (The previous implementation revoked inside the request transaction
  * and then threw — the rollback silently resurrected the whole family.)
+ *
+ * <p>Every token is also stamped with the account's security version at
+ * issuance (Flyway V9). A credential change (password set/reset,
+ * deactivation) increments the version in its own transaction, so a token
+ * minted by a login that raced the change carries the old version and is
+ * refused at rotation even though its row was never revoked — issuance and
+ * revocation no longer need to be coordinated for the reset to win.
  */
 @Service
 public class RefreshTokenService {
@@ -58,6 +65,7 @@ public class RefreshTokenService {
         RefreshToken token = new RefreshToken();
         token.setCentreId(user.getCentre().getCentreId());
         token.setUser(user);
+        token.setSecurityVersion(user.getSecurityVersion());
         token.setTokenHash(TokenHashing.sha256Hex(raw));
         token.setExpiresAt(now.plus(REFRESH_TOKEN_TTL));
         token.setCreatedAt(now);
@@ -83,6 +91,20 @@ public class RefreshTokenService {
             throw new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS);
         }
         if (presented.getExpiresAt().isBefore(Instant.now())) {
+            throw new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS);
+        }
+        if (presented.getSecurityVersion() != presented.getUser().getSecurityVersion()) {
+            // The account's credentials changed after this token was issued
+            // (a password reset or deactivation raced its issuance), so the
+            // token predates the current credential epoch even though its
+            // row was never revoked. This is NOT a replay — the credential
+            // change already revoked the family it knew about — so just
+            // kill this one token, in its own transaction so the refusal
+            // below cannot roll the revocation back.
+            requiresNewTemplate.executeWithoutResult(
+                    status ->
+                            refreshTokenRepository.revokeIfActive(
+                                    presented.getRefreshTokenId(), Instant.now()));
             throw new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS);
         }
         Rotation rotation =

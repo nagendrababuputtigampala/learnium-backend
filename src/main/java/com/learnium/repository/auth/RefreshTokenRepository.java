@@ -37,6 +37,18 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
     int consumeIfActive(@Param("id") UUID id, @Param("now") Instant now);
 
     /**
+     * Revoke this one token if it is still live (same conditional update as
+     * the rotation consume, under its own name: the security-version
+     * rejection in {@code RefreshTokenService.rotate} kills just the stale
+     * token, without touching the rest of the family).
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+            "update RefreshToken t set t.revokedAt = :now"
+                    + " where t.refreshTokenId = :id and t.revokedAt is null")
+    int revokeIfActive(@Param("id") UUID id, @Param("now") Instant now);
+
+    /**
      * Revoke every still-live token of one user inside one centre (logout-all
      * paths). {@code clearAutomatically} matters: a bulk update bypasses the
      * persistence context, and callers must never act on a stale, still-live

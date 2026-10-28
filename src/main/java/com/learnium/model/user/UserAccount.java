@@ -65,6 +65,16 @@ public class UserAccount extends AuditableEntity {
     @Column(name = "password_hash", length = 255)
     private String passwordHash;
 
+    /**
+     * Credential epoch (Flyway V9): incremented in the same transaction as
+     * every password set/change/reset and every deactivation. Refresh tokens
+     * are stamped with the version at issuance and rotation rejects a stale
+     * stamp — that is what makes a login racing a password reset harmless:
+     * whenever its token was written, it carries the pre-reset version.
+     */
+    @Column(name = "security_version", nullable = false)
+    private long securityVersion;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private UserStatus status = UserStatus.ACTIVE;

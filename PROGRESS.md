@@ -383,3 +383,18 @@
   defaults are non-secret local-dev values; the test-profile YAMLs hold
   only H2/test-fixture credentials by design.
 - Next: R2-S2 security version (reset/login race). Failing tests: none.
+- R2-S2 done: security version (reset/login race, Codex rerun P1). Flyway
+  V9 adds security_version (bigint, NOT NULL, default 0) to user_account
+  and refresh_token. RefreshTokenService.issue stamps the token with the
+  account's current version; password set/reset (AccountFlowService
+  accept-invite + reset-password) and teacher deactivation increment the
+  version in the same transaction as the credential/status change (the
+  revoke-all stays). rotate() refuses a stamp mismatch with the usual 401
+  after killing just that token in a REQUIRES_NEW transaction — a version
+  mismatch is not a replay, so no family action (the credential change
+  already revoked the family it knew). MigrationTest now expects V1..V9.
+  Targeted green: MigrationTest (5), V8MigrationTest (2), AuthFlowTest
+  (21), AccountFlowTest (9), AdminFlowTest (25), AuthServiceTest (1),
+  TeacherAdminServiceTest (2).
+- Next: R2-S3 committed-state proofs for the security version. Failing
+  tests: none.

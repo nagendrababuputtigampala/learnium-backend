@@ -92,6 +92,10 @@ public class AccountFlowService {
     public void resetPassword(String rawToken, String newPassword) {
         UserAccount user = accountTokenService.consume(rawToken, AccountTokenPurpose.RESET);
         user.setPasswordHash(passwordEncoder.encode(newPassword));
+        // Same transaction as the credential change: every token stamped
+        // with an older version is refused at rotation, including any a
+        // racing old-password login inserts after the revoke-all below.
+        user.setSecurityVersion(user.getSecurityVersion() + 1);
         userAccountRepository.save(user);
         refreshTokenService.revokeAllForUser(user);
     }
@@ -101,6 +105,7 @@ public class AccountFlowService {
     public void acceptInvite(String rawToken, String newPassword) {
         UserAccount user = accountTokenService.consume(rawToken, AccountTokenPurpose.INVITE);
         user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setSecurityVersion(user.getSecurityVersion() + 1);
         userAccountRepository.save(user);
     }
 

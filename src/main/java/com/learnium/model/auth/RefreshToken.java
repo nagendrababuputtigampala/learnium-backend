@@ -56,6 +56,15 @@ public class RefreshToken {
     @Column(name = "token_hash", nullable = false, length = 64)
     private String tokenHash;
 
+    /**
+     * The account's security version at issuance (Flyway V9). Rotation
+     * rejects the token once the account's version has moved on (password
+     * set/reset, deactivation), even if this row was never revoked — e.g.
+     * it was inserted by a login that raced the credential change.
+     */
+    @Column(name = "security_version", nullable = false)
+    private long securityVersion;
+
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 

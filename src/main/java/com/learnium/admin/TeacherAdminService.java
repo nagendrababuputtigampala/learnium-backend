@@ -99,6 +99,10 @@ public class TeacherAdminService {
     public void deactivateTeacher(LearniumPrincipal principal, UUID userId) {
         UserAccount teacher = findTeacher(principal, userId);
         teacher.setStatus(UserStatus.DISABLED);
+        // Same transaction as the status change: the version bump refuses
+        // any token a racing login stamped with the pre-deactivation
+        // version, on top of the revoke-all below.
+        teacher.setSecurityVersion(teacher.getSecurityVersion() + 1);
         userAccountRepository.save(teacher);
         refreshTokenService.revokeAllForUser(teacher);
     }
