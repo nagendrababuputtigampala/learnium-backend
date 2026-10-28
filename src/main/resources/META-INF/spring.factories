@@ -1,0 +1,3 @@
+# Bridges OTEL_EXPORTER_OTLP_ENDPOINT to the Boot 4 OTLP export properties.
+org.springframework.boot.EnvironmentPostProcessor=\
+com.learnium.config.OtelEndpointEnvironmentPostProcessor

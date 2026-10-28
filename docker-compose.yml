@@ -1,0 +1,51 @@
+# Local development stack for the Learnium platform.
+#
+# Layout note: backend and frontend live in SIBLING repositories
+# (learnium-backend/ and learnium-frontend/ side by side). The frontend service
+# below builds from ../learnium-frontend — clone both repos next to each other.
+#
+# Usage: docker compose up --build
+#   - API:      http://localhost:8080/api/v1/system/ping
+#   - Frontend: http://localhost:5173
+#   - Mailpit:  http://localhost:8025 (catches all outgoing mail locally)
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: learnium
+      POSTGRES_USER: learnium
+      POSTGRES_PASSWORD: learnium
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  backend:
+    build: .
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/learnium
+      DB_USERNAME: learnium
+      DB_PASSWORD: learnium
+      PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - mailpit
+
+  frontend:
+    build:
+      context: ../learnium-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
