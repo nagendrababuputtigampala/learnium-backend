@@ -29,8 +29,11 @@ class MigrationTest {
 
     @Test
     void allMigrationsAppliedSuccessfullyInOrder() {
+        // applied() also carries Flyway's null-version schema marker row; keep real migrations.
         List<MigrationInfo> applied =
-                List.of(flyway.info().applied());
+                java.util.Arrays.stream(flyway.info().applied())
+                        .filter(info -> info.getVersion() != null)
+                        .toList();
         assertThat(applied)
                 .extracting(MigrationInfo::getVersion)
                 .extracting(Object::toString)

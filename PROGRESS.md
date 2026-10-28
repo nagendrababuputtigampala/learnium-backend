@@ -23,3 +23,11 @@
 - M1 S2 done: content model (Topic, QuestionType with code, Material, Question
   with jsonb payload + DRAFT/APPROVED/REJECTED) + Flyway V3 with the five
   question-type seeds. Targeted persistence tests green.
+- M1 S3 done: exam chain (ExamMode, ExamTemplate(+Question), ExamInstance with
+  NEW published-test semantics, ExamInstanceQuestion, ExamAttempt with
+  attempt_no + INVALIDATED, QuestionAttempt with theory marking) +
+  UserTopicStat/Badge/UserBadges/UserXpLedger + Flyway V4. Migration test now
+  fully green: V1..V4 apply in order on H2-PG mode and ddl-auto=validate
+  passes against the migrated schema. Also fixed an M0 gap the migration test
+  caught: Boot 4 needs spring-boot-starter-flyway (bare flyway-core registers
+  no auto-configuration, so migrations never ran in-app).
