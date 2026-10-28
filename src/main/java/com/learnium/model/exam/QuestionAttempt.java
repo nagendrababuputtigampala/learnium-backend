@@ -52,6 +52,10 @@ public class QuestionAttempt extends AuditableEntity {
     @Column(name = "question_attempt_id", nullable = false, updatable = false)
     private UUID questionAttemptId;
 
+    /** Owning centre, copied from the attempt; composite FKs keep it honest (V5). */
+    @Column(name = "centre_id", nullable = false)
+    private UUID centreId;
+
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "attempt_id", nullable = false)
     private ExamAttempt attempt;

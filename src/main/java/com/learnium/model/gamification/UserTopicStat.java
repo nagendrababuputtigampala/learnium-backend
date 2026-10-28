@@ -40,6 +40,10 @@ public class UserTopicStat extends AuditableEntity {
     @Column(name = "user_topic_stats_id", nullable = false, updatable = false)
     private UUID userTopicStatsId;
 
+    /** Owning centre, copied from the user; composite FKs keep it honest (V5). */
+    @Column(name = "centre_id", nullable = false)
+    private UUID centreId;
+
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private UserAccount user;

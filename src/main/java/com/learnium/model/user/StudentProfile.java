@@ -33,6 +33,10 @@ public class StudentProfile extends AuditableEntity {
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
 
+    /** Owning centre, copied from the user; composite FKs keep it honest (V5). */
+    @Column(name = "centre_id", nullable = false)
+    private UUID centreId;
+
     @OneToOne(optional = false, fetch = FetchType.LAZY)
     @MapsId
     @JoinColumn(name = "user_id", nullable = false)

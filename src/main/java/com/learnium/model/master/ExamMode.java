@@ -25,9 +25,7 @@ import org.hibernate.type.SqlTypes;
         name = "exam_modes",
         schema = "learnium",
         uniqueConstraints = {
-            @UniqueConstraint(
-                    name = "uq_exam_modes_type_title",
-                    columnNames = {"test_type", "title"})
+            @UniqueConstraint(name = "uq_exam_modes_type", columnNames = {"test_type"})
         },
         indexes = {@Index(name = "idx_exam_modes_active_sort", columnList = "is_active, sort_order")})
 @Getter

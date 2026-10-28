@@ -170,6 +170,7 @@ class ExamChainPersistenceTest {
                 .containsExactly("Fractions Check");
 
         ExamTemplateQuestion tq1 = new ExamTemplateQuestion();
+        tq1.setCentreId(centre.getCentreId());
         tq1.setExamTemplate(template);
         tq1.setQuestion(written);
         tq1.setQuestionVersion(written.getVersion());
@@ -177,6 +178,7 @@ class ExamChainPersistenceTest {
         examTemplateQuestionRepository.save(tq1);
 
         ExamTemplateQuestion tq2 = new ExamTemplateQuestion();
+        tq2.setCentreId(centre.getCentreId());
         tq2.setExamTemplate(template);
         tq2.setQuestion(mcq);
         tq2.setQuestionVersion(mcq.getVersion());
@@ -190,6 +192,7 @@ class ExamChainPersistenceTest {
         batch = batchRepository.save(batch);
 
         ExamInstance instance = new ExamInstance();
+        instance.setCentreId(centre.getCentreId());
         instance.setExamTemplate(template);
         instance.setBatch(batch);
         instance.setPublishedBy(teacher);
@@ -201,6 +204,7 @@ class ExamChainPersistenceTest {
         instance = examInstanceRepository.save(instance);
 
         ExamInstanceQuestion iq1 = new ExamInstanceQuestion();
+        iq1.setCentreId(centre.getCentreId());
         iq1.setExamInstance(instance);
         iq1.setQuestion(mcq);
         iq1.setQuestionOrder(1);
@@ -208,6 +212,7 @@ class ExamChainPersistenceTest {
         examInstanceQuestionRepository.save(iq1);
 
         ExamInstanceQuestion iq2 = new ExamInstanceQuestion();
+        iq2.setCentreId(centre.getCentreId());
         iq2.setExamInstance(instance);
         iq2.setQuestion(written);
         iq2.setQuestionOrder(2);
@@ -215,6 +220,7 @@ class ExamChainPersistenceTest {
         examInstanceQuestionRepository.save(iq2);
 
         ExamAttempt attempt = new ExamAttempt();
+        attempt.setCentreId(centre.getCentreId());
         attempt.setExamInstance(instance);
         attempt.setUser(student);
         attempt.setStartedAt(Instant.parse("2026-10-28T15:05:00Z"));
@@ -225,6 +231,7 @@ class ExamChainPersistenceTest {
         assertThat(attempt.getTotalScore()).isNull();
 
         QuestionAttempt objective = new QuestionAttempt();
+        objective.setCentreId(centre.getCentreId());
         objective.setAttempt(attempt);
         objective.setQuestion(mcq);
         objective.setQuestionVersion(mcq.getVersion());
@@ -233,6 +240,7 @@ class ExamChainPersistenceTest {
         questionAttemptRepository.save(objective);
 
         QuestionAttempt writtenAnswer = new QuestionAttempt();
+        writtenAnswer.setCentreId(centre.getCentreId());
         writtenAnswer.setAttempt(attempt);
         writtenAnswer.setQuestion(written);
         writtenAnswer.setQuestionVersion(written.getVersion());
@@ -243,6 +251,7 @@ class ExamChainPersistenceTest {
 
         // A retake is a second row distinguished by attempt_no.
         ExamAttempt retake = new ExamAttempt();
+        retake.setCentreId(centre.getCentreId());
         retake.setExamInstance(instance);
         retake.setUser(student);
         retake.setAttemptNo(2);
@@ -321,6 +330,7 @@ class ExamChainPersistenceTest {
         topic = topicRepository.save(topic);
 
         UserTopicStat stat = new UserTopicStat();
+        stat.setCentreId(centre.getCentreId());
         stat.setUser(student);
         stat.setTopic(topic);
         stat.setAttempts(10);
@@ -337,11 +347,13 @@ class ExamChainPersistenceTest {
         badge = badgeRepository.save(badge);
 
         UserBadges userBadge = new UserBadges();
+        userBadge.setCentreId(centre.getCentreId());
         userBadge.setUser(student);
         userBadge.setBadge(badge);
         userBadgesRepository.save(userBadge);
 
         UserXpLedger xp = new UserXpLedger();
+        xp.setCentreId(centre.getCentreId());
         xp.setUser(student);
         xp.setSourceType(XpSourceType.exam);
         xp.setSourceId(badge.getBadgeId());

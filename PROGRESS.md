@@ -48,3 +48,17 @@
   S6 OTel export. Next: M2 (auth & roles). Failing tests: none.
 
 - PR fix (2026-10-28): dev root merged into this branch (--allow-unrelated-histories) so GitHub accepts the PR; dev tree was empty, no content change.
+
+## Codex review fixes (2026-10-28) — in progress
+- Fix S1 done: Flyway V5 tenancy invariants — centre_id backfilled + NOT NULL
+  on the 10 child tables, composite FKs (centre_id, parent) make cross-centre
+  links unstorable, template uniqueness per centre (NULL topic_id caveat noted
+  in the migration; service layer guards it in M4), exam_modes UNIQUE
+  (test_type). Entities carry a plain centreId set from the owning parent;
+  seeder + fixtures updated. New TenancyInvariantTest: 7 tests on the migrated
+  schema (cross-centre writes rejected, cross-centre template names coexist,
+  same-centre duplicate rejected, duplicate mode type rejected). Targeted
+  tests green: migration + invariant + tenancy/content/exam/seeder suites.
+- Next: Fix S2 — centre-scope every tenant repository finder + negative read
+  tests; strengthen TenancyPersistenceTest.
+- Failing tests: none.

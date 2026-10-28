@@ -34,7 +34,13 @@ import org.hibernate.type.SqlTypes;
             @UniqueConstraint(
                     name = "uq_exam_templates_unique",
                     columnNames = {
-                        "grade_id", "subject_id", "topic_id", "exam_mode_id", "template_name", "version"
+                        "centre_id",
+                        "grade_id",
+                        "subject_id",
+                        "topic_id",
+                        "exam_mode_id",
+                        "template_name",
+                        "version"
                     })
         },
         indexes = {

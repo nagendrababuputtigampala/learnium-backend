@@ -44,6 +44,10 @@ public class ExamInstanceQuestion extends AuditableEntity {
     @Column(name = "exam_instance_question_id", nullable = false, updatable = false)
     private UUID examInstanceQuestionId;
 
+    /** Owning centre, copied from the instance; composite FKs keep it honest (V5). */
+    @Column(name = "centre_id", nullable = false)
+    private UUID centreId;
+
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "exam_instance_id", nullable = false)
     private ExamInstance examInstance;

@@ -135,6 +135,7 @@ public class DemoCentreSeeder implements ApplicationRunner {
 
             StudentProfile profile = new StudentProfile();
             profile.setUser(student);
+            profile.setCentreId(centre.getCentreId());
             profile.setGrade(grade8);
             profile.setFullName(studentName);
             studentProfileRepository.save(profile);
@@ -158,6 +159,7 @@ public class DemoCentreSeeder implements ApplicationRunner {
     private void saveMembership(Batch batch, UserAccount user, MemberRole role, String pinHash) {
         BatchMembership membership = new BatchMembership();
         membership.setBatch(batch);
+        membership.setCentreId(batch.getCentre().getCentreId());
         membership.setUser(user);
         membership.setMemberRole(role);
         membership.setPinHash(pinHash);

@@ -47,6 +47,10 @@ public class BatchMembership extends AuditableEntity {
     @Column(name = "membership_id", nullable = false, updatable = false)
     private UUID membershipId;
 
+    /** Owning centre, copied from the batch; composite FKs keep it honest (V5). */
+    @Column(name = "centre_id", nullable = false)
+    private UUID centreId;
+
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "batch_id", nullable = false)
     private Batch batch;

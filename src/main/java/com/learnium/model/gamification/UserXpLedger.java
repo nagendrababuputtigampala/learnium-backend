@@ -36,6 +36,10 @@ public class UserXpLedger extends AuditableEntity {
     @Column(name = "xp_ledger_id", nullable = false, updatable = false)
     private UUID xpLedgerId;
 
+    /** Owning centre, copied from the user; composite FKs keep it honest (V5). */
+    @Column(name = "centre_id", nullable = false)
+    private UUID centreId;
+
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private UserAccount user;

@@ -87,12 +87,14 @@ class TenancyPersistenceTest {
 
         BatchMembership teacherMembership = new BatchMembership();
         teacherMembership.setBatch(batch);
+        teacherMembership.setCentreId(centre.getCentreId());
         teacherMembership.setUser(teacher);
         teacherMembership.setMemberRole(MemberRole.TEACHER);
         membershipRepository.save(teacherMembership);
 
         BatchMembership studentMembership = new BatchMembership();
         studentMembership.setBatch(batch);
+        studentMembership.setCentreId(centre.getCentreId());
         studentMembership.setUser(student);
         studentMembership.setMemberRole(MemberRole.STUDENT);
         studentMembership.setPinHash("hashed-pin");
@@ -162,6 +164,7 @@ class TenancyPersistenceTest {
 
         StudentProfile profile = new StudentProfile();
         profile.setUser(student);
+        profile.setCentreId(centre.getCentreId());
         profile.setGrade(grade);
         profile.setFullName("Simran Kaur");
         studentProfileRepository.save(profile);
