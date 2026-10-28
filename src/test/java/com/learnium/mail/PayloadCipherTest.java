@@ -85,6 +85,37 @@ class PayloadCipherTest {
     }
 
     @Test
+    void missingSha256ProviderFailsKeyDerivation() {
+        // SHA-256 comes from the SUN provider; removing it simulates a
+        // broken runtime so the defensive catch is exercised for real.
+        java.security.Provider sun = java.security.Security.getProvider("SUN");
+        java.security.Security.removeProvider("SUN");
+        try {
+            assertThatThrownBy(() -> new PayloadCipher("key", null))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("SHA-256");
+        } finally {
+            java.security.Security.addProvider(sun);
+        }
+    }
+
+    @Test
+    void missingCipherProviderFailsEncryption() {
+        // AES/GCM comes from SunJCE; without it the Cipher lookup fails and
+        // encrypt surfaces the wrapped IllegalStateException.
+        PayloadCipher cipher = new PayloadCipher("key", null);
+        java.security.Provider sunJce = java.security.Security.getProvider("SunJCE");
+        java.security.Security.removeProvider("SunJCE");
+        try {
+            assertThatThrownBy(() -> cipher.encrypt(samplePayload()))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("encryption failed");
+        } finally {
+            java.security.Security.addProvider(sunJce);
+        }
+    }
+
+    @Test
     void eachEncryptionUsesAFreshIv() {
         PayloadCipher cipher = new PayloadCipher("key", null);
 

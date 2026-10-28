@@ -353,5 +353,12 @@
   (verified against the stored hash). 4/4 green. Note: AccountFlowTest had
   already been converted in F3, completing the committed-state rework of
   all four auth-flow test classes.
-- Next: final gate — rm -rf target + full offline verify; report counts
-  and JaCoCo totals. Failing tests: none.
+- Final gate, first pass: 261 tests, 0 failures, 4 skipped (PG-gated);
+  JaCoCo gate FAILED at 99% lines / 98% branches — PayloadCipher's two
+  defensive catches (SHA-256 / cipher provider unavailable) and the
+  dispatcher's claim-lost branch were untested. Hardening added:
+  provider-removal tests mirroring the TokenHashing pattern, and the
+  mock-based OutboxDispatcherClaimTest (claim lost -> no delivery;
+  claimed row vanished -> skipped). Targeted green.
+- Next: re-run the from-scratch verify to confirm the gate. Failing
+  tests: none.
