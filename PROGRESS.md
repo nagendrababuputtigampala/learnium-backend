@@ -328,6 +328,30 @@
   POST /api/v1/admin/teachers/{id}/resend-invite invalidates outstanding
   invite tokens and enqueues a fresh 48h invite in one transaction;
   TeacherDto gains `invited` (passwordHash == null). AccountFlowTest
-  converted to committed state as part of this slice.
-- Next: F3 targeted batch, then commit; F4 concurrency tests + final
-  from-scratch verify. Failing tests: (to be filled by the targeted run).
+  converted to committed state as part of this slice. Targeted green:
+  PayloadCipherTest (7), EmailAddressesTest (3), JwtAuthenticationFilterTest
+  (9), V8MigrationTest (2), MigrationTest (5, incl. cross-centre case-variant
+  rejection on the real migrated schema), OutboxDispatcherTest (10),
+  AuthFlowTest (21), AdminFlowTest (25), StudentSessionTest (12),
+  AccountFlowTest (9), TeacherAdminServiceTest (2), PlatformServiceTest (2),
+  RosterFlowTest (10), PlatformOnboardingTest (4) + Disabled (2),
+  DemoCentreSeederTest (2). One test-authoring bug found and fixed on the
+  way: the stale-SENDING test must flush before backdating updated_at, or
+  the auditing listener overwrites the backdate at the next auto-flush.
+- Next: F4 committed-state concurrency tests + final from-scratch verify.
+  Failing tests: none.
+
+- FIX ROUND F4 done: CommittedAuthStateTest (committed state, real
+  services + HTTP) proves the production transaction behaviour end to end:
+  (1) five failed PIN attempts persist across separate requests and the
+  6th call with the correct PIN gets the locked 403; (2) after a refresh
+  replay, the family revocation is committed — the successor token can no
+  longer refresh and both rows show revokedAt set; (3) two concurrent
+  refreshes of one token (latch-gated threads) -> exactly one success, and
+  the loser's replay handling leaves the winner's successor revoked too;
+  (4) two concurrent resets with one token -> exactly one password change
+  (verified against the stored hash). 4/4 green. Note: AccountFlowTest had
+  already been converted in F3, completing the committed-state rework of
+  all four auth-flow test classes.
+- Next: final gate — rm -rf target + full offline verify; report counts
+  and JaCoCo totals. Failing tests: none.
