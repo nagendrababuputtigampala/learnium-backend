@@ -67,6 +67,14 @@ public class BatchMembership extends AuditableEntity {
     @Column(name = "pin_hash", length = 255)
     private String pinHash;
 
+    /** Consecutive failed PIN attempts at the student-session door (students only). */
+    @Column(name = "pin_failed_attempts", nullable = false)
+    private int pinFailedAttempts = 0;
+
+    /** Set once the failed-attempt limit is hit; a teacher PIN reset clears it. */
+    @Column(name = "pin_locked", nullable = false)
+    private boolean pinLocked = false;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private MembershipStatus status = MembershipStatus.ACTIVE;

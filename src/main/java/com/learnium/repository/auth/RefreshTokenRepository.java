@@ -1,0 +1,31 @@
+package com.learnium.repository.auth;
+
+import com.learnium.model.auth.RefreshToken;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID> {
+
+    Optional<RefreshToken> findByTokenHash(String tokenHash);
+
+    /**
+     * Revoke every still-live token of one user inside one centre (logout-all
+     * paths). {@code clearAutomatically} matters: a bulk update bypasses the
+     * persistence context, and callers must never act on a stale, still-live
+     * in-memory token afterwards (the reuse-detection check depends on it).
+     */
+    @Modifying(clearAutomatically = true)
+    @Query(
+            "update RefreshToken t set t.revokedAt = :now"
+                    + " where t.centreId = :centreId and t.user.userId = :userId"
+                    + " and t.revokedAt is null")
+    int revokeAllByCentreIdAndUserId(
+            @Param("centreId") UUID centreId,
+            @Param("userId") UUID userId,
+            @Param("now") Instant now);
+}

@@ -15,6 +15,15 @@ spring:
     schemas: learnium
     default-schema: learnium
 
+learnium:
+  jwt:
+    # HS256 signing secret for access tokens. Production MUST set JWT_SECRET;
+    # blank falls back to a labelled development-only secret (JwtService).
+    secret: <redacted>
+  app:
+    # Public origin of the frontend, used to build emailed set-password links.
+    public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:5173}
+
 server:
   port: ${PORT:8080}
 

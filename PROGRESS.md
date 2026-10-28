@@ -172,3 +172,24 @@
 - Next: M2 S1 — auth core (Flyway V7 auth tables, JWT service + filter,
   refresh-token rotation, login/refresh/logout/me).
 - Failing tests: none.
+- M2 S1 done: auth core. Flyway V7 — account_token, email_outbox,
+  refresh_token (all centre-owned with composite FKs) +
+  batch_memberships.pin_failed_attempts/pin_locked; PostgresMigrationTest
+  floor raised to 7. NOTE: token_hash is varchar(64), not char(64) —
+  Hibernate schema validation distinguishes CHAR from VARCHAR; same
+  fixed-length hex content. JwtService (jjwt, HS256; key = SHA-256 of the
+  configured secret so any secret length yields a 256-bit key; blank secret
+  falls back to a labelled dev-only value) issues 15-min staff tokens and
+  12-h student tokens (batchId + membershipId claims). JwtAuthenticationFilter
+  populates LearniumPrincipal (userId, centreId from token, role); permit
+  list covers the auth doors + /public/**. Refresh tokens are 32-byte
+  random, SHA-256-hashed at rest, rotating; replaying a revoked token
+  revokes the user's whole family (the bulk revoke uses
+  clearAutomatically — a JPQL update otherwise leaves stale live tokens in
+  the persistence context). Login: global email lookup, password picks the
+  account; unknown/wrong/ambiguous -> identical LRN-AUTH-002; inactive with
+  matching password -> LRN-AUTH-005. New ErrorCodes AUTH-002/004/005/006/
+  007, USR-001/002, CTR-001/002. pom.xml gains jjwt 0.12.6 + mail +
+  thymeleaf starters (S2 uses the latter two). Targeted green: JwtServiceTest,
+  CurrentPrincipalTest, AuthFlowTest (18), MigrationTest, ErrorCodeTest.
+- Next: M2 S2 — account tokens + email outbox + invite/reset flows.

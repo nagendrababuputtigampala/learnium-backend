@@ -37,7 +37,7 @@ class MigrationTest {
         assertThat(applied)
                 .extracting(MigrationInfo::getVersion)
                 .extracting(Object::toString)
-                .containsExactly("1", "2", "3", "4", "5", "6");
+                .containsExactly("1", "2", "3", "4", "5", "6", "7");
         assertThat(applied)
                 .extracting(MigrationInfo::getState)
                 .containsOnly(MigrationState.SUCCESS);
@@ -69,7 +69,10 @@ class MigrationTest {
                         "user_topic_stats",
                         "badges",
                         "user_badges",
-                        "user_xp_ledger");
+                        "user_xp_ledger",
+                        "account_token",
+                        "email_outbox",
+                        "refresh_token");
         List<String> actual =
                 jdbcTemplate.queryForList(
                         "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES"

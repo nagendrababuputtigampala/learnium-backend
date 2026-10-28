@@ -7,9 +7,11 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import com.learnium.security.JwtAuthenticationFilter;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
  * Security baseline for the API: stateless, CSRF off (token-based API), no form/basic
@@ -35,7 +37,8 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             ApiAuthenticationEntryPoint authenticationEntryPoint,
-            ApiAccessDeniedHandler accessDeniedHandler)
+            ApiAccessDeniedHandler accessDeniedHandler,
+            JwtAuthenticationFilter jwtAuthenticationFilter)
             throws Exception {
         return http.csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(
@@ -45,12 +48,20 @@ public class SecurityConfig {
                                 exceptions
                                         .authenticationEntryPoint(authenticationEntryPoint)
                                         .accessDeniedHandler(accessDeniedHandler))
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(
                         auth ->
                                 auth.requestMatchers(
                                                 "/actuator/health",
                                                 "/actuator/info",
-                                                "/api/v1/system/ping")
+                                                "/api/v1/system/ping",
+                                                "/api/v1/auth/login",
+                                                "/api/v1/auth/refresh",
+                                                "/api/v1/auth/forgot-password",
+                                                "/api/v1/auth/reset-password",
+                                                "/api/v1/auth/accept-invite",
+                                                "/api/v1/auth/student-session",
+                                                "/api/v1/public/**")
                                         .permitAll()
                                         .anyRequest()
                                         .authenticated())
