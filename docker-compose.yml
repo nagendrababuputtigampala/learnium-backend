@@ -33,6 +33,13 @@ services:
       DB_USERNAME: learnium
       DB_PASSWORD: learnium
       PORT: 8080
+      # DEV-ONLY JWT signing secret for the local stack — never use in production.
+      JWT_SECRET: learnium-dev-only-compose-secret-change-me
+      # Frontend origin used in emailed set-password links.
+      APP_PUBLIC_BASE_URL: http://localhost:5173
+      # Mailpit is a sibling service in this stack (the app default is localhost).
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
     ports:
       - "8080:8080"
     depends_on:
