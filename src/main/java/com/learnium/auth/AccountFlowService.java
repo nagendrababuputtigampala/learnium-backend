@@ -1,5 +1,6 @@
 package com.learnium.auth;
 
+import com.learnium.common.EmailAddresses;
 import com.learnium.model.auth.AccountTokenPurpose;
 import com.learnium.model.common.UserStatus;
 import com.learnium.model.user.UserAccount;
@@ -57,13 +58,24 @@ public class AccountFlowService {
     }
 
     /**
+     * Resend an invite for an account that has not set a password yet: every
+     * outstanding invite token is invalidated and a fresh 48-hour token +
+     * email replace them, in the caller's transaction.
+     */
+    @Transactional
+    public void resendInvite(UserAccount user) {
+        accountTokenService.invalidateOutstanding(user, AccountTokenPurpose.INVITE);
+        sendInvite(user);
+    }
+
+    /**
      * Forgot-password: deliberately silent about whether the email exists
      * (the endpoint always answers 202). Only active staff accounts get a
      * reset link — students have no password to reset.
      */
     @Transactional
     public void forgotPassword(String email) {
-        for (UserAccount user : userAccountRepository.findByEmail(email)) {
+        for (UserAccount user : userAccountRepository.findByEmail(EmailAddresses.normalize(email))) {
             if (user.getStatus() == UserStatus.ACTIVE && user.getRole() != UserRole.STUDENT) {
                 String raw = accountTokenService.create(user, AccountTokenPurpose.RESET, RESET_TTL);
                 emailOutboxService.enqueue(

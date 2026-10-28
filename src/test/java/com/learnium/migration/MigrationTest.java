@@ -37,7 +37,7 @@ class MigrationTest {
         assertThat(applied)
                 .extracting(MigrationInfo::getVersion)
                 .extracting(Object::toString)
-                .containsExactly("1", "2", "3", "4", "5", "6", "7");
+                .containsExactly("1", "2", "3", "4", "5", "6", "7", "8");
         assertThat(applied)
                 .extracting(MigrationInfo::getState)
                 .containsOnly(MigrationState.SUCCESS);
@@ -107,6 +107,50 @@ class MigrationTest {
                                         + " '10000000-0000-4000-8000-000000000008'",
                                 String.class))
                 .isEqualTo("G8");
+    }
+
+    @Test
+    void staffEmailIsGloballyUniqueCaseInsensitivelyAfterV8() {
+        java.util.UUID centreA = insertCentreRow("Email Centre A");
+        java.util.UUID centreB = insertCentreRow("Email Centre B");
+        insertUserRow(centreA, "shared@example.test");
+
+        // The same email in ANOTHER centre is rejected, in any letter case:
+        // the V8 expression index on lower(email) is the database backstop
+        // behind the services' friendly pre-check.
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> insertUserRow(centreB, "SHARED@example.test"))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        // And, trivially, within the same centre too (the old V2 rule).
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> insertUserRow(centreA, "shared@example.test"))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        // NULL emails (students) are unrestricted by the index.
+        insertUserRow(centreA, null);
+        insertUserRow(centreB, null);
+    }
+
+    private java.util.UUID insertCentreRow(String name) {
+        java.util.UUID centreId = java.util.UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO learnium.centres"
+                        + " (centre_id, name, status, created_at, updated_at)"
+                        + " VALUES (?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                centreId,
+                name);
+        return centreId;
+    }
+
+    private void insertUserRow(java.util.UUID centreId, String email) {
+        jdbcTemplate.update(
+                "INSERT INTO learnium.user_account"
+                        + " (user_id, centre_id, role, email, display_name, status,"
+                        + " created_at, updated_at)"
+                        + " VALUES (?, ?, 'TEACHER', ?, 'Email Test', 'ACTIVE',"
+                        + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                java.util.UUID.randomUUID(),
+                centreId,
+                email);
     }
 
     @Test

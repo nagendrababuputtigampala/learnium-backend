@@ -354,6 +354,48 @@ class StudentSessionTest {
     }
 
     @Test
+    void studentTokenStopsWorkingWhenMembershipIsDeactivated() throws Exception {
+        JsonNode added = addStudent("Simran Kaur");
+        UUID membershipId = UUID.fromString(added.get("membershipId").asString());
+        String body =
+                session(batch.getBatchId(), "Simran Kaur", added.get("pin").asString())
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        String studentToken = objectMapper.readTree(body).get("accessToken").asString();
+        mockMvc.perform(get("/api/v1/me").header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isOk());
+
+        BatchMembership membership = membership(membershipId);
+        membership.setStatus(MembershipStatus.INACTIVE);
+        batchMembershipRepository.save(membership);
+
+        mockMvc.perform(get("/api/v1/me").header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("LRN-AUTH-005"));
+    }
+
+    @Test
+    void studentTokenIsUnauthenticatedWhenMembershipRowIsGone() throws Exception {
+        JsonNode added = addStudent("Simran Kaur");
+        UUID membershipId = UUID.fromString(added.get("membershipId").asString());
+        String body =
+                session(batch.getBatchId(), "Simran Kaur", added.get("pin").asString())
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        String studentToken = objectMapper.readTree(body).get("accessToken").asString();
+
+        batchMembershipRepository.deleteById(membershipId);
+
+        mockMvc.perform(get("/api/v1/me").header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("LRN-AUTH-001"));
+    }
+
+    @Test
     void membershipWithoutPinHashNeverAuthenticates() throws Exception {
         // A roster row created outside the API (no PIN ever issued).
         UserAccount user =

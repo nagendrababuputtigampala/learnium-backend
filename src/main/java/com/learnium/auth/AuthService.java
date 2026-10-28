@@ -3,6 +3,7 @@ package com.learnium.auth;
 import com.learnium.api.dto.AuthDtos.AuthResponse;
 import com.learnium.api.dto.AuthDtos.MeResponse;
 import com.learnium.api.dto.AuthDtos.UserSummary;
+import com.learnium.common.EmailAddresses;
 import com.learnium.common.error.BusinessException;
 import com.learnium.common.error.ErrorCode;
 import com.learnium.model.common.UserStatus;
@@ -49,7 +50,8 @@ public class AuthService {
     @Transactional
     public AuthResponse login(String email, String password) {
         List<UserAccount> passwordMatches = new ArrayList<>();
-        for (UserAccount candidate : userAccountRepository.findByEmail(email)) {
+        for (UserAccount candidate :
+                userAccountRepository.findByEmail(EmailAddresses.normalize(email))) {
             if (candidate.getPasswordHash() != null
                     && passwordEncoder.matches(password, candidate.getPasswordHash())) {
                 passwordMatches.add(candidate);

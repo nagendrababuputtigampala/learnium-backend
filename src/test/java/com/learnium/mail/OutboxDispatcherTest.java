@@ -2,9 +2,15 @@ package com.learnium.mail;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.learnium.auth.EmailOutboxService;
 import com.learnium.model.auth.EmailOutbox;
 import com.learnium.model.auth.EmailOutboxStatus;
+import com.learnium.repository.auth.EmailOutboxRepository;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -17,6 +23,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +61,8 @@ class OutboxDispatcherTest {
 
     @Autowired private OutboxDispatcher dispatcher;
     @Autowired private EmailOutboxService emailOutboxService;
+    @Autowired private EmailOutboxRepository emailOutboxRepository;
+    @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private RecordingSender recordingSender;
 
     private final UUID centreId = UUID.randomUUID();
@@ -139,6 +148,101 @@ class OutboxDispatcherTest {
 
         assertThat(row.getStatus()).isEqualTo(EmailOutboxStatus.FAILED);
         assertThat(row.getLastError()).isEqualTo("TemplateInputException");
+    }
+
+    @Test
+    void payloadIsEncryptedAtRestAndWipedAfterDelivery() {
+        EmailOutbox row =
+                emailOutboxService.enqueue(centreId, "tess@bright.test", "invite", inviteModel());
+
+        // At rest the payload is a ciphertext envelope; the raw token is nowhere in it.
+        assertThat(row.getModel().has("enc")).isTrue();
+        assertThat(row.getModel().toString()).doesNotContain("raw-token-123");
+
+        dispatcher.dispatchPending();
+
+        assertThat(row.getStatus()).isEqualTo(EmailOutboxStatus.SENT);
+        // Delivered secrets do not linger: the payload is wiped on success.
+        assertThat(row.getModel().isEmpty()).isTrue();
+        assertThat(recordingSender.sent).hasSize(1);
+    }
+
+    @Test
+    void payloadIsWipedOnceAttemptsAreExhausted() {
+        recordingSender.fail = true;
+        EmailOutbox row =
+                emailOutboxService.enqueue(centreId, "tess@bright.test", "invite", inviteModel());
+
+        dispatcher.dispatchPending();
+        // Not yet terminal: the payload survives for the remaining retries.
+        assertThat(row.getModel().has("enc")).isTrue();
+
+        dispatcher.dispatchPending();
+        dispatcher.dispatchPending();
+
+        assertThat(row.getAttempts()).isEqualTo(3);
+        assertThat(row.getStatus()).isEqualTo(EmailOutboxStatus.FAILED);
+        assertThat(row.getModel().isEmpty()).isTrue();
+    }
+
+    @Test
+    void legacyPlaintextRowStillDispatches() {
+        ObjectNode plaintext = new ObjectMapper().createObjectNode();
+        plaintext.put("displayName", "Tess Teacher");
+        plaintext.put("centreName", "Bright Minds");
+        plaintext.put("token", "legacy-token-7");
+        plaintext.put("purpose", "invite");
+        plaintext.put("expiresHours", "48");
+        EmailOutbox row = new EmailOutbox();
+        row.setCentreId(centreId);
+        row.setRecipient("tess@bright.test");
+        row.setTemplate("invite");
+        row.setModel(plaintext);
+        row.setStatus(EmailOutboxStatus.PENDING);
+        emailOutboxRepository.save(row);
+
+        dispatcher.dispatchPending();
+
+        assertThat(row.getStatus()).isEqualTo(EmailOutboxStatus.SENT);
+        assertThat(recordingSender.sent).hasSize(1);
+        assertThat(recordingSender.sent.get(0).textBody()).contains("token=legacy-token-7");
+    }
+
+    @Test
+    void freshSendingClaimIsNotRedispatched() {
+        EmailOutbox row =
+                emailOutboxService.enqueue(centreId, "tess@bright.test", "invite", inviteModel());
+        row.setStatus(EmailOutboxStatus.SENDING);
+        emailOutboxRepository.save(row);
+
+        dispatcher.dispatchPending();
+
+        // Another dispatcher pass owns this row; it is left untouched.
+        assertThat(recordingSender.sent).isEmpty();
+        assertThat(row.getStatus()).isEqualTo(EmailOutboxStatus.SENDING);
+        assertThat(row.getAttempts()).isEqualTo(0);
+    }
+
+    @Test
+    void staleSendingClaimIsReclaimedAndDelivered() {
+        EmailOutbox row =
+                emailOutboxService.enqueue(centreId, "tess@bright.test", "invite", inviteModel());
+        row.setStatus(EmailOutboxStatus.SENDING);
+        emailOutboxRepository.save(row);
+        // Flush first: the auditing listener would otherwise bump
+        // updated_at back to now when the dispatcher's query auto-flushes,
+        // overwriting the backdate below.
+        emailOutboxRepository.flush();
+        // The claiming pass died ten minutes ago without recording an outcome.
+        jdbcTemplate.update(
+                "UPDATE learnium.email_outbox SET updated_at = ? WHERE email_outbox_id = ?",
+                Timestamp.from(Instant.now().minus(10, ChronoUnit.MINUTES)),
+                row.getEmailOutboxId());
+
+        dispatcher.dispatchPending();
+
+        assertThat(recordingSender.sent).hasSize(1);
+        assertThat(row.getStatus()).isEqualTo(EmailOutboxStatus.SENT);
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.learnium.api;
 
 import com.learnium.admin.TeacherAdminService;
 import com.learnium.api.dto.AuthDtos.CreateTeacherRequest;
+import com.learnium.api.dto.AuthDtos.ResendInviteDto;
 import com.learnium.api.dto.AuthDtos.TeacherDto;
 import com.learnium.common.api.PageResponse;
 import com.learnium.security.CurrentPrincipal;
@@ -43,6 +44,12 @@ public class AdminTeacherController {
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(
                 teacherAdminService.listTeachers(CurrentPrincipal.require(), PageRequest.of(page, size)));
+    }
+
+    @PostMapping("/{userId}/resend-invite")
+    public ResponseEntity<ResendInviteDto> resendInvite(@PathVariable UUID userId) {
+        return ResponseEntity.ok(
+                teacherAdminService.resendInvite(CurrentPrincipal.require(), userId));
     }
 
     @DeleteMapping("/{userId}")

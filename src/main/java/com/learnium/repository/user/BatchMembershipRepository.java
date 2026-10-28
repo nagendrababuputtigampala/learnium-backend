@@ -100,6 +100,17 @@ public interface BatchMembershipRepository extends JpaRepository<BatchMembership
             @Param("centreId") UUID centreId, @Param("membershipId") UUID membershipId);
 
     /**
+     * Status-only projection for the per-request authentication check on
+     * student tokens: the JWT filter verifies the roster membership behind
+     * the token is still ACTIVE, loading nothing but its status.
+     */
+    @Query(
+            "select m.status from BatchMembership m"
+                    + " where m.centreId = :centreId and m.membershipId = :membershipId")
+    Optional<MembershipStatus> findStatusByCentreIdAndMembershipId(
+            @Param("centreId") UUID centreId, @Param("membershipId") UUID membershipId);
+
+    /**
      * Atomically records one failed PIN attempt: the counter increments and
      * the lock flips in the same statement, decided on the POST-increment
      * value. Runs in the caller's transaction — the student-session service

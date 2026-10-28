@@ -1,5 +1,6 @@
 package com.learnium.repository.user;
 
+import com.learnium.model.common.UserStatus;
 import com.learnium.model.user.UserAccount;
 import com.learnium.model.user.UserRole;
 import java.util.List;
@@ -12,6 +13,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> {
+
+    /**
+     * Status-only projection for the per-request authentication check: the
+     * JWT filter loads nothing but the account's current status by id.
+     */
+    @Query("select u.status from UserAccount u where u.userId = :userId")
+    Optional<UserStatus> findStatusByUserId(@Param("userId") UUID userId);
 
     /** Centre-scoped: only ever returns users belonging to the given centre. */
     @Query("select u from UserAccount u where u.centre.centreId = :centreId")

@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.learnium.mail.PayloadCipher;
 import com.learnium.model.common.UserStatus;
 import com.learnium.model.master.Grade;
 import com.learnium.model.master.GradeSubject;
@@ -18,6 +19,7 @@ import com.learnium.model.user.Centre;
 import com.learnium.model.user.MemberRole;
 import com.learnium.model.user.UserAccount;
 import com.learnium.model.user.UserRole;
+import com.learnium.repository.auth.EmailOutboxRepository;
 import com.learnium.repository.master.GradeRepository;
 import com.learnium.repository.master.GradeSubjectRepository;
 import com.learnium.repository.master.SubjectRepository;
@@ -70,6 +72,8 @@ class AdminFlowTest {
     @Autowired private SubjectRepository subjectRepository;
     @Autowired private GradeSubjectRepository gradeSubjectRepository;
     @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private EmailOutboxRepository emailOutboxRepository;
+    @Autowired private PayloadCipher payloadCipher;
     @Autowired private JdbcTemplate jdbcTemplate;
 
     private Centre centreA;
@@ -283,6 +287,151 @@ class AdminFlowTest {
                                 .header("Authorization", "Bearer " + admin))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("LRN-USR-002"));
+    }
+
+    @Test
+    void createTeacherNormalisesEmailCase() throws Exception {
+        String admin = tokenFor("admin@alpha.test");
+
+        mockMvc.perform(
+                        post("/api/v1/admin/teachers")
+                                .header("Authorization", "Bearer " + admin)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"email\":\"MixedCase@Alpha.test\",\"displayName\":\"Mix Case\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.email").value("mixedcase@alpha.test"))
+                .andExpect(jsonPath("$.invited").value(true));
+
+        // The same address in another case is the same account: 409.
+        mockMvc.perform(
+                        post("/api/v1/admin/teachers")
+                                .header("Authorization", "Bearer " + admin)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"email\":\"MIXEDCASE@alpha.test\",\"displayName\":\"Dupe\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LRN-USR-001"));
+    }
+
+    /** Creates a teacher through the API and returns its user id. */
+    private UUID inviteTeacherViaApi(String adminToken, String email) throws Exception {
+        String body =
+                mockMvc.perform(
+                                post("/api/v1/admin/teachers")
+                                        .header("Authorization", "Bearer " + adminToken)
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                "{\"email\":\""
+                                                        + email
+                                                        + "\",\"displayName\":\"Invited Teacher\"}"))
+                        .andExpect(status().isCreated())
+                        .andExpect(jsonPath("$.invited").value(true))
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        return UUID.fromString(objectMapper.readTree(body).get("userId").asString());
+    }
+
+    /** The freshest invite token emailed to the given recipient, decrypted like the dispatcher does. */
+    private String latestInviteTokenFor(String recipient) {
+        return emailOutboxRepository.findByCentreId(centreA.getCentreId()).stream()
+                .filter(row -> row.getRecipient().equals(recipient))
+                .reduce((first, second) -> second)
+                .map(row -> payloadCipher.decrypt(row.getModel()).get("token").asText())
+                .orElseThrow();
+    }
+
+    @Test
+    void resendInviteIssuesAFreshTokenAndKillsTheOldOne() throws Exception {
+        String admin = tokenFor("admin@alpha.test");
+        UUID teacherId = inviteTeacherViaApi(admin, "invitee@alpha.test");
+        String firstToken = latestInviteTokenFor("invitee@alpha.test");
+
+        mockMvc.perform(
+                        post("/api/v1/admin/teachers/" + teacherId + "/resend-invite")
+                                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(teacherId.toString()))
+                .andExpect(jsonPath("$.email").value("invitee@alpha.test"));
+
+        String secondToken = latestInviteTokenFor("invitee@alpha.test");
+        assertThat(secondToken).isNotEqualTo(firstToken);
+
+        // The superseded link is dead; only the fresh one sets the password.
+        mockMvc.perform(
+                        post("/api/v1/auth/accept-invite")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"token\":\""
+                                                + firstToken
+                                                + "\",\"newPassword\":\"First1pass\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LRN-AUTH-004"));
+        mockMvc.perform(
+                        post("/api/v1/auth/accept-invite")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"token\":\""
+                                                + secondToken
+                                                + "\",\"newPassword\":\"First1pass\"}"))
+                .andExpect(status().isNoContent());
+
+        // Accepted now: no longer flagged as invited, and resend is refused.
+        String listBody =
+                mockMvc.perform(
+                                get("/api/v1/admin/teachers?page=0&size=20")
+                                        .header("Authorization", "Bearer " + admin))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        for (JsonNode teacher : objectMapper.readTree(listBody).get("content")) {
+            if (teacher.get("userId").asString().equals(teacherId.toString())) {
+                assertThat(teacher.get("invited").asBoolean()).isFalse();
+            }
+        }
+        mockMvc.perform(
+                        post("/api/v1/admin/teachers/" + teacherId + "/resend-invite")
+                                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LRN-VAL-001"));
+    }
+
+    @Test
+    void resendInviteForUnknownForeignOrNonTeacherReturns404() throws Exception {
+        String admin = tokenFor("admin@alpha.test");
+
+        mockMvc.perform(
+                        post("/api/v1/admin/teachers/" + UUID.randomUUID() + "/resend-invite")
+                                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("LRN-USR-002"));
+        // A teacher of another centre is invisible here.
+        UserAccount foreign =
+                AuthFixtures.createStaff(
+                        userAccountRepository, passwordEncoder, centreB, UserRole.TEACHER,
+                        "foreign@beta.test", "Foreign Teacher", null, UserStatus.ACTIVE);
+        mockMvc.perform(
+                        post("/api/v1/admin/teachers/" + foreign.getUserId() + "/resend-invite")
+                                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("LRN-USR-002"));
+        // The admin's own account is not a teacher.
+        mockMvc.perform(
+                        post("/api/v1/admin/teachers/" + adminA.getUserId() + "/resend-invite")
+                                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void resendInviteRequiresCentreAdmin() throws Exception {
+        String admin = tokenFor("admin@alpha.test");
+        UUID teacherId = inviteTeacherViaApi(admin, "guard@alpha.test");
+        String teacher = tokenFor("tess@alpha.test");
+
+        mockMvc.perform(
+                        post("/api/v1/admin/teachers/" + teacherId + "/resend-invite")
+                                .header("Authorization", "Bearer " + teacher))
+                .andExpect(status().isForbidden());
     }
 
     @Test

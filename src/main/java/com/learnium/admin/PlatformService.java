@@ -3,6 +3,7 @@ package com.learnium.admin;
 import com.learnium.api.dto.AdminDtos.CreateCentreRequest;
 import com.learnium.api.dto.AdminDtos.CreateCentreResponse;
 import com.learnium.auth.AccountFlowService;
+import com.learnium.common.EmailAddresses;
 import com.learnium.common.error.BusinessException;
 import com.learnium.common.error.ErrorCode;
 import com.learnium.model.common.UserStatus;
@@ -15,6 +16,7 @@ import com.learnium.repository.user.UserAccountRepository;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,7 +48,8 @@ public class PlatformService {
     @Transactional
     public CreateCentreResponse createCentre(String providedKey, CreateCentreRequest request) {
         requireProvisioningKey(providedKey);
-        if (userAccountRepository.existsByEmail(request.adminEmail())) {
+        String adminEmail = EmailAddresses.normalize(request.adminEmail());
+        if (userAccountRepository.existsByEmail(adminEmail)) {
             throw new BusinessException(ErrorCode.USR_EMAIL_TAKEN);
         }
         Centre centre = new Centre();
@@ -57,11 +60,18 @@ public class PlatformService {
         UserAccount admin = new UserAccount();
         admin.setCentre(centre);
         admin.setRole(UserRole.CENTRE_ADMIN);
-        admin.setEmail(request.adminEmail());
+        admin.setEmail(adminEmail);
         admin.setDisplayName(request.adminDisplayName());
         admin.setPasswordHash(null);
         admin.setStatus(UserStatus.ACTIVE);
         admin = userAccountRepository.save(admin);
+        try {
+            // Surface a database-level uniqueness violation (the V8 backstop
+            // behind the pre-check) here, as the email-in-use error.
+            userAccountRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new BusinessException(ErrorCode.USR_EMAIL_TAKEN);
+        }
 
         accountFlowService.sendInvite(admin);
         return new CreateCentreResponse(centre.getCentreId(), admin.getUserId());

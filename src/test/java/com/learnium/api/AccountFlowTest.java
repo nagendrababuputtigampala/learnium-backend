@@ -5,7 +5,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.learnium.auth.AccountTokenService;
+import com.learnium.mail.PayloadCipher;
 import com.learnium.model.auth.AccountToken;
 import com.learnium.model.auth.AccountTokenPurpose;
 import com.learnium.model.auth.EmailOutbox;
@@ -19,25 +21,40 @@ import com.learnium.repository.user.CentreRepository;
 import com.learnium.repository.user.UserAccountRepository;
 import com.learnium.security.TokenHashing;
 import com.learnium.testsupport.AuthFixtures;
+import com.learnium.testsupport.CommittedDataCleanup;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Emailed-link flows over HTTP: forgot/reset password and invite acceptance. */
+/**
+ * Emailed-link flows over HTTP: forgot/reset password and invite acceptance.
+ *
+ * <p>Committed-state class (no wrapping test transaction): a reset must kill
+ * sessions committed by earlier requests, which a class-level
+ * {@code @Transactional} cannot observe. The outbox payload is encrypted at
+ * rest, so tokens are recovered by decrypting through {@link PayloadCipher}
+ * — exactly what the dispatcher does. This class's own dispatcher is parked
+ * (dispatch delay) so passes cannot race the assertions.
+ */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Transactional
+@TestPropertySource(properties = "learnium.mail.dispatch-delay-ms=3600000")
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class AccountFlowTest {
 
     private static final String TEACHER_EMAIL = "teacher@flow.test";
@@ -50,9 +67,16 @@ class AccountFlowTest {
     @Autowired private AccountTokenRepository accountTokenRepository;
     @Autowired private AccountTokenService accountTokenService;
     @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private PayloadCipher payloadCipher;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     private Centre centre;
     private UserAccount invitedTeacher;
+
+    @AfterEach
+    void cleanUp() {
+        CommittedDataCleanup.clearAll(jdbcTemplate);
+    }
 
     @BeforeEach
     void setUp() {
@@ -84,10 +108,15 @@ class AccountFlowTest {
         return emailOutboxRepository.findByCentreId(centre.getCentreId());
     }
 
+    /** The payload as the dispatcher sees it: decrypted in memory. */
+    private JsonNode decryptedModel(EmailOutbox row) {
+        return payloadCipher.decrypt(row.getModel());
+    }
+
     private String rawTokenFromOutbox() {
         List<EmailOutbox> rows = outboxRows();
         assertThat(rows).hasSize(1);
-        return rows.get(0).getModel().get("token").asText();
+        return decryptedModel(rows.get(0)).get("token").asText();
     }
 
     private void postJson(String path, String json, int expectedStatus) throws Exception {
@@ -104,12 +133,15 @@ class AccountFlowTest {
         EmailOutbox row = rows.get(0);
         assertThat(row.getRecipient()).isEqualTo(TEACHER_EMAIL);
         assertThat(row.getTemplate()).isEqualTo("reset");
-        assertThat(row.getModel().get("purpose").asText()).isEqualTo("reset");
+        assertThat(decryptedModel(row).get("purpose").asText()).isEqualTo("reset");
         String raw = rawTokenFromOutbox();
         assertThat(
                         accountTokenRepository.findByTokenHashAndPurpose(
                                 TokenHashing.sha256Hex(raw), AccountTokenPurpose.RESET))
                 .isPresent();
+        // The stored payload is ciphertext: the raw token appears nowhere in it.
+        assertThat(row.getModel().has("enc")).isTrue();
+        assertThat(row.getModel().toString()).doesNotContain(raw);
     }
 
     @Test

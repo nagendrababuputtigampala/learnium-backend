@@ -306,3 +306,28 @@
   centre as well, or it arrives as an uninitialized proxy.
 - Next: F3 P2 batch (V8 email uniqueness, outbox claim + payload cipher,
   filter status checks, resend invite). Failing tests: none.
+
+- FIX ROUND F3 done: P2 batch. V8 is a JAVA migration
+  (V8__GlobalStaffEmailUniqueness): a lower(email) expression index cannot
+  be expressed for both engines (H2 2.4.240 rejects the expression index;
+  the generated-column syntax differs — PostgreSQL requires STORED, H2
+  rejects it) and Flyway does not filter vendor subfolders here, so the
+  migration branches on the connection's database product and adds an
+  email_normalized generated column + global unique index; emails are
+  normalised (trim + lower) at login/forgot/create-teacher/create-centre,
+  with flush violations translated to the registry's email-in-use code
+  LRN-USR-001. Outbox: PayloadCipher (AES-GCM over the payload model; key =
+  SHA-256 of OUTBOX_ENCRYPTION_KEY, else the JWT secret material, else the
+  dev fallback) encrypts on enqueue; the dispatcher claims rows with a
+  conditional status flip (PENDING/FAILED/SENDING-stale -> SENDING,
+  5-minute stale window), decrypts on delivery and purges the payload to
+  '{}' on SENT and on terminal FAILED. JwtAuthenticationFilter now checks
+  the subject's CURRENT status on every request (staff account /
+  membership projection): inactive -> 403 LRN-AUTH-005 from the filter,
+  missing subject -> unauthenticated. Resend invite:
+  POST /api/v1/admin/teachers/{id}/resend-invite invalidates outstanding
+  invite tokens and enqueues a fresh 48h invite in one transaction;
+  TeacherDto gains `invited` (passwordHash == null). AccountFlowTest
+  converted to committed state as part of this slice.
+- Next: F3 targeted batch, then commit; F4 concurrency tests + final
+  from-scratch verify. Failing tests: (to be filled by the targeted run).

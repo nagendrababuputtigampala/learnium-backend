@@ -9,10 +9,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.learnium.model.auth.RefreshToken;
 import com.learnium.model.common.UserStatus;
 import com.learnium.model.user.Centre;
+import com.learnium.model.user.UserAccount;
 import com.learnium.model.user.UserRole;
 import com.learnium.repository.auth.RefreshTokenRepository;
 import com.learnium.repository.user.CentreRepository;
 import com.learnium.repository.user.UserAccountRepository;
+import com.learnium.security.JwtService;
 import com.learnium.security.TokenHashing;
 import com.learnium.testsupport.AuthFixtures;
 import com.learnium.testsupport.CommittedDataCleanup;
@@ -58,6 +60,7 @@ class AuthFlowTest {
     @Autowired private UserAccountRepository userAccountRepository;
     @Autowired private RefreshTokenRepository refreshTokenRepository;
     @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private JwtService jwtService;
     @Autowired private JdbcTemplate jdbcTemplate;
 
     private Centre centre;
@@ -320,6 +323,42 @@ class AuthFlowTest {
                                                 + "\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("LRN-AUTH-002"));
+    }
+
+    @Test
+    void deactivatedAccountsAccessTokenStopsWorkingImmediately() throws Exception {
+        JsonNode body = login(ADMIN_EMAIL, PASSWORD);
+        String accessToken = body.get("accessToken").asString();
+        mockMvc.perform(get("/api/v1/me").header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk());
+
+        // Deactivation lands after the token was issued; the very next
+        // request must already fail — the token's remaining lifetime is
+        // irrelevant.
+        UserAccount admin = userAccountRepository.findByEmail(ADMIN_EMAIL).get(0);
+        admin.setStatus(UserStatus.DISABLED);
+        userAccountRepository.save(admin);
+
+        mockMvc.perform(get("/api/v1/me").header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("LRN-AUTH-005"));
+    }
+
+    @Test
+    void accessTokenWhoseAccountNoLongerExistsIsUnauthenticated() throws Exception {
+        // A well-formed token for an account row that does not exist.
+        Centre ghostCentre = new Centre();
+        ghostCentre.setCentreId(java.util.UUID.randomUUID());
+        ghostCentre.setName("Ghost Centre");
+        UserAccount ghost = new UserAccount();
+        ghost.setUserId(java.util.UUID.randomUUID());
+        ghost.setCentre(ghostCentre);
+        ghost.setRole(UserRole.TEACHER);
+        String token = jwtService.issueStaffToken(ghost);
+
+        mockMvc.perform(get("/api/v1/me").header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("LRN-AUTH-001"));
     }
 
     @Test

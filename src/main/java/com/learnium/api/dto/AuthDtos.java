@@ -59,7 +59,15 @@ public final class AuthDtos {
             @NotBlank(message = "must not be blank") String displayName) {}
 
     public record TeacherDto(
-            UUID userId, String email, String displayName, boolean active, Instant createdAt) {}
+            UUID userId,
+            String email,
+            String displayName,
+            boolean active,
+            boolean invited,
+            Instant createdAt) {}
+
+    /** Acknowledgement of a resent invite: who it went to (a fresh 48-hour link). */
+    public record ResendInviteDto(UUID userId, String email) {}
 
     public record StudentSessionRequest(
             @NotNull(message = "must not be null") UUID batchId,

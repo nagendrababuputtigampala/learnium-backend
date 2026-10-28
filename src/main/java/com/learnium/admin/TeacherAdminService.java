@@ -1,9 +1,11 @@
 package com.learnium.admin;
 
 import com.learnium.api.dto.AuthDtos.CreateTeacherRequest;
+import com.learnium.api.dto.AuthDtos.ResendInviteDto;
 import com.learnium.api.dto.AuthDtos.TeacherDto;
 import com.learnium.auth.AccountFlowService;
 import com.learnium.auth.RefreshTokenService;
+import com.learnium.common.EmailAddresses;
 import com.learnium.common.api.PageResponse;
 import com.learnium.common.error.BusinessException;
 import com.learnium.common.error.ErrorCode;
@@ -15,6 +17,7 @@ import com.learnium.repository.user.CentreRepository;
 import com.learnium.repository.user.UserAccountRepository;
 import com.learnium.security.LearniumPrincipal;
 import java.util.UUID;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,7 +48,8 @@ public class TeacherAdminService {
 
     @Transactional
     public TeacherDto createTeacher(LearniumPrincipal principal, CreateTeacherRequest request) {
-        if (userAccountRepository.existsByEmail(request.email())) {
+        String email = EmailAddresses.normalize(request.email());
+        if (userAccountRepository.existsByEmail(email)) {
             throw new BusinessException(ErrorCode.USR_EMAIL_TAKEN);
         }
         Centre centre =
@@ -55,13 +59,31 @@ public class TeacherAdminService {
         UserAccount teacher = new UserAccount();
         teacher.setCentre(centre);
         teacher.setRole(UserRole.TEACHER);
-        teacher.setEmail(request.email());
+        teacher.setEmail(email);
         teacher.setDisplayName(request.displayName());
         teacher.setPasswordHash(null);
         teacher.setStatus(UserStatus.ACTIVE);
         teacher = userAccountRepository.save(teacher);
+        flushOrEmailTaken();
         accountFlowService.sendInvite(teacher);
         return toDto(teacher);
+    }
+
+    /**
+     * Re-sends the invite to a teacher who has not set a password yet: the
+     * outstanding invite tokens are invalidated and a fresh 48-hour token +
+     * email are issued, all in this transaction. A teacher who already
+     * accepted (password set) has nothing to resend.
+     */
+    @Transactional
+    public ResendInviteDto resendInvite(LearniumPrincipal principal, UUID userId) {
+        UserAccount teacher = findTeacher(principal, userId);
+        if (teacher.getPasswordHash() != null) {
+            throw new BusinessException(
+                    ErrorCode.VAL_FAILED, "This teacher has already accepted their invite");
+        }
+        accountFlowService.resendInvite(teacher);
+        return new ResendInviteDto(teacher.getUserId(), teacher.getEmail());
     }
 
     @Transactional(readOnly = true)
@@ -75,14 +97,31 @@ public class TeacherAdminService {
     /** Deactivation is soft: the account stays, its sessions die immediately. */
     @Transactional
     public void deactivateTeacher(LearniumPrincipal principal, UUID userId) {
-        UserAccount teacher =
-                userAccountRepository
-                        .findByCentreIdAndUserId(principal.centreId(), userId)
-                        .filter(user -> user.getRole() == UserRole.TEACHER)
-                        .orElseThrow(() -> new BusinessException(ErrorCode.USR_NOT_FOUND));
+        UserAccount teacher = findTeacher(principal, userId);
         teacher.setStatus(UserStatus.DISABLED);
         userAccountRepository.save(teacher);
         refreshTokenService.revokeAllForUser(teacher);
+    }
+
+    /** Centre-scoped teacher lookup shared by deactivate and resend-invite. */
+    private UserAccount findTeacher(LearniumPrincipal principal, UUID userId) {
+        return userAccountRepository
+                .findByCentreIdAndUserId(principal.centreId(), userId)
+                .filter(user -> user.getRole() == UserRole.TEACHER)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USR_NOT_FOUND));
+    }
+
+    /**
+     * Forces the pending insert out so a database-level email-uniqueness
+     * violation (the V8 backstop behind the friendly pre-check) surfaces
+     * here — as the email-in-use error — instead of at transaction commit.
+     */
+    private void flushOrEmailTaken() {
+        try {
+            userAccountRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new BusinessException(ErrorCode.USR_EMAIL_TAKEN);
+        }
     }
 
     private static TeacherDto toDto(UserAccount user) {
@@ -91,6 +130,7 @@ public class TeacherAdminService {
                 user.getEmail(),
                 user.getDisplayName(),
                 user.getStatus() == UserStatus.ACTIVE,
+                user.getPasswordHash() == null,
                 user.getCreatedAt());
     }
 }
