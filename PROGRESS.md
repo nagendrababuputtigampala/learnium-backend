@@ -20,3 +20,6 @@
   fixed-UUID master seed (G1..G12, 5 subjects, 60 pairings) + JpaAuditingConfig.
   Targeted persistence tests green (incl. centre-scoping proof). Migration
   test asserts V1..V4, so it goes green only at S3.
+- M1 S2 done: content model (Topic, QuestionType with code, Material, Question
+  with jsonb payload + DRAFT/APPROVED/REJECTED) + Flyway V3 with the five
+  question-type seeds. Targeted persistence tests green.
