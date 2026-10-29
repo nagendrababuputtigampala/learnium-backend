@@ -30,6 +30,23 @@ class ExtractionServiceTest {
     }
 
     @Test
+    void multiPageDocumentWithHealthyDensityIsOk() {
+        // Exercises the per-page density check on its passing side: two
+        // full pages must not be flagged just for being multi-page.
+        String page =
+                "Cell division is the process by which a parent cell divides into two "
+                        + "daughter cells, each carrying a copy of the genetic material. "
+                        + "Mitosis produces identical cells for growth and repair in the body. ";
+        byte[] pdf =
+                PdfFixtures.pdfOf(
+                        List.of(linesOf(page.repeat(2)), linesOf(page.repeat(2))));
+
+        ExtractionResult result = service.extractPdf(pdf);
+
+        assertThat(result.status()).isEqualTo(ExtractionStatus.OK);
+    }
+
+    @Test
     void blankPagesAreNoText() {
         byte[] pdf = PdfFixtures.pdfOf(List.of(List.of(), List.of()));
 

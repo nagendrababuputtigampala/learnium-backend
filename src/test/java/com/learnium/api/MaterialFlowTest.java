@@ -216,6 +216,86 @@ class MaterialFlowTest {
     }
 
     @Test
+    void uploadValidatesMissingPieces() throws Exception {
+        byte[] pdf = PdfFixtures.pdfOf(List.of(linesOf(PROSE)));
+
+        // No gradeSubjectId param at all.
+        mockMvc.perform(
+                        multipart("/api/v1/materials")
+                                .file(new MockMultipartFile("file", "chapter.pdf", "application/pdf", pdf))
+                                .param("title", "No pairing")
+                                .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LRN-VAL-001"));
+
+        // No title param, then a blank title.
+        mockMvc.perform(
+                        multipart("/api/v1/materials")
+                                .file(new MockMultipartFile("file", "chapter.pdf", "application/pdf", pdf))
+                                .param("gradeSubjectId", gradeSubject.getGradeSubjectId().toString())
+                                .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LRN-VAL-001"));
+        upload(teacherToken, pdf, "chapter.pdf", "   ")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LRN-VAL-001"));
+
+        // An empty file part, and a part with no filename at all.
+        mockMvc.perform(
+                        multipart("/api/v1/materials")
+                                .file(new MockMultipartFile("file", "chapter.pdf", "application/pdf", new byte[0]))
+                                .param("title", "Empty")
+                                .param("gradeSubjectId", gradeSubject.getGradeSubjectId().toString())
+                                .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LRN-MAT-001"));
+        mockMvc.perform(
+                        multipart("/api/v1/materials")
+                                .file(new MockMultipartFile("file", null, "application/pdf", pdf))
+                                .param("title", "Nameless")
+                                .param("gradeSubjectId", gradeSubject.getGradeSubjectId().toString())
+                                .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LRN-MAT-001"));
+    }
+
+    @Test
+    void pasteSameTextTwiceDedupes() throws Exception {
+        JsonNode first = paste(teacherToken, "Pasted once", PROSE.repeat(3));
+
+        mockMvc.perform(
+                        post("/api/v1/materials/text")
+                                .header("Authorization", "Bearer " + teacherToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(textRequest("Pasted twice", PROSE.repeat(3))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deduplicated").value(true))
+                .andExpect(jsonPath("$.materialId").value(first.get("materialId").asString()));
+    }
+
+    @Test
+    void legacyMaterialWithoutExtractionStatusRenders() throws Exception {
+        // A row predating V10 has no extraction outcome yet; the DTOs must
+        // render it with a null status instead of failing.
+        var legacy = new com.learnium.model.content.Material();
+        legacy.setCentre(teacherA1.getCentre());
+        legacy.setUploadedBy(teacherA1);
+        legacy.setGradeSubject(gradeSubject);
+        legacy.setTitle("Legacy scanned chapter");
+        legacy.setSourceType(com.learnium.model.content.MaterialSourceType.PDF);
+        legacy = materialRepository.save(legacy);
+
+        mockMvc.perform(
+                        get("/api/v1/materials/" + legacy.getMaterialId())
+                                .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Legacy scanned chapter"));
+        mockMvc.perform(get("/api/v1/materials").header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
     void uploadBeyondTheServletCapIsMatTooLarge() throws Exception {
         byte[] pdf = PdfFixtures.pdfOf(List.of(linesOf(PROSE)));
         byte[] oversized = new byte[21 * 1024 * 1024];

@@ -58,6 +58,18 @@ class LocalStorageServiceTest {
     }
 
     @Test
+    void deleteOfNonEmptyDirectoryFails() throws IOException {
+        // deleteIfExists on a non-empty directory raises an IOException,
+        // which must surface as a StorageException, not leak raw.
+        Path dir = tempDir.resolve("some/key.pdf");
+        Files.createDirectories(dir);
+        Files.writeString(dir.resolve("child.txt"), "x");
+
+        assertThatExceptionOfType(StorageException.class)
+                .isThrownBy(() -> service().delete("some/key.pdf"));
+    }
+
+    @Test
     void storeFailsWhenTheRootIsNotWritable() throws IOException {
         Path fileRoot = tempDir.resolve("not-a-dir");
         Files.writeString(fileRoot, "occupied");
@@ -76,6 +88,7 @@ class LocalStorageServiceTest {
         assertThat(LocalStorageService.sanitize("../../etc/passwd")).isEqualTo("passwd");
         assertThat(LocalStorageService.sanitize("..\\windows\\evil.pdf")).isEqualTo("evil.pdf");
         assertThat(LocalStorageService.sanitize("..")).isEqualTo("file");
+        assertThat(LocalStorageService.sanitize(".")).isEqualTo("file");
         assertThat(LocalStorageService.sanitize("")).isEqualTo("file");
         assertThat(LocalStorageService.sanitize(null)).isEqualTo("file");
     }
