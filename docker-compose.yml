@@ -45,6 +45,10 @@ services:
       MAIL_PORT: 1025
     ports:
       - "8080:8080"
+    volumes:
+      # Uploaded chapter files (local storage at ./data/files in /app) must
+      # survive container replacement.
+      - appfiles:/app/data
     depends_on:
       - postgres
       - mailpit
@@ -59,3 +63,4 @@ services:
 
 volumes:
   pgdata:
+  appfiles:
