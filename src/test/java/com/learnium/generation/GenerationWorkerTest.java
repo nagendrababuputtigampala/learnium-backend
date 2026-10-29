@@ -465,7 +465,7 @@ class GenerationWorkerTest {
     }
 
     @Test
-    void zeroValidIsTerminalWithCountsAndUsage() throws Exception {
+    void zeroValidReschedulesThenFailsTerminallyWithCountsAndUsage() throws Exception {
         BackgroundJob job = newJob("{\"MCQ\":1}");
         generator.behavior =
                 call ->
@@ -480,16 +480,67 @@ class GenerationWorkerTest {
 
         assertThat(worker.runOnce()).isTrue();
 
-        BackgroundJob saved = reload(job);
-        assertThat(saved.getStatus()).isEqualTo(BackgroundJobStatus.FAILED);
-        assertThat(saved.getFailureKind()).isEqualTo(GenerationFailureKind.ZERO_VALID);
-        assertThat(saved.getUsageInputTokens()).isEqualTo(10L);
-        var mcq = GenerationResultCounts.fromJson(saved.getResultCounts())
+        BackgroundJob rescheduled = reload(job);
+        assertThat(rescheduled.getStatus()).isEqualTo(BackgroundJobStatus.PENDING);
+        assertThat(rescheduled.getAttempts()).isEqualTo(1);
+        assertThat(rescheduled.getFailureKind()).isEqualTo(GenerationFailureKind.ZERO_VALID);
+        assertThat(rescheduled.getNextAttemptAt()).isEqualTo(T0.plusSeconds(30));
+        assertThat(rescheduled.getFinishedAt()).isNull();
+        assertThat(worker.runOnce()).isFalse();
+
+        clock.advance(Duration.ofSeconds(31));
+        assertThat(worker.runOnce()).isTrue();
+
+        BackgroundJob failed = reload(job);
+        assertThat(failed.getStatus()).isEqualTo(BackgroundJobStatus.FAILED);
+        assertThat(failed.getAttempts()).isEqualTo(2);
+        assertThat(failed.getFailureKind()).isEqualTo(GenerationFailureKind.ZERO_VALID);
+        assertThat(failed.getFinishedAt()).isNotNull();
+        assertThat(failed.getUsageInputTokens()).isEqualTo(10L);
+        var mcq = GenerationResultCounts.fromJson(failed.getResultCounts())
                 .forType(GeneratedQuestionType.MCQ);
         assertThat(mcq.received()).isEqualTo(1);
         assertThat(mcq.accepted()).isZero();
         assertThat(mcq.dropped()).isEqualTo(1);
         assertThat(questionRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    void zeroValidFirstAttemptThenDraftsSucceedExactlyOnce() throws Exception {
+        BackgroundJob job = newJob("{\"MCQ\":1}");
+        generator.behavior =
+                call ->
+                        call == 1
+                                ? new Success(
+                                        questions(
+                                                "{\"type\":\"MCQ\",\"stem\":\"Broken?\","
+                                                        + "\"options\":[],\"correctIndex\":0}"),
+                                        10L,
+                                        5L,
+                                        null,
+                                        null)
+                                : new Success(
+                                        questions(mcq("Recovered draft")), 20L, 7L, null, null);
+
+        assertThat(worker.runOnce()).isTrue();
+
+        BackgroundJob rescheduled = reload(job);
+        assertThat(rescheduled.getStatus()).isEqualTo(BackgroundJobStatus.PENDING);
+        assertThat(rescheduled.getFailureKind()).isEqualTo(GenerationFailureKind.ZERO_VALID);
+        assertThat(questionRepository.findAll()).isEmpty();
+
+        clock.advance(Duration.ofSeconds(31));
+        assertThat(worker.runOnce()).isTrue();
+
+        BackgroundJob saved = reload(job);
+        assertThat(saved.getStatus()).isEqualTo(BackgroundJobStatus.SUCCEEDED);
+        assertThat(saved.getAttempts()).isEqualTo(2);
+        assertThat(questionRepository.countByGenerationJobId(job.getId())).isEqualTo(1);
+        assertThat(questionRepository.findAll().get(0).getPayload().get("stem").asText())
+                .isEqualTo("Recovered draft");
+        var mcq = GenerationResultCounts.fromJson(saved.getResultCounts())
+                .forType(GeneratedQuestionType.MCQ);
+        assertThat(mcq.accepted()).isEqualTo(1);
     }
 
     @Test

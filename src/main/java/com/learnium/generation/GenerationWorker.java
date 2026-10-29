@@ -18,7 +18,10 @@ import org.springframework.stereotype.Component;
  * (or fail / reschedule) through ownership-checked transitions. At most
  * {@value #MAX_ATTEMPTS} claims ever execute a job; transient failure
  * kinds (model error, malformed response, truncation) retry with
- * backoff, the rest fail terminally on the spot.
+ * backoff, the rest fail terminally on the spot. A response in which
+ * zero questions survive validation (ZERO_VALID) retries the same way —
+ * it is a sampling outcome and a re-sample may do better — and fails
+ * terminally only once the attempt budget is spent.
  *
  * <p>Log lines carry ids, kinds and counts only — never source text,
  * prompts or model output.
@@ -94,14 +97,30 @@ public class GenerationWorker {
     private void onSuccess(ClaimedJob claim, Success success) {
         ValidationOutcome validation = draftFactory.validate(success.questions(), claim.counts());
         if (validation.drafts().isEmpty()) {
-            claimService.failTerminal(
-                    claim, GenerationFailureKind.ZERO_VALID, null, validation.counts(), success);
-            log.info(
-                    "Generation job {} failed: zero valid questions from {} received",
-                    claim.jobId(),
+            int received =
                     validation.counts().byType().values().stream()
                             .mapToInt(GenerationResultCounts.TypeResult::received)
-                            .sum());
+                            .sum();
+            if (claim.attempts() < MAX_ATTEMPTS) {
+                // Same retry path as the transient failure kinds: back
+                // to PENDING with backoff. Counts and usage are recorded
+                // by whichever attempt concludes the job, exactly as
+                // for a retried model error.
+                claimService.reschedule(claim, GenerationFailureKind.ZERO_VALID, null);
+                log.info(
+                        "Generation job {} rescheduled after ZERO_VALID (attempt {}):"
+                                + " zero valid questions from {} received",
+                        claim.jobId(),
+                        claim.attempts(),
+                        received);
+            } else {
+                claimService.failTerminal(
+                        claim, GenerationFailureKind.ZERO_VALID, null, validation.counts(), success);
+                log.info(
+                        "Generation job {} failed: zero valid questions from {} received",
+                        claim.jobId(),
+                        received);
+            }
             return;
         }
         PersistResult result;
