@@ -17,11 +17,11 @@ import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
  * fixture files. Each list element becomes one page; each string is one line
  * of Helvetica text on that page. An empty list element makes a blank page.
  */
-final class PdfFixtures {
+public final class PdfFixtures {
 
     private PdfFixtures() {}
 
-    static byte[] pdfOf(List<List<String>> pages) {
+    public static byte[] pdfOf(List<List<String>> pages) {
         try (PDDocument document = new PDDocument();
                 ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             for (List<String> lines : pages) {
@@ -49,7 +49,7 @@ final class PdfFixtures {
         }
     }
 
-    static byte[] encryptedPdf() {
+    public static byte[] encryptedPdf() {
         byte[] plain = pdfOf(List.of(List.of("Secret chapter content.")));
         try (PDDocument document = org.apache.pdfbox.Loader.loadPDF(plain);
                 ByteArrayOutputStream out = new ByteArrayOutputStream()) {

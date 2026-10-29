@@ -214,6 +214,20 @@ class GlobalExceptionHandlerTest {
         assertThat(body.getMessage()).isEqualTo("Access denied");
     }
 
+    @Test
+    void uploadSizeExceededReturnsMat003() {
+        ResponseEntity<ApiErrorResponse> response =
+                handler.handleMaxUploadSize(
+                        new org.springframework.web.multipart.MaxUploadSizeExceededException(
+                                20_000_000L));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+        ApiErrorResponse body = response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.getCode()).isEqualTo("LRN-MAT-003");
+        assertThat(body.getMessage()).isEqualTo("The uploaded file is too large");
+    }
+
     private void dummyEndpoint(String payload) {
         // Only used to obtain a MethodParameter for exception construction.
     }

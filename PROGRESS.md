@@ -419,3 +419,26 @@
   e27440c (R2-S3 committed-state proofs). Not pushed — bundle handoff
   per the working agreement; backend PR #8 updates in place once
   Nagendra pushes.
+
+# Progress — feature/pdf-extraction (backend, M3 branch 1)
+
+- Setup: branched off merged dev f63ec5f (PR #8 merge; contains V9 +
+  security version + both M2 fix rounds). PDFBox was NOT in the pom —
+  added pdfbox 3.0.5 + AWS SDK v2 s3 (BOM 2.29.45); offline repo seeded
+  via seed_repo.py (resolution complete; script's final verify raced
+  in-flight code, artifacts all present).
+- Done (S1): Flyway V10 (materials += content_hash, extraction_status,
+  extracted_chars, deleted_at — extracted_text/storage_key already
+  existed from M1/V3). StorageService + local impl (path-traversal
+  safe) + S3 impl (mocked client tests) selected by
+  learnium.storage.type. MAT error codes LRN-MAT-001/002/003.
+  MigrationTest now expects V1..V10 (H2 note: use `timestamp with
+  time zone`, H2 rejects the `timestamptz` alias).
+- Done (S2): ExtractionService — PDFBox per-page extraction with a
+  time budget; classification OK / NO_TEXT / UNUSABLE_TEXT (min chars,
+  avg chars/page, alphanumeric ratio) / OVER_LIMIT (char + estimated
+  token caps, truncate at char cap) / EXTRACTION_FAILED. PDF fixtures
+  generated in test code (text / blank / header-only / encrypted).
+  Targeted: storage 13 + extraction 12 + migration 5 green.
+- Next: S3 materials API + flow tests, then the from-scratch verify.
+- Failing tests: none.
