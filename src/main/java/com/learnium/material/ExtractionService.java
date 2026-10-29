@@ -1,10 +1,10 @@
 package com.learnium.material;
 
 import com.learnium.model.content.ExtractionStatus;
+import com.learnium.security.TokenHashing;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -123,6 +123,7 @@ public class ExtractionService {
         long budgetNanos = TimeUnit.SECONDS.toNanos(properties.getTimeoutSeconds());
         TextSink sink = new TextSink(properties.getMaxExtractedChars());
         int pageCount;
+        boolean overPageLimit = false;
         try (PDDocument document = Loader.loadPDF(pdfBytes)) {
             // Loading a pathological document can itself burn the budget;
             // re-check before doing anything else with it.
@@ -131,14 +132,15 @@ public class ExtractionService {
             if (pageCount > properties.getMaxPages()) {
                 // Rejected BEFORE any text is extracted: no partial text,
                 // no hash, no character count is recorded for it.
-                return ExtractionResult.overPageLimit();
-            }
-            PDFTextStripper stripper = new PDFTextStripper();
-            for (int page = 1; page <= pageCount; page++) {
-                checkBudget(startNanos, budgetNanos);
-                stripper.setStartPage(page);
-                stripper.setEndPage(page);
-                sink.append(stripper.getText(document));
+                overPageLimit = true;
+            } else {
+                PDFTextStripper stripper = new PDFTextStripper();
+                for (int page = 1; page <= pageCount; page++) {
+                    checkBudget(startNanos, budgetNanos);
+                    stripper.setStartPage(page);
+                    stripper.setEndPage(page);
+                    sink.append(stripper.getText(document));
+                }
             }
         } catch (ExtractionTimeoutException e) {
             log.warn("PDF extraction exceeded its time budget");
@@ -146,6 +148,9 @@ public class ExtractionService {
         } catch (IOException | RuntimeException e) {
             log.warn("PDF extraction failed: {}", e.getClass().getSimpleName());
             return ExtractionResult.failed();
+        }
+        if (overPageLimit) {
+            return ExtractionResult.overPageLimit();
         }
         return classify(sink, pageCount);
     }
@@ -201,7 +206,7 @@ public class ExtractionService {
 
         private final int cap;
         private final StringBuilder kept = new StringBuilder();
-        private final MessageDigest digest = newSha256();
+        private final MessageDigest digest = TokenHashing.newSha256Digest();
         private long totalChars;
         private long alphanumericChars;
         private boolean sawNonWhitespace;
@@ -248,15 +253,6 @@ public class ExtractionService {
 
         String contentHashHex() {
             return HexFormat.of().formatHex(digest.digest());
-        }
-
-        private static MessageDigest newSha256() {
-            try {
-                return MessageDigest.getInstance("SHA-256");
-            } catch (NoSuchAlgorithmException e) {
-                // SHA-256 is guaranteed present on every JVM.
-                throw new IllegalStateException("SHA-256 MessageDigest is unavailable", e);
-            }
         }
     }
 

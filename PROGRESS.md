@@ -491,3 +491,15 @@
   callers served; re-upload after soft delete creates fresh; prefix-twin
   chapters (210K shared prefix, cap 200K) do not dedupe.
 - Next: from-scratch full verify. Failing tests: none.
+- FIX ROUND COMPLETE: from-scratch verify (rm -rf target + mvn -o
+  verify) BUILD SUCCESS — 345 tests run, 0 failures, 0 errors, 4
+  skipped (env-gated PostgresMigrationTest); JaCoCo zero missed lines
+  (1602), branches (293) and instructions. Coverage closes: page-cap
+  outcome moved out of the try-with-resources (synthetic close
+  branches), the sink's digest factory moved to TokenHashing with a
+  provider-removal test mirroring sha256Hex's, and the result record's
+  convenience constructor got null/blank arm tests. Commits:
+  6042f63 (F-1), 3e8511c (F-5..F-8 extraction), 874ffde (F-3), plus
+  this coverage close. Not pushed — bundle handoff per the working
+  agreement. PostgreSQL validation of V11 rides CI on the PR (the
+  migration-profile suite proves V1..V11 on H2-PG mode locally).

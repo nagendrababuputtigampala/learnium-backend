@@ -26,6 +26,18 @@ public final class TokenHashing {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
+    /** A fresh SHA-256 digest for incremental hashing of streamed content. */
+    public static MessageDigest newSha256Digest() {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return digest;
+        } catch (NoSuchAlgorithmException e) {
+            // SHA-256 is guaranteed present on every JVM; reaching this catch
+            // means a broken runtime, not bad input.
+            throw new IllegalStateException("SHA-256 MessageDigest is unavailable", e);
+        }
+    }
+
     public static String sha256Hex(String rawToken) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

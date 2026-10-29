@@ -365,6 +365,18 @@ class ExtractionServiceTest {
     }
 
     @Test
+    void handBuiltResultsDeriveTheirHashFromTheStoredText() {
+        // The convenience constructor (used for hand-built results) derives
+        // the identity from the stored text; absent or blank text has none.
+        assertThat(new ExtractionResult(ExtractionStatus.OK, "real text", 9).contentHash())
+                .isEqualTo(TokenHashing.sha256Hex("real text"));
+        assertThat(new ExtractionResult(ExtractionStatus.OVER_LIMIT, null, null).contentHash())
+                .isNull();
+        assertThat(new ExtractionResult(ExtractionStatus.NO_TEXT, "   ", 3).contentHash())
+                .isNull();
+    }
+
+    @Test
     void pasteTextClassifiesLikePdfText() {
         assertThat(service.extractText(PROSE.repeat(3)).status()).isEqualTo(ExtractionStatus.OK);
         assertThat(service.extractText("too short").status())
