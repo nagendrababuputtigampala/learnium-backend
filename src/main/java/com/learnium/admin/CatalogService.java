@@ -3,7 +3,11 @@ package com.learnium.admin;
 import com.learnium.api.dto.AdminDtos.GradeSubjectDto;
 import com.learnium.api.dto.AdminDtos.PublicBatchDto;
 import com.learnium.api.dto.AdminDtos.PublicCentreDto;
+import com.learnium.api.dto.AdminDtos.TopicDto;
+import com.learnium.common.error.BusinessException;
+import com.learnium.common.error.ErrorCode;
 import com.learnium.model.user.CentreStatus;
+import com.learnium.repository.content.TopicRepository;
 import com.learnium.repository.master.GradeSubjectRepository;
 import com.learnium.repository.user.BatchRepository;
 import com.learnium.repository.user.CentreRepository;
@@ -22,14 +26,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class CatalogService {
 
     private final GradeSubjectRepository gradeSubjectRepository;
+    private final TopicRepository topicRepository;
     private final CentreRepository centreRepository;
     private final BatchRepository batchRepository;
 
     public CatalogService(
             GradeSubjectRepository gradeSubjectRepository,
+            TopicRepository topicRepository,
             CentreRepository centreRepository,
             BatchRepository batchRepository) {
         this.gradeSubjectRepository = gradeSubjectRepository;
+        this.topicRepository = topicRepository;
         this.centreRepository = centreRepository;
         this.batchRepository = batchRepository;
     }
@@ -46,6 +53,16 @@ public class CatalogService {
                                         gs.getSubject().getSubjectId(),
                                         gs.getSubject().getSubjectName(),
                                         gs.getGrade().getName() + " · " + gs.getSubject().getSubjectName()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<TopicDto> topics(UUID gradeSubjectId) {
+        if (!gradeSubjectRepository.existsById(gradeSubjectId)) {
+            throw new BusinessException(ErrorCode.SYS_NOT_FOUND);
+        }
+        return topicRepository.findByGradeSubjectIdOrderByTopicNameAsc(gradeSubjectId).stream()
+                .map(topic -> new TopicDto(topic.getTopicId(), topic.getTopicName()))
                 .toList();
     }
 

@@ -580,3 +580,7 @@
   the PR (the migration-profile suite proves V1–V12 on H2-PG mode
   locally). Remaining M3 work: the frontend half (generate dialog, job
   polling, draft preview) and the Gemini quality gate.
+- Follow-up: GET /api/v1/master/grade-subjects/{id}/topics added for
+  the Generate dialog's topic picker (staff roles, name-ordered
+  {topicId, name} list, unknown pairing → LRN-SYS-404); AdminFlowTest
+  29 green, new code at 0 missed lines/branches.

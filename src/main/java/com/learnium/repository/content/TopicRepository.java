@@ -13,6 +13,14 @@ public interface TopicRepository extends JpaRepository<Topic, UUID> {
     @Query("select t from Topic t where t.gradeSubject.gradeSubjectId = :gradeSubjectId")
     List<Topic> findByGradeSubjectId(@Param("gradeSubjectId") UUID gradeSubjectId);
 
+    /** Picker list for one grade-subject pairing, in display (name) order. */
+    @Query(
+            "select t from Topic t"
+                    + " where t.gradeSubject.gradeSubjectId = :gradeSubjectId"
+                    + " order by t.topicName asc")
+    List<Topic> findByGradeSubjectIdOrderByTopicNameAsc(
+            @Param("gradeSubjectId") UUID gradeSubjectId);
+
     @Query(
             "select t from Topic t"
                     + " where t.gradeSubject.gradeSubjectId = :gradeSubjectId"

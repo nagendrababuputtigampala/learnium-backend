@@ -4,6 +4,7 @@ import com.learnium.admin.CatalogService;
 import com.learnium.api.dto.AdminDtos.GradeSubjectDto;
 import com.learnium.api.dto.AdminDtos.PublicBatchDto;
 import com.learnium.api.dto.AdminDtos.PublicCentreDto;
+import com.learnium.api.dto.AdminDtos.TopicDto;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +29,12 @@ public class CatalogController {
     @PreAuthorize("hasAnyRole('CENTRE_ADMIN', 'TEACHER')")
     public ResponseEntity<List<GradeSubjectDto>> gradeSubjects() {
         return ResponseEntity.ok(catalogService.gradeSubjects());
+    }
+
+    @GetMapping("/master/grade-subjects/{gradeSubjectId}/topics")
+    @PreAuthorize("hasAnyRole('CENTRE_ADMIN', 'TEACHER')")
+    public ResponseEntity<List<TopicDto>> topics(@PathVariable UUID gradeSubjectId) {
+        return ResponseEntity.ok(catalogService.topics(gradeSubjectId));
     }
 
     @GetMapping("/public/centres")

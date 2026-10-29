@@ -33,6 +33,8 @@ public final class AdminDtos {
             String subjectName,
             String label) {}
 
+    public record TopicDto(UUID topicId, String name) {}
+
     public record PublicCentreDto(UUID centreId, String name) {}
 
     public record PublicBatchDto(UUID batchId, String name) {}

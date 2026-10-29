@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.learnium.mail.PayloadCipher;
 import com.learnium.model.common.UserStatus;
 import com.learnium.model.master.Grade;
+import com.learnium.model.content.Topic;
 import com.learnium.model.master.GradeSubject;
 import com.learnium.model.master.Subject;
 import com.learnium.model.user.Batch;
@@ -20,6 +21,7 @@ import com.learnium.model.user.MemberRole;
 import com.learnium.model.user.UserAccount;
 import com.learnium.model.user.UserRole;
 import com.learnium.repository.auth.EmailOutboxRepository;
+import com.learnium.repository.content.TopicRepository;
 import com.learnium.repository.master.GradeRepository;
 import com.learnium.repository.master.GradeSubjectRepository;
 import com.learnium.repository.master.SubjectRepository;
@@ -71,6 +73,7 @@ class AdminFlowTest {
     @Autowired private GradeRepository gradeRepository;
     @Autowired private SubjectRepository subjectRepository;
     @Autowired private GradeSubjectRepository gradeSubjectRepository;
+    @Autowired private TopicRepository topicRepository;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private EmailOutboxRepository emailOutboxRepository;
     @Autowired private PayloadCipher payloadCipher;
@@ -753,6 +756,86 @@ class AdminFlowTest {
             }
         }
         assertThat(found).isTrue();
+    }
+
+    private Topic createTopic(GradeSubject gs, String name) {
+        Topic topic = new Topic();
+        topic.setGradeSubject(gs);
+        topic.setTopicName(name);
+        return topicRepository.save(topic);
+    }
+
+    private GradeSubject createGradeSubject(String gradeCode, String gradeName, String subjectName) {
+        Grade grade = new Grade();
+        grade.setCode(gradeCode);
+        grade.setName(gradeName);
+        grade = gradeRepository.save(grade);
+        Subject subject = new Subject();
+        subject.setSubjectName(subjectName);
+        subject = subjectRepository.save(subject);
+        GradeSubject gs = new GradeSubject();
+        gs.setGrade(grade);
+        gs.setSubject(subject);
+        return gradeSubjectRepository.save(gs);
+    }
+
+    @Test
+    void gradeSubjectTopicsListOwnTopicsInNameOrder() throws Exception {
+        Topic fractions = createTopic(gradeSubject, "Fractions");
+        Topic algebra = createTopic(gradeSubject, "Algebra");
+        Topic decimals = createTopic(gradeSubject, "Decimals");
+        GradeSubject science = createGradeSubject("G7", "Grade 7", "Science");
+        createTopic(science, "Cells");
+
+        String tess = tokenFor("tess@alpha.test");
+
+        mockMvc.perform(
+                        get("/api/v1/master/grade-subjects/"
+                                        + gradeSubject.getGradeSubjectId()
+                                        + "/topics")
+                                .header("Authorization", "Bearer " + tess))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].name").value("Algebra"))
+                .andExpect(jsonPath("$[0].topicId").value(algebra.getTopicId().toString()))
+                .andExpect(jsonPath("$[1].name").value("Decimals"))
+                .andExpect(jsonPath("$[1].topicId").value(decimals.getTopicId().toString()))
+                .andExpect(jsonPath("$[2].name").value("Fractions"))
+                .andExpect(jsonPath("$[2].topicId").value(fractions.getTopicId().toString()));
+    }
+
+    @Test
+    void gradeSubjectTopicsEmptyForGradeSubjectWithoutTopics() throws Exception {
+        GradeSubject empty = createGradeSubject("G6", "Grade 6", "History");
+
+        String admin = tokenFor("admin@alpha.test");
+
+        mockMvc.perform(
+                        get("/api/v1/master/grade-subjects/" + empty.getGradeSubjectId() + "/topics")
+                                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void gradeSubjectTopicsUnknownIdReturns404() throws Exception {
+        String admin = tokenFor("admin@alpha.test");
+
+        mockMvc.perform(
+                        get("/api/v1/master/grade-subjects/" + UUID.randomUUID() + "/topics")
+                                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("LRN-SYS-404"));
+    }
+
+    @Test
+    void gradeSubjectTopicsRequireAuthentication() throws Exception {
+        mockMvc.perform(
+                        get("/api/v1/master/grade-subjects/"
+                                + gradeSubject.getGradeSubjectId()
+                                + "/topics"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("LRN-AUTH-001"));
     }
 
     @Test
