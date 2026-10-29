@@ -106,6 +106,27 @@ class MaterialServiceTest {
     }
 
     @Test
+    void uploadWithoutAFilenameIsMatInvalidFile() {
+        // Real servlet stacks can deliver a part with no filename at all;
+        // MockMvc normalizes that away, so it is pinned here with a mock.
+        MultipartFile file = mock(MultipartFile.class);
+        when(file.isEmpty()).thenReturn(false);
+        when(file.getSize()).thenReturn(1024L);
+        when(file.getOriginalFilename()).thenReturn(null);
+
+        assertThatExceptionOfType(BusinessException.class)
+                .isThrownBy(
+                        () ->
+                                service.createFromUpload(
+                                        principal,
+                                        file,
+                                        "Chapter",
+                                        gradeSubject.getGradeSubjectId()))
+                .satisfies(
+                        e -> assertThat(e.getErrorCode().name()).isEqualTo("MAT_INVALID_FILE"));
+    }
+
+    @Test
     void failedExtractionPersistsWithoutHashOrDedupeLookup() {
         when(extractionService.extractText(anyString())).thenReturn(ExtractionResult.failed());
 
