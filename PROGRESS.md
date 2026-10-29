@@ -596,3 +596,36 @@
   create ending in exactly one row) + CatalogServiceTest 3 green
   pinning the conflict branches deterministically; new code at 0
   missed lines/branches.
+
+# Progress — feature/m3-generation-fixes (backend)
+
+- Tracker task 80 (from Nagendra's 2026-10-29 local validation on
+  Ollama), branched off feature/ai-generation (c475058). Three small
+  commits, one per item; not pushed — bundle handoff per the working
+  agreement.
+- Done: prompt grade label — PromptBuilder no longer hardcodes a
+  "Grade " prefix (grade display names already carry it), so the
+  opening line reads "for Grade 6 Mathematics". Test pins the exact
+  opening line for a grade named "Grade 6". Commit dc2988f;
+  PromptBuilderTest 5 green.
+- Done: ZERO_VALID retries within the existing 2-attempt budget — the
+  worker reschedules a zero-valid response through the same claim
+  service path as the transient failure kinds (PENDING + existing
+  backoff); the concluding attempt records counts/usage, and only the
+  final attempt lands FAILED/ZERO_VALID. Worker tests prove all three
+  shapes: reschedule-then-terminal (counts + usage intact),
+  zero-valid-then-success with drafts committed exactly once.
+  Commit 1b1834f; GenerationWorkerTest 17 + ClaimService 6 + unit 1
+  green.
+- Done: FILL_BLANK presentation normalization in DraftQuestionFactory
+  — stemWithBlank absent/blank falls back to the item's stem field,
+  and runs of 5+ underscores collapse to the single _____ marker
+  before the exactly-one check; the normalized stem is what the
+  payload persists. Semantic rules unchanged (two real blanks, a
+  4-underscore run, and a missing answer all still drop).
+  Commit bb38166; DraftQuestionFactoryTest 30 green.
+- Coverage: full generation package run (100 tests green) with a
+  fresh JaCoCo report — PromptBuilder, GenerationWorker and
+  DraftQuestionFactory all at 0 missed lines/branches/instructions.
+  Full suite + gate remain the parent's from-scratch verification.
+- Failing tests: none.
