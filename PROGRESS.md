@@ -503,3 +503,12 @@
   this coverage close. Not pushed — bundle handoff per the working
   agreement. PostgreSQL validation of V11 rides CI on the PR (the
   migration-profile suite proves V1..V11 on H2-PG mode locally).
+
+## M3 branch 2 — feature/ai-generation (off dev c7277dcf, V1–V11 merged)
+- S1 done: Flyway V12 — background_job (frozen job inputs, claim
+  token/generation + lease, per-type result counts, token usage) with
+  due/material indexes and composite tenancy FKs; questions gain
+  generation provenance columns + composite FK to the job. BackgroundJob
+  entity + status/failure-kind/difficulty enums; MigrationTest asserts
+  V1–V12 and the cross-centre provenance FK rejection.
+- Next: S2 job creation + read APIs. Failing tests: none yet.

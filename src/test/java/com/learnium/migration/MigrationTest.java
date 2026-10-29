@@ -37,7 +37,8 @@ class MigrationTest {
         assertThat(applied)
                 .extracting(MigrationInfo::getVersion)
                 .extracting(Object::toString)
-                .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11");
+                .containsExactly(
+                        "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12");
         assertThat(applied)
                 .extracting(MigrationInfo::getState)
                 .containsOnly(MigrationState.SUCCESS);
@@ -72,7 +73,8 @@ class MigrationTest {
                         "user_xp_ledger",
                         "account_token",
                         "email_outbox",
-                        "refresh_token");
+                        "refresh_token",
+                        "background_job");
         List<String> actual =
                 jdbcTemplate.queryForList(
                         "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES"
@@ -178,6 +180,94 @@ class MigrationTest {
                 otherUploader,
                 centreId);
         insertMaterialRow(centreId, otherUploader, gradeSubjectId, hash, hash, null);
+    }
+
+    @Test
+    void generationJobSchemaAndProvenanceFkAfterV12() {
+        java.util.UUID centreA = insertCentreRow("Generation Centre A");
+        java.util.UUID centreB = insertCentreRow("Generation Centre B");
+        java.util.UUID uploaderId = java.util.UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO learnium.user_account"
+                        + " (user_id, centre_id, role, email, display_name, status,"
+                        + " created_at, updated_at)"
+                        + " VALUES (?, ?, 'TEACHER', 'gen@example.test', 'Gen Test',"
+                        + " 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                uploaderId,
+                centreA);
+        java.util.UUID gradeSubjectId =
+                jdbcTemplate.queryForObject(
+                        "SELECT grade_subject_id FROM learnium.grade_subjects LIMIT 1",
+                        java.util.UUID.class);
+        java.util.UUID materialId = java.util.UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO learnium.materials"
+                        + " (material_id, centre_id, uploaded_by, grade_subject_id, title,"
+                        + " source_type, content_hash, created_at, updated_at)"
+                        + " VALUES (?, ?, ?, ?, 'Gen chapter', 'PASTE', ?,"
+                        + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                materialId,
+                centreA,
+                uploaderId,
+                gradeSubjectId,
+                "b".repeat(64));
+        java.util.UUID topicId = java.util.UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO learnium.topics"
+                        + " (topic_id, grade_subject_id, topic_name, sort_order, is_active,"
+                        + " created_at, updated_at)"
+                        + " VALUES (?, ?, 'Fractions', 0, TRUE,"
+                        + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                topicId,
+                gradeSubjectId);
+        java.util.UUID jobId = java.util.UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO learnium.background_job"
+                        + " (id, centre_id, material_id, content_hash, topic_id,"
+                        + " requested_counts, difficulty, provider, model, prompt_version,"
+                        + " payload_schema_version, status, next_attempt_at,"
+                        + " created_at, updated_at)"
+                        + " VALUES (?, ?, ?, ?, ?, CAST(? AS jsonb), 'MEDIUM', 'gemini',"
+                        + " 'gemini-2.0-flash', 'gen-prompt-v1', 'gen-payload-v1', 'PENDING',"
+                        + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                jobId,
+                centreA,
+                materialId,
+                "b".repeat(64),
+                topicId,
+                "{\"MCQ\":5}");
+        java.util.UUID questionTypeId =
+                jdbcTemplate.queryForObject(
+                        "SELECT question_type_id FROM learnium.question_types"
+                                + " WHERE code = 'MCQ'",
+                        java.util.UUID.class);
+
+        // A question in the job's own centre may reference the job.
+        insertQuestionRow(centreA, topicId, questionTypeId, jobId);
+        // The composite tenancy FK rejects a cross-centre job reference.
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> insertQuestionRow(centreB, topicId, questionTypeId, jobId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+    }
+
+    private void insertQuestionRow(
+            java.util.UUID centreId,
+            java.util.UUID topicId,
+            java.util.UUID questionTypeId,
+            java.util.UUID generationJobId) {
+        jdbcTemplate.update(
+                "INSERT INTO learnium.questions"
+                        + " (question_id, centre_id, topic_id, question_type_id, difficulty,"
+                        + " payload, correct_ref, version, status, is_active, generation_job_id,"
+                        + " created_at, updated_at)"
+                        + " VALUES (?, ?, ?, ?, 3, CAST(? AS jsonb), 'a', 1, 'DRAFT', TRUE, ?,"
+                        + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                java.util.UUID.randomUUID(),
+                centreId,
+                topicId,
+                questionTypeId,
+                "{\"stem\":\"1/2 + 1/4?\"}",
+                generationJobId);
     }
 
     private void insertMaterialRow(
