@@ -2,6 +2,7 @@ package com.learnium.api.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.util.UUID;
 import org.hibernate.validator.constraints.URL;
 
@@ -32,6 +33,13 @@ public final class AdminDtos {
             UUID subjectId,
             String subjectName,
             String label) {}
+
+    public record TopicDto(UUID topicId, String name) {}
+
+    public record CreateTopicRequest(
+            @NotBlank(message = "must not be blank")
+                    @Size(max = 200, message = "must be at most 200 characters")
+                    String name) {}
 
     public record PublicCentreDto(UUID centreId, String name) {}
 

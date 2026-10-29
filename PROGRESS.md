@@ -503,3 +503,96 @@
   this coverage close. Not pushed — bundle handoff per the working
   agreement. PostgreSQL validation of V11 rides CI on the PR (the
   migration-profile suite proves V1..V11 on H2-PG mode locally).
+
+## M3 branch 2 — feature/ai-generation (off dev c7277dcf, V1–V11 merged)
+- S1 done: Flyway V12 — background_job (frozen job inputs, claim
+  token/generation + lease, per-type result counts, token usage) with
+  due/material indexes and composite tenancy FKs; questions gain
+  generation provenance columns + composite FK to the job. BackgroundJob
+  entity + status/failure-kind/difficulty enums; MigrationTest asserts
+  V1–V12 and the cross-centre provenance FK rejection.
+- Next: S2 job creation + read APIs. Failing tests: none yet.
+- S2 done: LRN-GEN-001..005; GenerationProperties/Config (provider,
+  worker, lease/backoff, daily caps; shared Clock bean). POST
+  /materials/{id}/generate freezes the job (hash, counts, difficulty,
+  provider/model, contract versions, creator) with the validation
+  matrix + per-teacher/per-centre daily caps; GET /generation-jobs/{id}
+  and GET /materials/{id}/questions (paged, newest first) under the
+  branch-1 visibility rule. GenerationFlowTest 11 + GenerationCapFlowTest
+  1 green. CommittedDataCleanup learned questions/background_job/topics.
+- Next: S3 generator SPI + prompt/schema + Gemini/Ollama providers.
+  Failing tests: none.
+- S3 done: QuestionGenerator SPI + GenerationOutcome (typed failures),
+  PromptBuilder (strict, only-from-text, exact counts), the shared
+  structured-output schema, a ModelTransport seam with a thin
+  HttpClient impl, and Gemini (structured output, finishReason +
+  usageMetadata mapping incl. thoughts tokens) / Ollama (format schema,
+  eval-count usage) adapters behind learnium.generation.provider.
+  27 offline unit tests against recorded response shapes; no sockets.
+- Next: S4 validation + draft factory. Failing tests: none.
+- S4 done: DraftQuestionFactory (pure) validates per type with drop
+  reasons (SCHEMA_INVALID, ANSWER_KEY_INVALID, RUBRIC_INVALID,
+  FIELD_TOO_LONG, DUPLICATE_STEM, EXCEEDS_REQUESTED), caps, and
+  materializes payload + correctRef following the M1 conventions:
+  option ids a..d in the payload + correctRef = option id; FIB
+  correctRef = the answer; NUMERIC correctRef = compact
+  value/tolerance/unit JSON (correct_ref is varchar(50)); WRITTEN
+  rubric criterion ids crit-1..n in the payload, correctRef =
+  "modelAnswer". 17 unit tests green.
+- Next: S5 worker. Failing tests: none.
+- S5 done: claim-ownership worker. BackgroundJobRepository gains the
+  fetch-joined claim snapshot and four conditional updates (claim /
+  completeSucceeded / completeFailed / reschedule) keyed on id +
+  status RUNNING + claim token + claim generation — a stale worker's
+  completion matches zero rows. ClaimedJob snapshot; GenerationClaimService
+  (claim, reschedule with backoff base × attempts, terminal fail with
+  optional counts/usage); GenerationPersistenceService (material hash /
+  deletion re-check, ownership-checked SUCCEEDED transition and question
+  inserts in ONE transaction; difficulty bands EASY→1 / MEDIUM→3 /
+  HARD→5 onto the 1..5 question scale; createdBy = the job's creator);
+  GenerationWorker (retryable MODEL_ERROR / MALFORMED_RESPONSE /
+  TRUNCATED reschedule while attempts < 2, everything else terminal;
+  ZERO_VALID terminal with counts + usage; persist crashes leave the
+  job RUNNING for lease reclaim); GenerationScheduler behind
+  worker-enabled. 13 tests green, incl. the deterministic stale-worker
+  test (blocking fake generator + mutable clock), deletion during
+  generation, crash-before-commit via a spy seam (drafts exactly once
+  after reclaim), retry/backoff timing and claim exclusivity.
+- Next: S6 ER refresh + from-scratch verify. Failing tests: none.
+- S6 done: ER-Diagram.md refreshed to the V1–V12 reality (BACKGROUND_JOB
+  full shape, question provenance columns, material dedupe/extraction
+  columns, security_version, REFRESH_TOKEN, composite-FK tenancy notes).
+- BRANCH 2 BACKEND COMPLETE: final from-scratch verify (rm -rf target +
+  mvn -o verify) BUILD SUCCESS — 459 tests run, 0 failures, 0 errors, 4
+  skipped (env-gated PostgresMigrationTest); JaCoCo zero missed lines
+  (2509), branches (603) and instructions (10904) in jacoco.csv.
+  Coverage closes worth remembering: the read DTOs were only reachable
+  with real drafts present (new flow tests seed finished jobs +
+  questions); the RefreshTokenService race-loser arm was racy under the
+  threaded test and is now pinned by a deterministic Mockito test
+  (RefreshTokenRaceTest); three unreachable defensive arms were removed
+  instead of contorted around (counts forRequest, the two writeJson
+  catches, toWebJson's catch — in-memory tree serialization cannot
+  fail). Commits on feature/ai-generation: cef85bd (S1 V12),
+  4f1cdcf (S2 APIs), 22eb8ac (S3 providers), a117ccc (S4 factory),
+  0c97e62 (S5 worker), plus this S6 close. Not pushed — bundle handoff
+  per the working agreement. PostgreSQL validation of V12 rides CI on
+  the PR (the migration-profile suite proves V1–V12 on H2-PG mode
+  locally). Remaining M3 work: the frontend half (generate dialog, job
+  polling, draft preview) and the Gemini quality gate.
+- Follow-up: GET /api/v1/master/grade-subjects/{id}/topics added for
+  the Generate dialog's topic picker (staff roles, name-ordered
+  {topicId, name} list, unknown pairing → LRN-SYS-404); AdminFlowTest
+  29 green, new code at 0 missed lines/branches.
+- Follow-up: POST /api/v1/master/grade-subjects/{id}/topics added —
+  create-or-return so teachers can name a topic the catalogue lacks
+  (staff roles; name trimmed, case-insensitive match returns the
+  existing topic with 200 and its original casing, a new name creates
+  with 201; unknown pairing → LRN-SYS-404, validation → LRN-VAL-001).
+  The insert runs in TopicCreationService's own transaction with a
+  flush, and a lost race against uq_topics_name_per_grade_subject
+  recovers by returning the winner — the material-dedupe split.
+  Tests: AdminFlowTest 38 green (9 new, incl. a two-thread concurrent
+  create ending in exactly one row) + CatalogServiceTest 3 green
+  pinning the conflict branches deterministically; new code at 0
+  missed lines/branches.

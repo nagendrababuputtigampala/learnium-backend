@@ -41,7 +41,22 @@ public enum ErrorCode {
             "LRN-MAT-001", HttpStatus.BAD_REQUEST, "The uploaded file is not a valid PDF"),
     MAT_NOT_FOUND("LRN-MAT-002", HttpStatus.NOT_FOUND, "Material not found"),
     MAT_TOO_LARGE(
-            "LRN-MAT-003", HttpStatus.PAYLOAD_TOO_LARGE, "The uploaded file is too large");
+            "LRN-MAT-003", HttpStatus.PAYLOAD_TOO_LARGE, "The uploaded file is too large"),
+    GEN_NOT_GENERATABLE(
+            "LRN-GEN-001",
+            HttpStatus.UNPROCESSABLE_CONTENT,
+            "This material's text could not be extracted well enough to generate questions"),
+    GEN_TOPIC_MISMATCH(
+            "LRN-GEN-002",
+            HttpStatus.BAD_REQUEST,
+            "Topic does not belong to this material's grade and subject"),
+    GEN_COUNT_INVALID(
+            "LRN-GEN-003",
+            HttpStatus.BAD_REQUEST,
+            "Question counts must total between 1 and 40"),
+    GEN_DAILY_LIMIT(
+            "LRN-GEN-004", HttpStatus.TOO_MANY_REQUESTS, "Daily generation limit reached"),
+    GEN_JOB_NOT_FOUND("LRN-GEN-005", HttpStatus.NOT_FOUND, "Generation job not found");
 
     private final String code;
     private final HttpStatus status;

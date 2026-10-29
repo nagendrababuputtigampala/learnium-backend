@@ -85,4 +85,29 @@ public class Question extends AuditableEntity {
 
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
+
+    // ---- Generation provenance (M3 branch 2): set only on AI-generated
+    // questions, copied from the job that produced them. The job link is a
+    // plain id (the row is the audit trail, never edited through here);
+    // the database enforces it as a composite (centre_id, generation_job_id)
+    // foreign key.
+
+    @Column(name = "generation_job_id")
+    private UUID generationJobId;
+
+    @Column(name = "generation_provider", length = 16)
+    private String generationProvider;
+
+    @Column(name = "generated_by_model", length = 64)
+    private String generatedByModel;
+
+    @Column(name = "prompt_version", length = 32)
+    private String promptVersion;
+
+    @Column(name = "payload_schema_version", length = 32)
+    private String payloadSchemaVersion;
+
+    /** SHA-256 of the complete source text this question was generated from. */
+    @Column(name = "content_hash", length = 64)
+    private String contentHash;
 }
