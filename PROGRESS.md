@@ -410,3 +410,12 @@
   revoke-all, and a stale-stamped token landing after it is refused the
   same way. 4/4 green.
 - Next: final from-scratch verify for the round. Failing tests: none.
+- FIX ROUND 2 COMPLETE: final from-scratch verify (rm -rf target +
+  mvn -o verify) BUILD SUCCESS — 269 tests run, 0 failures, 0 errors,
+  4 skipped (env-gated PostgresMigrationTest); JaCoCo LINE 100%
+  (1217/1217), BRANCH 100% (197/197), INSTRUCTION 100% (5193/5193),
+  zero missed in jacoco.csv totals. Commits on feature/auth-roles:
+  2794576 (R2-S1 config bindings), 8805542 (R2-S2 security version),
+  e27440c (R2-S3 committed-state proofs). Not pushed — bundle handoff
+  per the working agreement; backend PR #8 updates in place once
+  Nagendra pushes.
