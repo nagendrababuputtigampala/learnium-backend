@@ -16,6 +16,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -69,4 +70,25 @@ public class Material extends AuditableEntity {
 
     @Column(name = "extracted_text", columnDefinition = "text")
     private String extractedText;
+
+    /** SHA-256 hex of the stored extracted text; null until extraction ran. */
+    @Column(name = "content_hash", length = 64)
+    private String contentHash;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "extraction_status", length = 24)
+    private ExtractionStatus extractionStatus;
+
+    /** Length of the stored extracted text (after any cap truncation). */
+    @Column(name = "extracted_chars")
+    private Integer extractedChars;
+
+    /**
+     * Soft-delete marker. A deleted material is hidden from every read path
+     * and blocks any in-flight generation from persisting results; the row
+     * and the stored file are physically cleaned up later, once nothing
+     * references them.
+     */
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
 }

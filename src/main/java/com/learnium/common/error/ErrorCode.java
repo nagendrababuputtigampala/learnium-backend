@@ -36,7 +36,12 @@ public enum ErrorCode {
     USR_EMAIL_TAKEN("LRN-USR-001", HttpStatus.CONFLICT, "Email is already registered"),
     USR_NOT_FOUND("LRN-USR-002", HttpStatus.NOT_FOUND, "User not found"),
     CTR_BATCH_NOT_FOUND("LRN-CTR-001", HttpStatus.NOT_FOUND, "Batch not found"),
-    CTR_ROSTER_NOT_FOUND("LRN-CTR-002", HttpStatus.NOT_FOUND, "Roster entry not found");
+    CTR_ROSTER_NOT_FOUND("LRN-CTR-002", HttpStatus.NOT_FOUND, "Roster entry not found"),
+    MAT_INVALID_FILE(
+            "LRN-MAT-001", HttpStatus.BAD_REQUEST, "The uploaded file is not a valid PDF"),
+    MAT_NOT_FOUND("LRN-MAT-002", HttpStatus.NOT_FOUND, "Material not found"),
+    MAT_TOO_LARGE(
+            "LRN-MAT-003", HttpStatus.PAYLOAD_TOO_LARGE, "The uploaded file is too large");
 
     private final String code;
     private final HttpStatus status;
