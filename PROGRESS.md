@@ -461,3 +461,20 @@
   body still persists as EXTRACTION_FAILED. Targeted tests green
   (MaterialFlowTest 18, MaterialServiceTest 4, ExtractionServiceTest
   13); full re-verify by the parent from scratch.
+
+## Codex review fix round — M3 branch 1 (2026-10-28)
+- F-1 done: Dockerfile creates /app/data/files owned by learnium before
+  the USER switch; compose mounts the named `appfiles` volume at
+  /app/data so uploads survive container replacement.
+- F-5/F-6/F-7/F-8 (extraction) done: page cap (learnium.extraction
+  .max-pages, default 40) rejects BEFORE extraction with no partial
+  work recorded (text/chars/hash NULL). Parsing runs on a dedicated
+  daemon executor; the caller waits at most the budget — a per-page
+  check alone cannot bound document load or one pathological page.
+  Text accumulates through a bounded sink: at most the char cap is
+  retained, every persisted outcome is truncated at the cap, and the
+  content hash digests the COMPLETE text as it streams (prefix-twin
+  chapters no longer share an identity). ExtractionServiceTest 22
+  green; flow suites unchanged-green.
+- Next: F-3 dedupe identity (V11) + race recovery; then the
+  from-scratch verify. Failing tests: none.

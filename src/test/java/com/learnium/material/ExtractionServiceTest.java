@@ -3,8 +3,14 @@ package com.learnium.material;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.learnium.model.content.ExtractionStatus;
+import com.learnium.security.TokenHashing;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
 class ExtractionServiceTest {
@@ -158,6 +164,204 @@ class ExtractionServiceTest {
 
         assertThat(result.status()).isEqualTo(ExtractionStatus.OVER_LIMIT);
         assertThat(result.storedText()).isEqualTo(PROSE.repeat(3));
+    }
+
+    @Test
+    void fortyOnePageDocumentIsRejectedByThePageCapBeforeExtraction() {
+        ExtractionProperties properties = new ExtractionProperties();
+        properties.setMaxPages(40);
+        // Content-rich pages: the rejection must be the page cap itself,
+        // not a usability side effect, and no partial work is recorded.
+        List<List<String>> pages = new ArrayList<>();
+        for (int i = 0; i < 41; i++) {
+            pages.add(linesOf(PROSE));
+        }
+
+        ExtractionResult result =
+                new ExtractionService(properties).extractPdf(PdfFixtures.pdfOf(pages));
+
+        assertThat(result.status()).isEqualTo(ExtractionStatus.OVER_LIMIT);
+        assertThat(result.storedText()).isNull();
+        assertThat(result.storedChars()).isNull();
+        assertThat(result.contentHash()).isNull();
+    }
+
+    @Test
+    void documentAtThePageCapStillExtracts() {
+        ExtractionProperties properties = new ExtractionProperties();
+        properties.setMaxPages(40);
+        List<List<String>> pages = new ArrayList<>();
+        for (int i = 0; i < 40; i++) {
+            pages.add(linesOf(PROSE));
+        }
+
+        ExtractionResult result =
+                new ExtractionService(properties).extractPdf(PdfFixtures.pdfOf(pages));
+
+        assertThat(result.status()).isEqualTo(ExtractionStatus.OK);
+    }
+
+    @Test
+    void slowParseIsAbandonedAtTheBudget() {
+        // One uninterruptible page must not hold the caller hostage: the
+        // future deadline, not a per-page check, is the bound.
+        ExtractionProperties properties = new ExtractionProperties();
+        properties.setTimeoutSeconds(1);
+        ExecutorService executor = Executors.newCachedThreadPool();
+        try {
+            ExtractionService slow =
+                    new ExtractionService(properties, executor) {
+                        @Override
+                        ExtractionResult extractWithinBudget(byte[] pdfBytes) {
+                            try {
+                                Thread.sleep(60_000);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            }
+                            return new ExtractionResult(ExtractionStatus.OK, "late", 4);
+                        }
+                    };
+
+            long startedNanos = System.nanoTime();
+            ExtractionResult result = slow.extractPdf(new byte[0]);
+            long elapsedMillis = (System.nanoTime() - startedNanos) / 1_000_000;
+
+            assertThat(result.status()).isEqualTo(ExtractionStatus.EXTRACTION_FAILED);
+            assertThat(elapsedMillis).isLessThan(10_000);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void budgetExpiringDuringTheParseFailsExtraction() {
+        // The clock jumps past the budget right after the start stamp, so
+        // the post-load budget check inside the parse is what fires.
+        ExtractionProperties properties = new ExtractionProperties();
+        properties.setTimeoutSeconds(1);
+        ExecutorService executor = Executors.newCachedThreadPool();
+        try {
+            AtomicLong calls = new AtomicLong();
+            ExtractionService service =
+                    new ExtractionService(
+                            properties,
+                            executor,
+                            () -> calls.getAndIncrement() == 0
+                                    ? 0L
+                                    : TimeUnit.SECONDS.toNanos(2));
+            byte[] pdf = PdfFixtures.pdfOf(List.of(linesOf(PROSE)));
+
+            ExtractionResult result = service.extractPdf(pdf);
+
+            assertThat(result.status()).isEqualTo(ExtractionStatus.EXTRACTION_FAILED);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void parserCrashFailsExtraction() {
+        ExecutorService executor = Executors.newCachedThreadPool();
+        try {
+            ExtractionService broken =
+                    new ExtractionService(new ExtractionProperties(), executor) {
+                        @Override
+                        ExtractionResult extractWithinBudget(byte[] pdfBytes) {
+                            throw new IllegalStateException("parser exploded");
+                        }
+                    };
+
+            assertThat(broken.extractPdf(new byte[0]).status())
+                    .isEqualTo(ExtractionStatus.EXTRACTION_FAILED);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void interruptedWaitFailsExtractionAndRestoresTheFlag() {
+        ExtractionProperties properties = new ExtractionProperties();
+        properties.setTimeoutSeconds(30);
+        ExecutorService executor = Executors.newCachedThreadPool();
+        try {
+            ExtractionService slow =
+                    new ExtractionService(properties, executor) {
+                        @Override
+                        ExtractionResult extractWithinBudget(byte[] pdfBytes) {
+                            try {
+                                Thread.sleep(60_000);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            }
+                            return ExtractionResult.failed();
+                        }
+                    };
+
+            Thread.currentThread().interrupt();
+            ExtractionResult result = slow.extractPdf(new byte[0]);
+
+            assertThat(result.status()).isEqualTo(ExtractionStatus.EXTRACTION_FAILED);
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        } finally {
+            Thread.interrupted(); // never leak the flag into other tests
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void unusableTextIsTruncatedAtTheStorageCapToo() {
+        ExtractionProperties properties = new ExtractionProperties();
+        properties.setMaxExtractedChars(50);
+
+        ExtractionResult result =
+                new ExtractionService(properties).extractText("!@# $%^ &*() ".repeat(40));
+
+        assertThat(result.status()).isEqualTo(ExtractionStatus.UNUSABLE_TEXT);
+        assertThat(result.storedText()).hasSize(50);
+        assertThat(result.storedChars()).isEqualTo(50);
+    }
+
+    @Test
+    void cappedPdfStoresOnlyTheCapButHashesTheWholeDocument() {
+        byte[] pdf =
+                PdfFixtures.pdfOf(
+                        List.of(
+                                linesOf(PROSE.repeat(2)),
+                                linesOf(PROSE.repeat(2)),
+                                linesOf(PROSE.repeat(2))));
+        ExtractionResult whole = service.extractPdf(pdf);
+
+        ExtractionProperties properties = new ExtractionProperties();
+        properties.setMaxExtractedChars(100);
+        properties.setMaxInputTokens(1_000_000);
+        ExtractionResult capped = new ExtractionService(properties).extractPdf(pdf);
+
+        assertThat(whole.status()).isEqualTo(ExtractionStatus.OK);
+        assertThat(capped.status()).isEqualTo(ExtractionStatus.OVER_LIMIT);
+        assertThat(capped.storedChars()).isEqualTo(100);
+        // The identity digests every page, including the ones past the cap.
+        assertThat(capped.contentHash()).isEqualTo(whole.contentHash());
+    }
+
+    @Test
+    void hashCoversTheCompleteTextNotTheTruncatedStore() {
+        ExtractionProperties properties = new ExtractionProperties();
+        properties.setMaxExtractedChars(100);
+        properties.setMaxInputTokens(1_000_000);
+        ExtractionService capped = new ExtractionService(properties);
+        // Both texts share a 150-char prefix — well past the 100-char store —
+        // and differ only afterwards.
+        String prefix = "word ".repeat(30);
+        String first = prefix + "alpha ".repeat(50);
+        String second = prefix + "beta ".repeat(50);
+
+        ExtractionResult a = capped.extractText(first);
+        ExtractionResult b = capped.extractText(second);
+
+        assertThat(a.storedText()).isEqualTo(b.storedText());
+        assertThat(a.contentHash()).isEqualTo(TokenHashing.sha256Hex(first));
+        assertThat(b.contentHash()).isEqualTo(TokenHashing.sha256Hex(second));
+        assertThat(a.contentHash()).isNotEqualTo(b.contentHash());
     }
 
     @Test

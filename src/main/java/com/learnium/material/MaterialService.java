@@ -15,7 +15,6 @@ import com.learnium.repository.content.MaterialRepository;
 import com.learnium.repository.master.GradeSubjectRepository;
 import com.learnium.repository.user.UserAccountRepository;
 import com.learnium.security.LearniumPrincipal;
-import com.learnium.security.TokenHashing;
 import com.learnium.storage.StorageService;
 import java.io.IOException;
 import java.time.Instant;
@@ -33,10 +32,10 @@ import org.springframework.web.multipart.MultipartFile;
  * nobody else, not even another teacher in the same centre.
  *
  * <p>Tenancy always comes from the token. Content identity is the SHA-256
- * of the extracted text, computed only when extraction produced text (two
- * different scanned PDFs both extract to nothing and must never dedupe
- * into each other). Deduplication is scoped to the same uploader: a match
- * returns the teacher's own earlier material and stores nothing new.
+ * of the COMPLETE extracted text, computed only when extraction produced
+ * text (two different scanned PDFs both extract to nothing and must never
+ * dedupe into each other). Deduplication is scoped to the same uploader: a
+ * match returns the teacher's own earlier material and stores nothing new.
  */
 @Service
 public class MaterialService {
@@ -226,11 +225,14 @@ public class MaterialService {
         }
     }
 
-    /** Content identity exists only when extraction produced text. */
+    /**
+     * Content identity is the extraction's SHA-256 of the COMPLETE text —
+     * never of the truncated store, or two chapters sharing a capped prefix
+     * but differing later would collapse into one identity. It is null when
+     * extraction produced no text (see {@link ExtractionResult}).
+     */
     private static String contentHashOf(ExtractionResult extraction) {
-        return extraction.storedChars() > 0
-                ? TokenHashing.sha256Hex(extraction.storedText())
-                : null;
+        return extraction.contentHash();
     }
 
     private static void applyExtraction(

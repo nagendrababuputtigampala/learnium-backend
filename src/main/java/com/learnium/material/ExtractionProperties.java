@@ -19,6 +19,9 @@ public class ExtractionProperties {
     /** Wall-clock budget for one PDF extraction, in seconds. */
     private int timeoutSeconds = 30;
 
+    /** Documents with more pages than this are rejected before extraction. */
+    private int maxPages = 40;
+
     /** Stored extracted text is truncated at this many characters. */
     private int maxExtractedChars = 200_000;
 

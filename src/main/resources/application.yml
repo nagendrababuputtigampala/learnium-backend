@@ -71,6 +71,7 @@ learnium:
   extraction:
     # PDF extraction budget and usability thresholds (see ExtractionProperties).
     timeout-seconds: ${EXTRACTION_TIMEOUT_SECONDS:30}
+    max-pages: ${EXTRACTION_MAX_PAGES:40}
     max-extracted-chars: ${EXTRACTION_MAX_CHARS:200000}
     max-input-tokens: ${EXTRACTION_MAX_TOKENS:40000}
 
