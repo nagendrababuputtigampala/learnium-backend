@@ -522,3 +522,11 @@
   1 green. CommittedDataCleanup learned questions/background_job/topics.
 - Next: S3 generator SPI + prompt/schema + Gemini/Ollama providers.
   Failing tests: none.
+- S3 done: QuestionGenerator SPI + GenerationOutcome (typed failures),
+  PromptBuilder (strict, only-from-text, exact counts), the shared
+  structured-output schema, a ModelTransport seam with a thin
+  HttpClient impl, and Gemini (structured output, finishReason +
+  usageMetadata mapping incl. thoughts tokens) / Ollama (format schema,
+  eval-count usage) adapters behind learnium.generation.provider.
+  27 offline unit tests against recorded response shapes; no sockets.
+- Next: S4 validation + draft factory. Failing tests: none.
