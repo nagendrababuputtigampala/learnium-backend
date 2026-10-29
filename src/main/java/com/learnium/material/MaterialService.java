@@ -7,20 +7,16 @@ import com.learnium.common.api.PageResponse;
 import com.learnium.common.error.BusinessException;
 import com.learnium.common.error.ErrorCode;
 import com.learnium.model.content.Material;
-import com.learnium.model.content.MaterialSourceType;
-import com.learnium.model.master.GradeSubject;
-import com.learnium.model.user.UserAccount;
 import com.learnium.model.user.UserRole;
 import com.learnium.repository.content.MaterialRepository;
 import com.learnium.repository.master.GradeSubjectRepository;
-import com.learnium.repository.user.UserAccountRepository;
 import com.learnium.security.LearniumPrincipal;
-import com.learnium.storage.StorageService;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.UUID;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +32,13 @@ import org.springframework.web.multipart.MultipartFile;
  * text (two different scanned PDFs both extract to nothing and must never
  * dedupe into each other). Deduplication is scoped to the same uploader: a
  * match returns the teacher's own earlier material and stores nothing new.
+ *
+ * <p>Creation itself runs in {@link MaterialCreationService}'s transaction.
+ * When two identical uploads race past the dedupe lookup, the V11 unique
+ * index lets exactly one insert commit; the loser lands here with a
+ * {@link DataIntegrityViolationException} and recovers by returning the
+ * winner as a dedupe hit — a concurrent duplicate is a normal outcome of
+ * this API, never a 500.
  */
 @Service
 public class MaterialService {
@@ -53,24 +56,20 @@ public class MaterialService {
 
     private final MaterialRepository materialRepository;
     private final GradeSubjectRepository gradeSubjectRepository;
-    private final UserAccountRepository userAccountRepository;
     private final ExtractionService extractionService;
-    private final StorageService storageService;
+    private final MaterialCreationService creationService;
 
     public MaterialService(
             MaterialRepository materialRepository,
             GradeSubjectRepository gradeSubjectRepository,
-            UserAccountRepository userAccountRepository,
             ExtractionService extractionService,
-            StorageService storageService) {
+            MaterialCreationService creationService) {
         this.materialRepository = materialRepository;
         this.gradeSubjectRepository = gradeSubjectRepository;
-        this.userAccountRepository = userAccountRepository;
         this.extractionService = extractionService;
-        this.storageService = storageService;
+        this.creationService = creationService;
     }
 
-    @Transactional
     public MaterialDto createFromUpload(
             LearniumPrincipal principal, MultipartFile file, String title, UUID gradeSubjectId) {
         validateTitle(title);
@@ -87,7 +86,7 @@ public class MaterialService {
         if (filename == null || !filename.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
             throw new BusinessException(ErrorCode.MAT_INVALID_FILE, "Only PDF files are accepted");
         }
-        GradeSubject gradeSubject = requireGradeSubject(gradeSubjectId);
+        requireGradeSubject(gradeSubjectId);
         byte[] bytes;
         try {
             bytes = file.getBytes();
@@ -103,47 +102,44 @@ public class MaterialService {
                     ErrorCode.MAT_INVALID_FILE, "The uploaded file is not a PDF");
         }
         ExtractionResult extraction = extractionService.extractPdf(bytes);
-        String contentHash = contentHashOf(extraction);
-        if (contentHash != null) {
-            var existing =
-                    materialRepository.findDedupeCandidate(
-                            principal.centreId(), principal.userId(), contentHash);
-            if (existing.isPresent()) {
-                return toDto(existing.get(), true);
-            }
+        try {
+            return creationService.insertUpload(
+                    principal, title, gradeSubjectId, filename, bytes, extraction);
+        } catch (DataIntegrityViolationException conflict) {
+            return dedupeWinnerOrRethrow(principal, extraction, conflict);
         }
-        Material material = newMaterial(principal, title, gradeSubject, MaterialSourceType.PDF);
-        applyExtraction(material, extraction, contentHash);
-        // Persist first so the generated id anchors the storage key, then
-        // store the file inside the same transaction: if storing fails,
-        // the insert rolls back with it — a committed row never points at
-        // a missing file. (Pre-assigning the id instead made save() take
-        // the merge path and trip the @Version check.)
-        material = materialRepository.save(material);
-        material.setStorageKey(
-                storageService.store(
-                        principal.centreId(), material.getMaterialId(), filename, bytes));
-        return toDto(material, false);
     }
 
-    @Transactional
     public MaterialDto createFromText(
             LearniumPrincipal principal, CreateMaterialTextRequest request) {
-        GradeSubject gradeSubject = requireGradeSubject(request.gradeSubjectId());
         ExtractionResult extraction = extractionService.extractText(request.text());
-        String contentHash = contentHashOf(extraction);
-        if (contentHash != null) {
-            var existing =
+        try {
+            return creationService.insertText(
+                    principal, request.title(), request.gradeSubjectId(), extraction);
+        } catch (DataIntegrityViolationException conflict) {
+            return dedupeWinnerOrRethrow(principal, extraction, conflict);
+        }
+    }
+
+    /**
+     * Recovery for a lost creation race: the insert hit the dedupe unique
+     * index, so the winning row is committed by now — return it as a dedupe
+     * hit. If there is no winner (no identity, or the match vanished), the
+     * violation was about something else and surfaces unchanged.
+     */
+    private MaterialDto dedupeWinnerOrRethrow(
+            LearniumPrincipal principal,
+            ExtractionResult extraction,
+            DataIntegrityViolationException conflict) {
+        if (extraction.contentHash() != null) {
+            var winner =
                     materialRepository.findDedupeCandidate(
-                            principal.centreId(), principal.userId(), contentHash);
-            if (existing.isPresent()) {
-                return toDto(existing.get(), true);
+                            principal.centreId(), principal.userId(), extraction.contentHash());
+            if (winner.isPresent()) {
+                return toDto(winner.get(), true);
             }
         }
-        Material material =
-                newMaterial(principal, request.title(), gradeSubject, MaterialSourceType.PASTE);
-        applyExtraction(material, extraction, contentHash);
-        return toDto(materialRepository.save(material), false);
+        throw conflict;
     }
 
     @Transactional(readOnly = true)
@@ -171,6 +167,9 @@ public class MaterialService {
     public void delete(LearniumPrincipal principal, UUID materialId) {
         Material material = requireVisible(principal, materialId);
         material.setDeletedAt(Instant.now());
+        // Free the dedupe identity in the same transaction: the unique
+        // index must not block re-uploading the same chapter afterwards.
+        material.setDedupeHash(null);
         materialRepository.save(material);
     }
 
@@ -191,26 +190,8 @@ public class MaterialService {
         return material;
     }
 
-    private Material newMaterial(
-            LearniumPrincipal principal,
-            String title,
-            GradeSubject gradeSubject,
-            MaterialSourceType sourceType) {
-        UserAccount uploader =
-                userAccountRepository
-                        .findByCentreIdAndUserId(principal.centreId(), principal.userId())
-                        .orElseThrow(() -> new BusinessException(ErrorCode.SYS_NOT_FOUND));
-        Material material = new Material();
-        material.setCentre(uploader.getCentre());
-        material.setUploadedBy(uploader);
-        material.setGradeSubject(gradeSubject);
-        material.setTitle(title.trim());
-        material.setSourceType(sourceType);
-        return material;
-    }
-
-    private GradeSubject requireGradeSubject(UUID gradeSubjectId) {
-        return gradeSubjectRepository
+    private void requireGradeSubject(UUID gradeSubjectId) {
+        gradeSubjectRepository
                 .findById(gradeSubjectId)
                 .orElseThrow(
                         () ->
@@ -225,25 +206,7 @@ public class MaterialService {
         }
     }
 
-    /**
-     * Content identity is the extraction's SHA-256 of the COMPLETE text —
-     * never of the truncated store, or two chapters sharing a capped prefix
-     * but differing later would collapse into one identity. It is null when
-     * extraction produced no text (see {@link ExtractionResult}).
-     */
-    private static String contentHashOf(ExtractionResult extraction) {
-        return extraction.contentHash();
-    }
-
-    private static void applyExtraction(
-            Material material, ExtractionResult extraction, String contentHash) {
-        material.setExtractedText(extraction.storedText());
-        material.setExtractedChars(extraction.storedChars());
-        material.setExtractionStatus(extraction.status());
-        material.setContentHash(contentHash);
-    }
-
-    private static MaterialDto toDto(Material material, boolean deduplicated) {
+    static MaterialDto toDto(Material material, boolean deduplicated) {
         return new MaterialDto(
                 material.getMaterialId(),
                 material.getTitle(),

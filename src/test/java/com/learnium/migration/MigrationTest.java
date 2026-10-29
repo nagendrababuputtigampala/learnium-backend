@@ -37,7 +37,7 @@ class MigrationTest {
         assertThat(applied)
                 .extracting(MigrationInfo::getVersion)
                 .extracting(Object::toString)
-                .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
+                .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11");
         assertThat(applied)
                 .extracting(MigrationInfo::getState)
                 .containsOnly(MigrationState.SUCCESS);
@@ -128,6 +128,79 @@ class MigrationTest {
         // NULL emails (students) are unrestricted by the index.
         insertUserRow(centreA, null);
         insertUserRow(centreB, null);
+    }
+
+    @Test
+    void materialDedupeIdentityIsUniqueOnlyWhileActiveAfterV11() {
+        java.util.UUID centreId = insertCentreRow("Dedupe Centre");
+        java.util.UUID uploaderId = java.util.UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO learnium.user_account"
+                        + " (user_id, centre_id, role, email, display_name, status,"
+                        + " created_at, updated_at)"
+                        + " VALUES (?, ?, 'TEACHER', 'dedupe@example.test', 'Dedupe Test',"
+                        + " 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                uploaderId,
+                centreId);
+        java.util.UUID gradeSubjectId =
+                jdbcTemplate.queryForObject(
+                        "SELECT grade_subject_id FROM learnium.grade_subjects LIMIT 1",
+                        java.util.UUID.class);
+        String hash = "a".repeat(64);
+
+        insertMaterialRow(centreId, uploaderId, gradeSubjectId, hash, hash, null);
+        // The same identity again while the first row is active: rejected.
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () ->
+                                insertMaterialRow(
+                                        centreId, uploaderId, gradeSubjectId, hash, hash, null))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        // NULL identities never collide (failed extractions, legacy rows).
+        insertMaterialRow(centreId, uploaderId, gradeSubjectId, null, null, null);
+        insertMaterialRow(centreId, uploaderId, gradeSubjectId, null, null, null);
+        // A soft-deleted row keeps its content hash for provenance but its
+        // identity is cleared, so it does not block the active row above.
+        insertMaterialRow(
+                centreId,
+                uploaderId,
+                gradeSubjectId,
+                hash,
+                null,
+                java.sql.Timestamp.from(java.time.Instant.now()));
+        // A different uploader may hold the same content identity.
+        java.util.UUID otherUploader = java.util.UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO learnium.user_account"
+                        + " (user_id, centre_id, role, email, display_name, status,"
+                        + " created_at, updated_at)"
+                        + " VALUES (?, ?, 'TEACHER', 'dedupe2@example.test', 'Dedupe Two',"
+                        + " 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                otherUploader,
+                centreId);
+        insertMaterialRow(centreId, otherUploader, gradeSubjectId, hash, hash, null);
+    }
+
+    private void insertMaterialRow(
+            java.util.UUID centreId,
+            java.util.UUID uploaderId,
+            java.util.UUID gradeSubjectId,
+            String contentHash,
+            String dedupeHash,
+            java.sql.Timestamp deletedAt) {
+        jdbcTemplate.update(
+                "INSERT INTO learnium.materials"
+                        + " (material_id, centre_id, uploaded_by, grade_subject_id, title,"
+                        + " source_type, content_hash, dedupe_hash, deleted_at,"
+                        + " created_at, updated_at)"
+                        + " VALUES (?, ?, ?, ?, 'Dedupe chapter', 'PASTE', ?, ?, ?,"
+                        + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                java.util.UUID.randomUUID(),
+                centreId,
+                uploaderId,
+                gradeSubjectId,
+                contentHash,
+                dedupeHash,
+                deletedAt);
     }
 
     private java.util.UUID insertCentreRow(String name) {

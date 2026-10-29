@@ -478,3 +478,16 @@
   green; flow suites unchanged-green.
 - Next: F-3 dedupe identity (V11) + race recovery; then the
   from-scratch verify. Failing tests: none.
+- F-3 done: V11 adds an app-maintained dedupe_hash (mirrors content_hash
+  while active, cleared on soft delete in the same transaction) with a
+  plain unique index on (centre_id, uploaded_by, dedupe_hash) — NULLs
+  never collide, portable to H2 + PostgreSQL (partial indexes are not).
+  Creation moved to MaterialCreationService so a lost race rolls back in
+  its own transaction; MaterialService recovers by returning the winner
+  with deduplicated=true (never a 500). New committed-state
+  MaterialConcurrencyTest runs on a dedicated Flyway profile (the test
+  profile builds schema from entities, where migration-only indexes do
+  not exist): latch-gated simultaneous pastes -> exactly one row, both
+  callers served; re-upload after soft delete creates fresh; prefix-twin
+  chapters (210K shared prefix, cap 200K) do not dedupe.
+- Next: from-scratch full verify. Failing tests: none.

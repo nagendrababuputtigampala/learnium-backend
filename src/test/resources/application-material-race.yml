@@ -1,0 +1,26 @@
+# Material-race profile: the real Flyway schema (so the V11 dedupe unique
+# index exists — the plain `test` profile builds its schema from the
+# entities and migration-only constraints are absent there), on its OWN
+# database. MaterialConcurrencyTest cleans up by deleting whole tables;
+# a private database keeps that from wiping the master seeds MigrationTest
+# counts in the shared migration database.
+spring:
+  datasource:
+    url: jdbc:h2:mem:learnium-material-race;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=false
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+# A test-only signing secret so the context satisfies the JWT gate without a
+# demo/dev profile or the development fallback.
+learnium:
+  jwt:
+    secret: <redacted>
+  storage:
+    type: local
+    local-dir: ${java.io.tmpdir}/learnium-test-files

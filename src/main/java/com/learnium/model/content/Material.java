@@ -71,9 +71,19 @@ public class Material extends AuditableEntity {
     @Column(name = "extracted_text", columnDefinition = "text")
     private String extractedText;
 
-    /** SHA-256 hex of the stored extracted text; null until extraction ran. */
+    /** SHA-256 hex of the COMPLETE extracted text; null until extraction ran. */
     @Column(name = "content_hash", length = 64)
     private String contentHash;
+
+    /**
+     * Dedupe identity (V11): mirrors {@link #contentHash} while the material
+     * is active and is cleared on soft delete. The unique index over
+     * (centre_id, uploaded_by, dedupe_hash) is the database backstop behind
+     * the service's dedupe lookup, so concurrent identical uploads cannot
+     * both insert; NULL identities never collide.
+     */
+    @Column(name = "dedupe_hash", length = 64)
+    private String dedupeHash;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "extraction_status", length = 24)
