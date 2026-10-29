@@ -455,3 +455,9 @@
   bundle handoff per the working agreement. Deferred to branch 2:
   physical cleanup of soft-deleted files (findCleanupCandidates),
   generation jobs. PostgreSQL validation of V10 rides CI on push.
+- Follow-up fix: uploads are gated on the %PDF- magic bytes (not the
+  filename) — non-PDF bytes now reject 400 LRN-MAT-001 before anything
+  is extracted, stored or persisted; a valid header with a corrupt
+  body still persists as EXTRACTION_FAILED. Targeted tests green
+  (MaterialFlowTest 18, MaterialServiceTest 4, ExtractionServiceTest
+  13); full re-verify by the parent from scratch.

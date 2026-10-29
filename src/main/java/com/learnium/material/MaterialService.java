@@ -19,6 +19,7 @@ import com.learnium.security.TokenHashing;
 import com.learnium.storage.StorageService;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
@@ -42,6 +43,14 @@ public class MaterialService {
 
     /** Upload cap for chapter PDFs; the servlet limit sits just above it. */
     static final long MAX_FILE_BYTES = 20L * 1024 * 1024;
+
+    private static final byte[] PDF_HEADER = {'%', 'P', 'D', 'F', '-'};
+
+    private static boolean startsWithPdfHeader(byte[] bytes) {
+        return bytes.length >= PDF_HEADER.length
+                && Arrays.equals(
+                        bytes, 0, PDF_HEADER.length, PDF_HEADER, 0, PDF_HEADER.length);
+    }
 
     private final MaterialRepository materialRepository;
     private final GradeSubjectRepository gradeSubjectRepository;
@@ -85,6 +94,14 @@ public class MaterialService {
             bytes = file.getBytes();
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.MAT_INVALID_FILE, "The file could not be read");
+        }
+        // Magic bytes, not the filename, decide: anything that does not
+        // start with the PDF header is rejected before it is extracted,
+        // stored or persisted. A file WITH the header but a corrupt body
+        // still flows through and persists as EXTRACTION_FAILED.
+        if (!startsWithPdfHeader(bytes)) {
+            throw new BusinessException(
+                    ErrorCode.MAT_INVALID_FILE, "The uploaded file is not a PDF");
         }
         ExtractionResult extraction = extractionService.extractPdf(bytes);
         String contentHash = contentHashOf(extraction);

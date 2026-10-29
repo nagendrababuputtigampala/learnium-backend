@@ -260,6 +260,42 @@ class MaterialFlowTest {
     }
 
     @Test
+    void uploadRejectsNonPdfBytesWhateverTheFilename() throws Exception {
+        long before = materialRepository.count();
+
+        // Random bytes wearing a .pdf filename.
+        upload(
+                        teacherToken,
+                        "definitely not a pdf".getBytes(StandardCharsets.UTF_8),
+                        "chapter.pdf",
+                        "Fake PDF")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LRN-MAT-001"));
+
+        // A plain text file renamed to .pdf.
+        upload(teacherToken, PROSE.getBytes(StandardCharsets.UTF_8), "notes.pdf", "Renamed text")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LRN-MAT-001"));
+
+        // Fewer bytes than the PDF header itself.
+        upload(teacherToken, "%PD".getBytes(StandardCharsets.UTF_8), "tiny.pdf", "Tiny file")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LRN-MAT-001"));
+
+        // Nothing was persisted for any of them.
+        assertThat(materialRepository.count()).isEqualTo(before);
+    }
+
+    @Test
+    void uploadWithPdfHeaderButCorruptBodyPersistsAsExtractionFailed() throws Exception {
+        byte[] corrupt = "%PDF-1.7 garbage body with no objects".getBytes(StandardCharsets.UTF_8);
+
+        upload(teacherToken, corrupt, "corrupt.pdf", "Corrupt chapter")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.extractionStatus").value("EXTRACTION_FAILED"));
+    }
+
+    @Test
     void pasteSameTextTwiceDedupes() throws Exception {
         JsonNode first = paste(teacherToken, "Pasted once", PROSE.repeat(3));
 
