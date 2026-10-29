@@ -446,4 +446,12 @@
   Gotcha recorded: pre-assigning the UUID made save() take the merge
   path and trip @Version (StaleObjectStateException) — persist first,
   store the file in the same transaction instead.
-- Next: final from-scratch verify.
+- BRANCH 1 COMPLETE: final from-scratch verify (rm -rf target +
+  mvn -o verify) BUILD SUCCESS — 318 tests run, 0 failures, 0 errors,
+  4 skipped (env-gated PostgresMigrationTest); JaCoCo zero missed
+  lines (1501), branches (271) and instructions in jacoco.csv.
+  Commits on feature/pdf-extraction: db73b59 (S1), 93b825d (S2),
+  32052a1 (S3), 27cdabb + 2f1c7cd (coverage closes). Not pushed —
+  bundle handoff per the working agreement. Deferred to branch 2:
+  physical cleanup of soft-deleted files (findCleanupCandidates),
+  generation jobs. PostgreSQL validation of V10 rides CI on push.
