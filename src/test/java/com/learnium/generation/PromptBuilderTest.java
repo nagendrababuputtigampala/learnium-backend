@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.learnium.generation.PromptBuilder.Prompt;
+import com.learnium.model.content.GenerationDifficulty;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,6 +31,26 @@ class PromptBuilderTest {
                 .contains("Fractions represent parts of a whole");
         // Unrequested types produce no count line.
         assertThat(prompt.user()).doesNotContain("flashcards", "numeric-answer questions");
+    }
+
+    @Test
+    void openingLineUsesTheGradeNameAsIs() {
+        // Grade display names already contain "Grade" ("Grade 6"): the
+        // opening line must use the name verbatim, not prefix it again.
+        GenerationRequest request =
+                new GenerationRequest(
+                        "Fractions represent parts of a whole.",
+                        "Fractions",
+                        "Grade 6",
+                        "Mathematics",
+                        Map.of(GeneratedQuestionType.MCQ, 1),
+                        GenerationDifficulty.MEDIUM,
+                        GenerationContract.PAYLOAD_SCHEMA_VERSION);
+        Prompt prompt = builder.build(request);
+
+        assertThat(prompt.user())
+                .startsWith(
+                        "Write practice questions for Grade 6 Mathematics, topic: Fractions.\n");
     }
 
     @Test

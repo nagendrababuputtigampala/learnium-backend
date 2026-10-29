@@ -22,7 +22,9 @@ public final class PromptBuilder {
 
     public Prompt build(GenerationRequest request) {
         StringBuilder user = new StringBuilder();
-        user.append("Write practice questions for Grade ")
+        // Grade display names already carry the word "Grade" ("Grade 6"),
+        // so the name is used as-is — no hardcoded prefix.
+        user.append("Write practice questions for ")
                 .append(request.gradeName())
                 .append(' ')
                 .append(request.subjectName())
