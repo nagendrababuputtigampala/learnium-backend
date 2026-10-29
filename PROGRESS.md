@@ -442,3 +442,8 @@
   Targeted: storage 13 + extraction 12 + migration 5 green.
 - Next: S3 materials API + flow tests, then the from-scratch verify.
 - Failing tests: none.
+- Done (S3): materials API + flow tests (13 + 1 limits + handler unit).
+  Gotcha recorded: pre-assigning the UUID made save() take the merge
+  path and trip @Version (StaleObjectStateException) — persist first,
+  store the file in the same transaction instead.
+- Next: final from-scratch verify.
