@@ -199,6 +199,17 @@ public final class DraftQuestionFactory {
 
     private Verdict validateFillBlank(JsonNode item) {
         String stem = JsonFields.textOrNull(item, "stemWithBlank");
+        if (stem == null || stem.isBlank()) {
+            // Weaker models often put the text in the generic stem field
+            // instead. Which field carried the text is presentation, not
+            // semantics, so fall back before judging the text itself.
+            stem = JsonFields.textOrNull(item, "stem");
+        }
+        if (stem != null) {
+            // The normalized stem is what validation judges AND what the
+            // payload persists — students see the clean blank.
+            stem = collapseBlankRuns(stem);
+        }
         String stemReason = textProblem(stem, STEM_MAX);
         if (stemReason != null) {
             return Verdict.drop(stemReason);
@@ -341,6 +352,16 @@ public final class DraftQuestionFactory {
             return SCHEMA_INVALID;
         }
         return value.length() > maxLength ? FIELD_TOO_LONG : null;
+    }
+
+    /**
+     * Collapses every run of five or more underscores into exactly one
+     * blank marker. Models routinely draw the blank wider than five
+     * underscores; the width is presentation, the marker is the meaning.
+     * Shorter runs are not markers and are left untouched.
+     */
+    private static String collapseBlankRuns(String stem) {
+        return stem.replaceAll("_{5,}", BLANK_MARKER);
     }
 
     private static int countOccurrences(String text, String marker) {

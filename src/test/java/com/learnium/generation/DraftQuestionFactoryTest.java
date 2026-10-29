@@ -165,6 +165,80 @@ class DraftQuestionFactoryTest {
     }
 
     @Test
+    void fillBlankFallsBackToTheStemField() throws Exception {
+        // No stemWithBlank at all: the text rides in the generic stem field.
+        String stemOnly =
+                "{\"type\":\"FILL_BLANK\",\"stem\":\"One half equals _____ quarters.\","
+                        + "\"answer\":\"two\"}";
+        ValidationOutcome outcome =
+                factory.validate(
+                        items("[" + stemOnly + "]"), requested(GeneratedQuestionType.FILL_BLANK, 1));
+        assertThat(outcome.drafts()).hasSize(1);
+        assertThat(outcome.drafts().get(0).correctRef()).isEqualTo("two");
+        assertThat(outcome.drafts().get(0).payload().get("stemWithBlank").asText())
+                .isEqualTo("One half equals _____ quarters.");
+
+        // A blank stemWithBlank falls back the same way.
+        String blankCanonicalField =
+                "{\"type\":\"FILL_BLANK\",\"stemWithBlank\":\" \","
+                        + "\"stem\":\"One half equals _____ quarters.\",\"answer\":\"two\"}";
+        ValidationOutcome blankOutcome =
+                factory.validate(
+                        items("[" + blankCanonicalField + "]"),
+                        requested(GeneratedQuestionType.FILL_BLANK, 1));
+        assertThat(blankOutcome.drafts()).hasSize(1);
+        assertThat(blankOutcome.drafts().get(0).payload().get("stemWithBlank").asText())
+                .isEqualTo("One half equals _____ quarters.");
+    }
+
+    @Test
+    void fillBlankCollapsesLongUnderscoreRunsIntoOneMarker() throws Exception {
+        String longRun =
+                "{\"type\":\"FILL_BLANK\",\"stemWithBlank\":\"One half equals "
+                        + "_".repeat(21)
+                        + " quarters.\",\"answer\":\"two\"}";
+        ValidationOutcome outcome =
+                factory.validate(
+                        items("[" + longRun + "]"), requested(GeneratedQuestionType.FILL_BLANK, 1));
+        assertThat(outcome.drafts()).hasSize(1);
+        // The persisted payload carries the normalized single marker.
+        assertThat(outcome.drafts().get(0).payload().get("stemWithBlank").asText())
+                .isEqualTo("One half equals _____ quarters.");
+    }
+
+    @Test
+    void fillBlankNormalizationLeavesRealDefectsDropped() throws Exception {
+        // One real marker plus a long run: two blanks once the run
+        // collapses, so still not exactly one.
+        String longRunPlusMarker =
+                "{\"type\":\"FILL_BLANK\",\"stemWithBlank\":\"One _____ half equals "
+                        + "_".repeat(21)
+                        + " quarters.\",\"answer\":\"two\"}";
+        assertDropped(
+                factory.validate(
+                        items("[" + longRunPlusMarker + "]"),
+                        requested(GeneratedQuestionType.FILL_BLANK, 1)),
+                GeneratedQuestionType.FILL_BLANK,
+                SCHEMA_INVALID);
+        // Four underscores are below marker length: no marker at all.
+        String shortRun =
+                "{\"type\":\"FILL_BLANK\",\"stemWithBlank\":\"One half equals ____ quarters.\","
+                        + "\"answer\":\"two\"}";
+        assertDropped(
+                factory.validate(
+                        items("[" + shortRun + "]"), requested(GeneratedQuestionType.FILL_BLANK, 1)),
+                GeneratedQuestionType.FILL_BLANK,
+                SCHEMA_INVALID);
+        // Neither text field present: nothing to fall back to.
+        assertDropped(
+                factory.validate(
+                        items("[{\"type\":\"FILL_BLANK\",\"answer\":\"two\"}]"),
+                        requested(GeneratedQuestionType.FILL_BLANK, 1)),
+                GeneratedQuestionType.FILL_BLANK,
+                SCHEMA_INVALID);
+    }
+
+    @Test
     void fillBlankNeedsExactlyOneMarkerAndAShortAnswer() throws Exception {
         String noMarker = FIB.replace(" _____", "");
         assertDropped(
