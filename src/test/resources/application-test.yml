@@ -21,3 +21,8 @@ learnium:
     # Uploads in tests land in a scratch dir, never the working tree.
     type: local
     local-dir: ${java.io.tmpdir}/learnium-test-files
+  generation:
+    # The scheduled worker never fires in tests: suites drive runOnce()
+    # manually so job execution is deterministic and no test can reach a
+    # real model endpoint.
+    worker-enabled: false

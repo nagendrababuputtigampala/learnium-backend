@@ -512,3 +512,13 @@
   entity + status/failure-kind/difficulty enums; MigrationTest asserts
   V1–V12 and the cross-centre provenance FK rejection.
 - Next: S2 job creation + read APIs. Failing tests: none yet.
+- S2 done: LRN-GEN-001..005; GenerationProperties/Config (provider,
+  worker, lease/backoff, daily caps; shared Clock bean). POST
+  /materials/{id}/generate freezes the job (hash, counts, difficulty,
+  provider/model, contract versions, creator) with the validation
+  matrix + per-teacher/per-centre daily caps; GET /generation-jobs/{id}
+  and GET /materials/{id}/questions (paged, newest first) under the
+  branch-1 visibility rule. GenerationFlowTest 11 + GenerationCapFlowTest
+  1 green. CommittedDataCleanup learned questions/background_job/topics.
+- Next: S3 generator SPI + prompt/schema + Gemini/Ollama providers.
+  Failing tests: none.

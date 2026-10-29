@@ -74,6 +74,28 @@ learnium:
     max-pages: ${EXTRACTION_MAX_PAGES:40}
     max-extracted-chars: ${EXTRACTION_MAX_CHARS:200000}
     max-input-tokens: ${EXTRACTION_MAX_TOKENS:40000}
+  generation:
+    # AI question generation (see GenerationProperties). Provider choice is
+    # configuration: `ollama` for local development (no key, no cost),
+    # `gemini` for production and the quality gate. Jobs freeze the
+    # provider/model they were created under.
+    provider: ${GENERATION_PROVIDER:gemini}
+    worker-enabled: ${GENERATION_WORKER_ENABLED:true}
+    poll-delay-ms: ${GENERATION_POLL_DELAY_MS:2000}
+    lease-duration-seconds: ${GENERATION_LEASE_SECONDS:300}
+    retry-backoff-seconds: ${GENERATION_RETRY_BACKOFF_SECONDS:30}
+    max-jobs-per-teacher-per-day: ${GENERATION_MAX_JOBS_PER_TEACHER_DAY:20}
+    max-jobs-per-centre-per-day: ${GENERATION_MAX_JOBS_PER_CENTRE_DAY:100}
+    gemini:
+      # Key from the environment only (secure entry; never committed).
+      api-key: ${GEMINI_API_KEY:}
+      # Model availability varies per project — verify before the gate.
+      model: ${GEMINI_MODEL:gemini-2.0-flash}
+      timeout-seconds: ${GEMINI_TIMEOUT_SECONDS:120}
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      model: ${OLLAMA_MODEL:llama3.1}
+      timeout-seconds: ${OLLAMA_TIMEOUT_SECONDS:120}
 
 server:
   port: ${PORT:8080}
