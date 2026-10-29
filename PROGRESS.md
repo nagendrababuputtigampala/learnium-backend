@@ -584,3 +584,15 @@
   the Generate dialog's topic picker (staff roles, name-ordered
   {topicId, name} list, unknown pairing → LRN-SYS-404); AdminFlowTest
   29 green, new code at 0 missed lines/branches.
+- Follow-up: POST /api/v1/master/grade-subjects/{id}/topics added —
+  create-or-return so teachers can name a topic the catalogue lacks
+  (staff roles; name trimmed, case-insensitive match returns the
+  existing topic with 200 and its original casing, a new name creates
+  with 201; unknown pairing → LRN-SYS-404, validation → LRN-VAL-001).
+  The insert runs in TopicCreationService's own transaction with a
+  flush, and a lost race against uq_topics_name_per_grade_subject
+  recovers by returning the winner — the material-dedupe split.
+  Tests: AdminFlowTest 38 green (9 new, incl. a two-thread concurrent
+  create ending in exactly one row) + CatalogServiceTest 3 green
+  pinning the conflict branches deterministically; new code at 0
+  missed lines/branches.
