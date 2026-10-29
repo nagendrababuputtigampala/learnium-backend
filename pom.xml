@@ -19,7 +19,21 @@
         <lombok.version>1.18.34</lombok.version>
         <logstash-encoder.version>9.0</logstash-encoder.version>
         <jacoco.version>0.8.13</jacoco.version>
+        <pdfbox.version>3.0.5</pdfbox.version>
+        <aws-sdk.version>2.29.45</aws-sdk.version>
     </properties>
+    <dependencyManagement>
+        <dependencies>
+            <!-- AWS SDK v2 BOM: one aligned version for every SDK module. -->
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${aws-sdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -108,6 +122,20 @@
             <groupId>net.logstash.logback</groupId>
             <artifactId>logstash-logback-encoder</artifactId>
             <version>${logstash-encoder.version}</version>
+        </dependency>
+
+        <!-- PDF text extraction for uploaded chapter material (M3). -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>${pdfbox.version}</version>
+        </dependency>
+
+        <!-- S3-compatible object storage for uploaded files (Cloudflare R2 in
+             production; the local-disk StorageService is the dev default). -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
         </dependency>
 
         <!-- Test starters (split per module in Spring Boot 4) -->

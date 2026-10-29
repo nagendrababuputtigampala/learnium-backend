@@ -17,3 +17,7 @@ spring:
 learnium:
   jwt:
     secret: <redacted>
+  storage:
+    # Uploads in tests land in a scratch dir, never the working tree.
+    type: local
+    local-dir: ${java.io.tmpdir}/learnium-test-files

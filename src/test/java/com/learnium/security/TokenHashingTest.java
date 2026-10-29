@@ -43,4 +43,25 @@ class TokenHashingTest {
             Security.addProvider(sun);
         }
     }
+
+    @Test
+    void newDigestHashesIncrementallyAndFailsWhenSha256IsUnavailable() {
+        // The streaming factory produces a working digest…
+        java.security.MessageDigest digest = TokenHashing.newSha256Digest();
+        digest.update("ab".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        digest.update("c".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertThat(java.util.HexFormat.of().formatHex(digest.digest()))
+                .isEqualTo(TokenHashing.sha256Hex("abc"));
+
+        // …and its defensive catch behaves exactly like sha256Hex's.
+        Provider sun = Security.getProvider("SUN");
+        Security.removeProvider("SUN");
+        try {
+            assertThatThrownBy(TokenHashing::newSha256Digest)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("SHA-256");
+        } finally {
+            Security.addProvider(sun);
+        }
+    }
 }

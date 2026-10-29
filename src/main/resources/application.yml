@@ -1,6 +1,12 @@
 spring:
   application:
     name: learnium-backend
+  servlet:
+    multipart:
+      # Chapter PDFs are capped at 20 MB (validated again in the service so
+      # the API answers with LRN-MAT-003, not a framework default).
+      max-file-size: 20MB
+      max-request-size: 21MB
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/learnium}
     username: ${DB_USERNAME:learnium}
@@ -50,6 +56,24 @@ learnium:
     # Shared secret for the platform onboarding endpoint. Blank (the default)
     # disables POST /api/v1/platform/centres entirely (it answers 404).
     provisioning-key: ${PLATFORM_PROVISIONING_KEY:}
+  storage:
+    # Object storage for uploaded chapter files: `local` disk for
+    # development, `s3` for any S3-compatible store (Cloudflare R2 in
+    # production). Credentials come from the environment only.
+    type: ${STORAGE_TYPE:local}
+    local-dir: ${STORAGE_LOCAL_DIR:./data/files}
+    s3:
+      endpoint: ${STORAGE_S3_ENDPOINT:}
+      bucket: ${STORAGE_S3_BUCKET:}
+      region: ${STORAGE_S3_REGION:us-east-1}
+      access-key: ${STORAGE_S3_ACCESS_KEY:}
+      secret-key: ${STORAGE_S3_SECRET_KEY:}
+  extraction:
+    # PDF extraction budget and usability thresholds (see ExtractionProperties).
+    timeout-seconds: ${EXTRACTION_TIMEOUT_SECONDS:30}
+    max-pages: ${EXTRACTION_MAX_PAGES:40}
+    max-extracted-chars: ${EXTRACTION_MAX_CHARS:200000}
+    max-input-tokens: ${EXTRACTION_MAX_TOKENS:40000}
 
 server:
   port: ${PORT:8080}

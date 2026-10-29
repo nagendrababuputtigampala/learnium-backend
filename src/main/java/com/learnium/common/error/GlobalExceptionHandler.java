@@ -16,6 +16,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
@@ -112,6 +113,22 @@ public class GlobalExceptionHandler {
                 ErrorCode.SYS_UNSUPPORTED_MEDIA_TYPE,
                 ErrorCode.SYS_UNSUPPORTED_MEDIA_TYPE.getDefaultMessage(),
                 null);
+    }
+
+    /**
+     * An upload beyond the servlet multipart cap never reaches the
+     * controller; translate it into the materials domain code so clients
+     * see the same envelope as a service-level size rejection. The file
+     * name and content are never logged.
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
+        log.warn(
+                "Upload too large {} (max {} bytes)",
+                ErrorCode.MAT_TOO_LARGE.getCode(),
+                ex.getMaxUploadSize());
+        return buildResponse(
+                ErrorCode.MAT_TOO_LARGE, ErrorCode.MAT_TOO_LARGE.getDefaultMessage(), null);
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

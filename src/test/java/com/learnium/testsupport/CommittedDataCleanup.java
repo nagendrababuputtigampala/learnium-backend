@@ -15,6 +15,7 @@ public final class CommittedDataCleanup {
     private CommittedDataCleanup() {}
 
     public static void clearAll(JdbcTemplate jdbcTemplate) {
+        jdbcTemplate.execute("DELETE FROM learnium.materials");
         jdbcTemplate.execute("DELETE FROM learnium.refresh_token");
         jdbcTemplate.execute("DELETE FROM learnium.account_token");
         jdbcTemplate.execute("DELETE FROM learnium.email_outbox");

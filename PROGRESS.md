@@ -419,3 +419,87 @@
   e27440c (R2-S3 committed-state proofs). Not pushed — bundle handoff
   per the working agreement; backend PR #8 updates in place once
   Nagendra pushes.
+
+# Progress — feature/pdf-extraction (backend, M3 branch 1)
+
+- Setup: branched off merged dev f63ec5f (PR #8 merge; contains V9 +
+  security version + both M2 fix rounds). PDFBox was NOT in the pom —
+  added pdfbox 3.0.5 + AWS SDK v2 s3 (BOM 2.29.45); offline repo seeded
+  via seed_repo.py (resolution complete; script's final verify raced
+  in-flight code, artifacts all present).
+- Done (S1): Flyway V10 (materials += content_hash, extraction_status,
+  extracted_chars, deleted_at — extracted_text/storage_key already
+  existed from M1/V3). StorageService + local impl (path-traversal
+  safe) + S3 impl (mocked client tests) selected by
+  learnium.storage.type. MAT error codes LRN-MAT-001/002/003.
+  MigrationTest now expects V1..V10 (H2 note: use `timestamp with
+  time zone`, H2 rejects the `timestamptz` alias).
+- Done (S2): ExtractionService — PDFBox per-page extraction with a
+  time budget; classification OK / NO_TEXT / UNUSABLE_TEXT (min chars,
+  avg chars/page, alphanumeric ratio) / OVER_LIMIT (char + estimated
+  token caps, truncate at char cap) / EXTRACTION_FAILED. PDF fixtures
+  generated in test code (text / blank / header-only / encrypted).
+  Targeted: storage 13 + extraction 12 + migration 5 green.
+- Next: S3 materials API + flow tests, then the from-scratch verify.
+- Failing tests: none.
+- Done (S3): materials API + flow tests (13 + 1 limits + handler unit).
+  Gotcha recorded: pre-assigning the UUID made save() take the merge
+  path and trip @Version (StaleObjectStateException) — persist first,
+  store the file in the same transaction instead.
+- BRANCH 1 COMPLETE: final from-scratch verify (rm -rf target +
+  mvn -o verify) BUILD SUCCESS — 318 tests run, 0 failures, 0 errors,
+  4 skipped (env-gated PostgresMigrationTest); JaCoCo zero missed
+  lines (1501), branches (271) and instructions in jacoco.csv.
+  Commits on feature/pdf-extraction: db73b59 (S1), 93b825d (S2),
+  32052a1 (S3), 27cdabb + 2f1c7cd (coverage closes). Not pushed —
+  bundle handoff per the working agreement. Deferred to branch 2:
+  physical cleanup of soft-deleted files (findCleanupCandidates),
+  generation jobs. PostgreSQL validation of V10 rides CI on push.
+- Follow-up fix: uploads are gated on the %PDF- magic bytes (not the
+  filename) — non-PDF bytes now reject 400 LRN-MAT-001 before anything
+  is extracted, stored or persisted; a valid header with a corrupt
+  body still persists as EXTRACTION_FAILED. Targeted tests green
+  (MaterialFlowTest 18, MaterialServiceTest 4, ExtractionServiceTest
+  13); full re-verify by the parent from scratch.
+
+## Codex review fix round — M3 branch 1 (2026-10-28)
+- F-1 done: Dockerfile creates /app/data/files owned by learnium before
+  the USER switch; compose mounts the named `appfiles` volume at
+  /app/data so uploads survive container replacement.
+- F-5/F-6/F-7/F-8 (extraction) done: page cap (learnium.extraction
+  .max-pages, default 40) rejects BEFORE extraction with no partial
+  work recorded (text/chars/hash NULL). Parsing runs on a dedicated
+  daemon executor; the caller waits at most the budget — a per-page
+  check alone cannot bound document load or one pathological page.
+  Text accumulates through a bounded sink: at most the char cap is
+  retained, every persisted outcome is truncated at the cap, and the
+  content hash digests the COMPLETE text as it streams (prefix-twin
+  chapters no longer share an identity). ExtractionServiceTest 22
+  green; flow suites unchanged-green.
+- Next: F-3 dedupe identity (V11) + race recovery; then the
+  from-scratch verify. Failing tests: none.
+- F-3 done: V11 adds an app-maintained dedupe_hash (mirrors content_hash
+  while active, cleared on soft delete in the same transaction) with a
+  plain unique index on (centre_id, uploaded_by, dedupe_hash) — NULLs
+  never collide, portable to H2 + PostgreSQL (partial indexes are not).
+  Creation moved to MaterialCreationService so a lost race rolls back in
+  its own transaction; MaterialService recovers by returning the winner
+  with deduplicated=true (never a 500). New committed-state
+  MaterialConcurrencyTest runs on a dedicated Flyway profile (the test
+  profile builds schema from entities, where migration-only indexes do
+  not exist): latch-gated simultaneous pastes -> exactly one row, both
+  callers served; re-upload after soft delete creates fresh; prefix-twin
+  chapters (210K shared prefix, cap 200K) do not dedupe.
+- Next: from-scratch full verify. Failing tests: none.
+- FIX ROUND COMPLETE: from-scratch verify (rm -rf target + mvn -o
+  verify) BUILD SUCCESS — 345 tests run, 0 failures, 0 errors, 4
+  skipped (env-gated PostgresMigrationTest); JaCoCo zero missed lines
+  (1602), branches (293) and instructions. Coverage closes: page-cap
+  outcome moved out of the try-with-resources (synthetic close
+  branches), the sink's digest factory moved to TokenHashing with a
+  provider-removal test mirroring sha256Hex's, and the result record's
+  convenience constructor got null/blank arm tests. Commits:
+  6042f63 (F-1), 3e8511c (F-5..F-8 extraction), 874ffde (F-3), plus
+  this coverage close. Not pushed — bundle handoff per the working
+  agreement. PostgreSQL validation of V11 rides CI on the PR (the
+  migration-profile suite proves V1..V11 on H2-PG mode locally).
