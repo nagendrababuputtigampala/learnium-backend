@@ -530,3 +530,32 @@
   eval-count usage) adapters behind learnium.generation.provider.
   27 offline unit tests against recorded response shapes; no sockets.
 - Next: S4 validation + draft factory. Failing tests: none.
+- S4 done: DraftQuestionFactory (pure) validates per type with drop
+  reasons (SCHEMA_INVALID, ANSWER_KEY_INVALID, RUBRIC_INVALID,
+  FIELD_TOO_LONG, DUPLICATE_STEM, EXCEEDS_REQUESTED), caps, and
+  materializes payload + correctRef following the M1 conventions:
+  option ids a..d in the payload + correctRef = option id; FIB
+  correctRef = the answer; NUMERIC correctRef = compact
+  value/tolerance/unit JSON (correct_ref is varchar(50)); WRITTEN
+  rubric criterion ids crit-1..n in the payload, correctRef =
+  "modelAnswer". 17 unit tests green.
+- Next: S5 worker. Failing tests: none.
+- S5 done: claim-ownership worker. BackgroundJobRepository gains the
+  fetch-joined claim snapshot and four conditional updates (claim /
+  completeSucceeded / completeFailed / reschedule) keyed on id +
+  status RUNNING + claim token + claim generation — a stale worker's
+  completion matches zero rows. ClaimedJob snapshot; GenerationClaimService
+  (claim, reschedule with backoff base × attempts, terminal fail with
+  optional counts/usage); GenerationPersistenceService (material hash /
+  deletion re-check, ownership-checked SUCCEEDED transition and question
+  inserts in ONE transaction; difficulty bands EASY→1 / MEDIUM→3 /
+  HARD→5 onto the 1..5 question scale; createdBy = the job's creator);
+  GenerationWorker (retryable MODEL_ERROR / MALFORMED_RESPONSE /
+  TRUNCATED reschedule while attempts < 2, everything else terminal;
+  ZERO_VALID terminal with counts + usage; persist crashes leave the
+  job RUNNING for lease reclaim); GenerationScheduler behind
+  worker-enabled. 13 tests green, incl. the deterministic stale-worker
+  test (blocking fake generator + mutable clock), deletion during
+  generation, crash-before-commit via a spy seam (drafts exactly once
+  after reclaim), retry/backoff timing and claim exclusivity.
+- Next: S6 ER refresh + from-scratch verify. Failing tests: none.
