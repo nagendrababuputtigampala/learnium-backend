@@ -85,6 +85,7 @@ class SystemControllerTest {
     void wrongMethodReturns405WithSys405() throws Exception {
         mockMvc.perform(get("/test-support/validated").with(user("tester")))
                 .andExpect(status().isMethodNotAllowed())
+                .andExpect(header().string("Allow", Matchers.containsString("POST")))
                 .andExpect(jsonPath("$.code").value("LRN-SYS-405"))
                 .andExpect(jsonPath("$.message").value("Method not allowed"))
                 .andExpect(jsonPath("$.timestamp").isNotEmpty());

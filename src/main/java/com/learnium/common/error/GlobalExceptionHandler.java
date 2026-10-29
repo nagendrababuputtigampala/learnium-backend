@@ -6,6 +6,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -72,7 +73,14 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiErrorResponse> handleMalformedBody(HttpMessageNotReadableException ex) {
-        log.warn("Malformed body {}: {}", ErrorCode.VAL_MALFORMED_BODY.getCode(), ex.getMessage());
+        // NEVER log ex.getMessage() here: parser messages can quote the submitted
+        // body (field values, tokens), which would leak client input into the logs.
+        // Code, trace id and the exception type are enough to diagnose the failure.
+        log.warn(
+                "Malformed body {} (traceId={}, cause={})",
+                ErrorCode.VAL_MALFORMED_BODY.getCode(),
+                currentTraceId(),
+                ex.getClass().getSimpleName());
         return buildResponse(
                 ErrorCode.VAL_MALFORMED_BODY, ErrorCode.VAL_MALFORMED_BODY.getDefaultMessage(), null);
     }
@@ -85,10 +93,12 @@ public class GlobalExceptionHandler {
                 ErrorCode.SYS_METHOD_NOT_ALLOWED.getCode(),
                 ex.getMethod(),
                 ex.getSupportedHttpMethods());
+        // Preserve the framework headers (Allow: <supported methods>) on the 405.
         return buildResponse(
                 ErrorCode.SYS_METHOD_NOT_ALLOWED,
                 ErrorCode.SYS_METHOD_NOT_ALLOWED.getDefaultMessage(),
-                null);
+                null,
+                ex.getHeaders());
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
@@ -119,6 +129,14 @@ public class GlobalExceptionHandler {
 
     private ResponseEntity<ApiErrorResponse> buildResponse(
             ErrorCode errorCode, String message, Map<String, String> fieldErrors) {
+        return buildResponse(errorCode, message, fieldErrors, null);
+    }
+
+    private ResponseEntity<ApiErrorResponse> buildResponse(
+            ErrorCode errorCode,
+            String message,
+            Map<String, String> fieldErrors,
+            HttpHeaders headers) {
         ApiErrorResponse body = ApiErrorResponse.builder()
                 .code(errorCode.getCode())
                 .message(message)
@@ -126,7 +144,11 @@ public class GlobalExceptionHandler {
                 .timestamp(Instant.now())
                 .fieldErrors(fieldErrors)
                 .build();
-        return ResponseEntity.status(errorCode.getStatus()).body(body);
+        ResponseEntity.BodyBuilder responseBuilder = ResponseEntity.status(errorCode.getStatus());
+        if (headers != null) {
+            responseBuilder.headers(headers);
+        }
+        return responseBuilder.body(body);
     }
 
     private String currentTraceId() {

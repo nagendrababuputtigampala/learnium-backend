@@ -180,6 +180,7 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<ApiErrorResponse> response = handler.handleMethodNotSupported(ex);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(response.getHeaders().getAllow()).contains(org.springframework.http.HttpMethod.POST);
         ApiErrorResponse body = response.getBody();
         assertThat(body).isNotNull();
         assertThat(body.getCode()).isEqualTo("LRN-SYS-405");

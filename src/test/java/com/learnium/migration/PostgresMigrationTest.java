@@ -23,7 +23,14 @@ import org.springframework.test.context.DynamicPropertySource;
  * CI {@code postgres-migration} job provides a postgres:16 service); locally
  * and in the default CI build it is skipped, never failed.
  */
-@SpringBootTest
+// This full-context test runs without the H2 test profiles, which normally
+// supply a signing secret. Keep its key local to this test and leave the
+// production missing-secret gate enabled.
+@SpringBootTest(
+        properties = {
+            "learnium.jwt.secret=postgres-migration-test-only-signing-secret-0123456789",
+            "learnium.jwt.dev-secret-allowed=false"
+        })
 @EnabledIfEnvironmentVariable(named = "LEARINUM_PG_TEST", matches = "true")
 class PostgresMigrationTest {
 
@@ -53,7 +60,7 @@ class PostgresMigrationTest {
                 jdbcTemplate.queryForObject(
                         "SELECT COUNT(*) FROM learnium.flyway_schema_history WHERE success = true",
                         Long.class);
-        assertThat(applied).isGreaterThanOrEqualTo(6L);
+        assertThat(applied).isGreaterThanOrEqualTo(7L);
     }
 
     @Test

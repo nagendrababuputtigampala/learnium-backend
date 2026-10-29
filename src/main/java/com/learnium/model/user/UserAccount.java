@@ -14,7 +14,6 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
@@ -31,11 +30,10 @@ import lombok.Setter;
 @Table(
         name = "user_account",
         schema = "learnium",
-        uniqueConstraints = {
-            @UniqueConstraint(
-                    name = "uq_user_account_centre_email",
-                    columnNames = {"centre_id", "email"})
-        },
+        // Staff-email uniqueness is GLOBAL and case-insensitive, enforced by
+        // the Flyway V8 expression index uq_user_account_email_global on
+        // lower(email) — an expression index cannot be declared as a JPA
+        // unique constraint, so it lives only in the migration.
         indexes = {
             @Index(name = "idx_user_account_centre", columnList = "centre_id"),
             @Index(name = "idx_user_account_email", columnList = "email")
@@ -66,6 +64,16 @@ public class UserAccount extends AuditableEntity {
 
     @Column(name = "password_hash", length = 255)
     private String passwordHash;
+
+    /**
+     * Credential epoch (Flyway V9): incremented in the same transaction as
+     * every password set/change/reset and every deactivation. Refresh tokens
+     * are stamped with the version at issuance and rotation rejects a stale
+     * stamp — that is what makes a login racing a password reset harmless:
+     * whenever its token was written, it carries the pre-reset version.
+     */
+    @Column(name = "security_version", nullable = false)
+    private long securityVersion;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)

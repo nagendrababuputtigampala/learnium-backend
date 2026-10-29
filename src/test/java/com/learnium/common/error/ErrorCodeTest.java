@@ -67,6 +67,75 @@ class ErrorCodeTest {
     }
 
     @Test
+    void authInvalidCredentialsHasRegisteredValues() {
+        assertThat(ErrorCode.AUTH_INVALID_CREDENTIALS.getCode()).isEqualTo("LRN-AUTH-002");
+        assertThat(ErrorCode.AUTH_INVALID_CREDENTIALS.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(ErrorCode.AUTH_INVALID_CREDENTIALS.getDefaultMessage())
+                .isEqualTo("Invalid email or password");
+    }
+
+    @Test
+    void authAccountTokenInvalidHasRegisteredValues() {
+        assertThat(ErrorCode.AUTH_ACCOUNT_TOKEN_INVALID.getCode()).isEqualTo("LRN-AUTH-004");
+        assertThat(ErrorCode.AUTH_ACCOUNT_TOKEN_INVALID.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.AUTH_ACCOUNT_TOKEN_INVALID.getDefaultMessage())
+                .isEqualTo("This link is invalid or has expired");
+    }
+
+    @Test
+    void authAccountInactiveHasRegisteredValues() {
+        assertThat(ErrorCode.AUTH_ACCOUNT_INACTIVE.getCode()).isEqualTo("LRN-AUTH-005");
+        assertThat(ErrorCode.AUTH_ACCOUNT_INACTIVE.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(ErrorCode.AUTH_ACCOUNT_INACTIVE.getDefaultMessage())
+                .isEqualTo("This account is inactive");
+    }
+
+    @Test
+    void authPinLockedHasRegisteredValues() {
+        assertThat(ErrorCode.AUTH_PIN_LOCKED.getCode()).isEqualTo("LRN-AUTH-006");
+        assertThat(ErrorCode.AUTH_PIN_LOCKED.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(ErrorCode.AUTH_PIN_LOCKED.getDefaultMessage())
+                .isEqualTo("This PIN is locked; ask your teacher to reset it");
+    }
+
+    @Test
+    void authStudentRejectedHasRegisteredValues() {
+        assertThat(ErrorCode.AUTH_STUDENT_REJECTED.getCode()).isEqualTo("LRN-AUTH-007");
+        assertThat(ErrorCode.AUTH_STUDENT_REJECTED.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(ErrorCode.AUTH_STUDENT_REJECTED.getDefaultMessage())
+                .isEqualTo("Name or PIN not recognised for this batch");
+    }
+
+    @Test
+    void usrEmailTakenHasRegisteredValues() {
+        assertThat(ErrorCode.USR_EMAIL_TAKEN.getCode()).isEqualTo("LRN-USR-001");
+        assertThat(ErrorCode.USR_EMAIL_TAKEN.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(ErrorCode.USR_EMAIL_TAKEN.getDefaultMessage())
+                .isEqualTo("Email is already registered");
+    }
+
+    @Test
+    void usrNotFoundHasRegisteredValues() {
+        assertThat(ErrorCode.USR_NOT_FOUND.getCode()).isEqualTo("LRN-USR-002");
+        assertThat(ErrorCode.USR_NOT_FOUND.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(ErrorCode.USR_NOT_FOUND.getDefaultMessage()).isEqualTo("User not found");
+    }
+
+    @Test
+    void ctrBatchNotFoundHasRegisteredValues() {
+        assertThat(ErrorCode.CTR_BATCH_NOT_FOUND.getCode()).isEqualTo("LRN-CTR-001");
+        assertThat(ErrorCode.CTR_BATCH_NOT_FOUND.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(ErrorCode.CTR_BATCH_NOT_FOUND.getDefaultMessage()).isEqualTo("Batch not found");
+    }
+
+    @Test
+    void ctrRosterNotFoundHasRegisteredValues() {
+        assertThat(ErrorCode.CTR_ROSTER_NOT_FOUND.getCode()).isEqualTo("LRN-CTR-002");
+        assertThat(ErrorCode.CTR_ROSTER_NOT_FOUND.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(ErrorCode.CTR_ROSTER_NOT_FOUND.getDefaultMessage()).isEqualTo("Roster entry not found");
+    }
+
+    @Test
     void everyConstantIsFullyDefined() {
         for (ErrorCode errorCode : ErrorCode.values()) {
             assertThat(errorCode.getCode()).isNotBlank();

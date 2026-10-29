@@ -34,6 +34,38 @@ and their local defaults). Secrets never live in the repo.
 
 Health check: `GET /actuator/health` · App ping: `GET /api/v1/system/ping`
 
+## Auth & accounts (M2)
+
+Staff sign in with email + password (`POST /api/v1/auth/login` → 15-minute JWT
+access token + rotating refresh token; replaying a revoked refresh token kills
+the whole session family). Teachers are invited by the centre admin and set
+their first password from the emailed link; password reset works the same way.
+Students need no account: they pick their centre + batch from the public lists
+and open a 12-hour session with their roster name + 4-digit PIN
+(`POST /api/v1/auth/student-session`; 5 wrong PINs lock the roster entry until
+a teacher/admin resets it). New centres are onboarded via
+`POST /api/v1/platform/centres`, gated by a provisioning key.
+
+Additional environment variables:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `JWT_SECRET` | *(blank)* | HS256 signing secret for access tokens. **Always set a real secret in production.** When blank (or set to the published development literal), startup fails unless a development gate is open: the `demo`/`dev` Spring profile or `JWT_DEV_SECRET_ALLOWED=true`. |
+| `JWT_DEV_SECRET_ALLOWED` | `false` | Local development only: permits the published dev-only JWT fallback secret when no `JWT_SECRET` is set. Never enable in production. |
+| `OUTBOX_ENCRYPTION_KEY` | *(blank → derived from the JWT secret)* | Key material for encrypting email-outbox payloads at rest (they carry raw set-password tokens until delivery). |
+| `APP_PUBLIC_BASE_URL` | `http://localhost:5173` | Frontend origin used to build emailed set-password links. |
+| `MAIL_HOST` / `MAIL_PORT` | `localhost` / `1025` | SMTP server for invite/reset mail (Mailpit locally). |
+| `MAIL_USERNAME` / `MAIL_PASSWORD` | *(blank)* | SMTP credentials, when the server requires them. |
+| `MAIL_FROM` | `no-reply@learnium.local` | Sender address for transactional mail. |
+| `MAIL_DISPATCH_DELAY_MS` | `5000` | How often the email outbox dispatcher polls. |
+| `PLATFORM_PROVISIONING_KEY` | *(blank)* | Shared secret for the onboarding endpoint. Blank disables it (404). |
+
+Demo data: run with the `demo` profile (`SPRING_PROFILES_ACTIVE=demo`) to seed
+the Demo Tutoring Centre. The demo login now works end-to-end against the real
+auth endpoints — **admin@demo.learnium.local / Demo@123** (teacher:
+patel@demo.learnium.local, same password) — and the seeded Batch B roster
+students sign in with PIN **1234**.
+
 ## Build & test
 
 ```bash

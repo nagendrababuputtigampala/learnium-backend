@@ -1,0 +1,42 @@
+package com.learnium.api;
+
+import com.learnium.admin.CatalogService;
+import com.learnium.api.dto.AdminDtos.GradeSubjectDto;
+import com.learnium.api.dto.AdminDtos.PublicBatchDto;
+import com.learnium.api.dto.AdminDtos.PublicCentreDto;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/** Catalogues: staff master data, plus the public join-page pickers. */
+@RestController
+@RequestMapping("/api/v1")
+public class CatalogController {
+
+    private final CatalogService catalogService;
+
+    public CatalogController(CatalogService catalogService) {
+        this.catalogService = catalogService;
+    }
+
+    @GetMapping("/master/grade-subjects")
+    @PreAuthorize("hasAnyRole('CENTRE_ADMIN', 'TEACHER')")
+    public ResponseEntity<List<GradeSubjectDto>> gradeSubjects() {
+        return ResponseEntity.ok(catalogService.gradeSubjects());
+    }
+
+    @GetMapping("/public/centres")
+    public ResponseEntity<List<PublicCentreDto>> publicCentres() {
+        return ResponseEntity.ok(catalogService.publicCentres());
+    }
+
+    @GetMapping("/public/centres/{centreId}/batches")
+    public ResponseEntity<List<PublicBatchDto>> publicBatches(@PathVariable UUID centreId) {
+        return ResponseEntity.ok(catalogService.publicBatches(centreId));
+    }
+}

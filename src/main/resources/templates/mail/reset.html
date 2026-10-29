@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<p>Hello <span th:text="${displayName}">there</span>,</p>
+<p>
+  We received a request to reset the password for your
+  <strong th:text="${centreName}">your centre</strong> account on Learnium.
+</p>
+<p>
+  <a th:href="${link}">Choose a new password</a>. This link expires in
+  <span th:text="${expiresHours}">1</span> hour and can only be used once.
+</p>
+<p>If the link above does not work, copy this address into your browser:<br/>
+  <span th:text="${link}">https://example.invalid/set-password</span>
+</p>
+<p>If you did not request a password reset, you can ignore this email.</p>
+</body>
+</html>
