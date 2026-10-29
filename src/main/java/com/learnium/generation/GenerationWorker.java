@@ -84,8 +84,9 @@ public class GenerationWorker {
         }
         if (outcome instanceof Success success) {
             onSuccess(claim, success);
-        } else if (outcome instanceof Failure failure) {
-            onFailure(claim, failure);
+        } else {
+            // GenerationOutcome is sealed: not a Success means a Failure.
+            onFailure(claim, (Failure) outcome);
         }
         return true;
     }

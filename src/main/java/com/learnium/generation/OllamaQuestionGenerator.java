@@ -38,7 +38,9 @@ public class OllamaQuestionGenerator implements QuestionGenerator {
     @Override
     public GenerationOutcome generate(GenerationRequest request) {
         GenerationProperties.Ollama config = properties.getOllama();
-        String bodyJson = writeJson(buildRequestBody(promptBuilder.build(request), config));
+        // Serializing a tree we built cannot fail, so the node renders
+        // itself — no checked-exception ceremony around it.
+        String bodyJson = buildRequestBody(promptBuilder.build(request), config).toString();
         ModelTransport.ModelResponse response;
         try {
             response =
@@ -106,12 +108,4 @@ public class OllamaQuestionGenerator implements QuestionGenerator {
                 null);
     }
 
-    private static String writeJson(JsonNode node) {
-        try {
-            return JSON.writeValueAsString(node);
-        } catch (JsonProcessingException e) {
-            // Serializing a tree we built cannot fail; treat as a bug.
-            throw new IllegalStateException("Could not serialize the generation request", e);
-        }
-    }
 }

@@ -27,22 +27,9 @@ public record GenerationResultCounts(EnumMap<GeneratedQuestionType, TypeResult> 
         public TypeResult {
             dropReasons = Map.copyOf(dropReasons);
         }
-
-        static TypeResult zero(int requested) {
-            return new TypeResult(requested, 0, 0, 0, Map.of());
-        }
     }
 
     private static final ObjectMapper JSON = new ObjectMapper();
-
-    /** Empty tallies for a job about to execute: every type at its requested count. */
-    public static GenerationResultCounts forRequest(Map<GeneratedQuestionType, Integer> requested) {
-        EnumMap<GeneratedQuestionType, TypeResult> byType = new EnumMap<>(GeneratedQuestionType.class);
-        for (GeneratedQuestionType type : GeneratedQuestionType.values()) {
-            byType.put(type, TypeResult.zero(requested.getOrDefault(type, 0)));
-        }
-        return new GenerationResultCounts(byType);
-    }
 
     public TypeResult forType(GeneratedQuestionType type) {
         return byType.get(type);

@@ -49,7 +49,9 @@ public class GeminiQuestionGenerator implements QuestionGenerator {
             // once the key exists.
             return new Failure(GenerationFailureKind.MODEL_ERROR, "IllegalStateException");
         }
-        String bodyJson = writeJson(buildRequestBody(promptBuilder.build(request)));
+        // Serializing a tree we built cannot fail, so the node renders
+        // itself — no checked-exception ceremony around it.
+        String bodyJson = buildRequestBody(promptBuilder.build(request)).toString();
         ModelTransport.ModelResponse response;
         try {
             response =
@@ -140,12 +142,4 @@ public class GeminiQuestionGenerator implements QuestionGenerator {
                 null);
     }
 
-    private static String writeJson(JsonNode node) {
-        try {
-            return JSON.writeValueAsString(node);
-        } catch (JsonProcessingException e) {
-            // Serializing a tree we built cannot fail; treat as a bug.
-            throw new IllegalStateException("Could not serialize the generation request", e);
-        }
-    }
 }

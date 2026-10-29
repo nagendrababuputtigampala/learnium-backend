@@ -1,6 +1,5 @@
 package com.learnium.generation;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -312,10 +311,8 @@ public class GenerationJobService {
 
     /** Entity JSON is Jackson 2; the web layer renders Jackson 3 — bridge by text. */
     private tools.jackson.databind.JsonNode toWebJson(JsonNode payload) {
-        try {
-            return webJson.readTree(JSON.writeValueAsString(payload));
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Stored question payload is not valid JSON", e);
-        }
+        // The payload was serialized by our own factory, so it always
+        // re-parses; the node's own rendering is the bridge text.
+        return webJson.readTree(payload.toString());
     }
 }

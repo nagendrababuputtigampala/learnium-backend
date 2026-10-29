@@ -559,3 +559,24 @@
   generation, crash-before-commit via a spy seam (drafts exactly once
   after reclaim), retry/backoff timing and claim exclusivity.
 - Next: S6 ER refresh + from-scratch verify. Failing tests: none.
+- S6 done: ER-Diagram.md refreshed to the V1–V12 reality (BACKGROUND_JOB
+  full shape, question provenance columns, material dedupe/extraction
+  columns, security_version, REFRESH_TOKEN, composite-FK tenancy notes).
+- BRANCH 2 BACKEND COMPLETE: final from-scratch verify (rm -rf target +
+  mvn -o verify) BUILD SUCCESS — 459 tests run, 0 failures, 0 errors, 4
+  skipped (env-gated PostgresMigrationTest); JaCoCo zero missed lines
+  (2509), branches (603) and instructions (10904) in jacoco.csv.
+  Coverage closes worth remembering: the read DTOs were only reachable
+  with real drafts present (new flow tests seed finished jobs +
+  questions); the RefreshTokenService race-loser arm was racy under the
+  threaded test and is now pinned by a deterministic Mockito test
+  (RefreshTokenRaceTest); three unreachable defensive arms were removed
+  instead of contorted around (counts forRequest, the two writeJson
+  catches, toWebJson's catch — in-memory tree serialization cannot
+  fail). Commits on feature/ai-generation: cef85bd (S1 V12),
+  4f1cdcf (S2 APIs), 22eb8ac (S3 providers), a117ccc (S4 factory),
+  0c97e62 (S5 worker), plus this S6 close. Not pushed — bundle handoff
+  per the working agreement. PostgreSQL validation of V12 rides CI on
+  the PR (the migration-profile suite proves V1–V12 on H2-PG mode
+  locally). Remaining M3 work: the frontend half (generate dialog, job
+  polling, draft preview) and the Gemini quality gate.

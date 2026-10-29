@@ -53,6 +53,16 @@ class HttpModelTransportTest {
     }
 
     @Test
+    void informationalStatusIsAlsoAnError() {
+        FakeHttpClient client = new FakeHttpClient();
+        client.response = new FakeHttpResponse(199, "too early");
+        HttpModelTransport transport = new HttpModelTransport(client);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> transport.send(request()))
+                .isInstanceOf(ModelTransportException.class);
+    }
+
+    @Test
     void errorStatusThrowsWithTheStatus() {
         FakeHttpClient client = new FakeHttpClient();
         client.response = new FakeHttpResponse(503, "unavailable");

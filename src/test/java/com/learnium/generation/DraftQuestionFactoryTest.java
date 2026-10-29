@@ -404,6 +404,277 @@ class DraftQuestionFactoryTest {
     }
 
     @Test
+    void nullItemsInTheArrayAreIgnoredEntirely() throws Exception {
+        ValidationOutcome outcome =
+                factory.validate(items("[null," + MCQ + "]"), requested(GeneratedQuestionType.MCQ, 1));
+
+        TypeResult result = result(outcome, GeneratedQuestionType.MCQ);
+        assertThat(result.received()).isEqualTo(1);
+        assertThat(result.accepted()).isEqualTo(1);
+    }
+
+    @Test
+    void mcqMissingPiecesDropAsSchemaInvalid() throws Exception {
+        // No options at all.
+        assertDropped(
+                factory.validate(
+                        items("[{\"type\":\"MCQ\",\"stem\":\"Q?\",\"correctIndex\":0}]"),
+                        requested(GeneratedQuestionType.MCQ, 1)),
+                GeneratedQuestionType.MCQ,
+                SCHEMA_INVALID);
+        // Options that are not an array.
+        assertDropped(
+                factory.validate(
+                        items(
+                                "[{\"type\":\"MCQ\",\"stem\":\"Q?\",\"options\":\"four\","
+                                        + "\"correctIndex\":0}]"),
+                        requested(GeneratedQuestionType.MCQ, 1)),
+                GeneratedQuestionType.MCQ,
+                SCHEMA_INVALID);
+        // An option without text.
+        assertDropped(
+                factory.validate(
+                        items(
+                                "[{\"type\":\"MCQ\",\"stem\":\"Q?\",\"options\":[{},"
+                                        + "{\"text\":\"b\"},{\"text\":\"c\"},{\"text\":\"d\"}],"
+                                        + "\"correctIndex\":0}]"),
+                        requested(GeneratedQuestionType.MCQ, 1)),
+                GeneratedQuestionType.MCQ,
+                SCHEMA_INVALID);
+        // No stem field at all.
+        assertDropped(
+                factory.validate(
+                        items(
+                                "[{\"type\":\"MCQ\",\"options\":[{\"text\":\"a\"},{\"text\":\"b\"},"
+                                        + "{\"text\":\"c\"},{\"text\":\"d\"}],\"correctIndex\":0}]"),
+                        requested(GeneratedQuestionType.MCQ, 1)),
+                GeneratedQuestionType.MCQ,
+                SCHEMA_INVALID);
+    }
+
+    @Test
+    void mcqNegativeCorrectIndexDropsAsAnswerKeyInvalid() throws Exception {
+        assertDropped(
+                factory.validate(
+                        items(
+                                "[{\"type\":\"MCQ\",\"stem\":\"Q?\",\"options\":[{\"text\":\"a\"},"
+                                        + "{\"text\":\"b\"},{\"text\":\"c\"},{\"text\":\"d\"}],"
+                                        + "\"correctIndex\":-1}]"),
+                        requested(GeneratedQuestionType.MCQ, 1)),
+                GeneratedQuestionType.MCQ,
+                ANSWER_KEY_INVALID);
+    }
+
+    @Test
+    void fillBlankOverLongStemDropsAsFieldTooLong() throws Exception {
+        String stem = "_____ " + "x".repeat(500);
+        assertDropped(
+                factory.validate(
+                        items(
+                                "[{\"type\":\"FILL_BLANK\",\"stemWithBlank\":\""
+                                        + stem
+                                        + "\",\"answer\":\"half\"}]"),
+                        requested(GeneratedQuestionType.FILL_BLANK, 1)),
+                GeneratedQuestionType.FILL_BLANK,
+                FIELD_TOO_LONG);
+    }
+
+    @Test
+    void fillBlankMissingAnswerDropsAsSchemaInvalid() throws Exception {
+        assertDropped(
+                factory.validate(
+                        items("[{\"type\":\"FILL_BLANK\",\"stemWithBlank\":\"One _____ is half.\"}]"),
+                        requested(GeneratedQuestionType.FILL_BLANK, 1)),
+                GeneratedQuestionType.FILL_BLANK,
+                SCHEMA_INVALID);
+    }
+
+    @Test
+    void numericMissingStemAndNonFiniteNumbersDrop() throws Exception {
+        // No stem at all.
+        assertDropped(
+                factory.validate(
+                        items(
+                                "[{\"type\":\"NUMERIC\",\"answerValue\":3.5,"
+                                        + "\"workedSolution\":\"Work.\"}]"),
+                        requested(GeneratedQuestionType.NUMERIC, 1)),
+                GeneratedQuestionType.NUMERIC,
+                SCHEMA_INVALID);
+        // answerValue beyond double range parses as infinity.
+        assertDropped(
+                factory.validate(
+                        items(
+                                "[{\"type\":\"NUMERIC\",\"stem\":\"Compute.\","
+                                        + "\"answerValue\":1e999,\"workedSolution\":\"Work.\"}]"),
+                        requested(GeneratedQuestionType.NUMERIC, 1)),
+                GeneratedQuestionType.NUMERIC,
+                SCHEMA_INVALID);
+        // Same for an infinite tolerance.
+        assertDropped(
+                factory.validate(
+                        items(
+                                "[{\"type\":\"NUMERIC\",\"stem\":\"Compute.\",\"answerValue\":3.5,"
+                                        + "\"tolerance\":1e999,\"workedSolution\":\"Work.\"}]"),
+                        requested(GeneratedQuestionType.NUMERIC, 1)),
+                GeneratedQuestionType.NUMERIC,
+                SCHEMA_INVALID);
+    }
+
+    @Test
+    void writtenWithoutARubricDropsAsRubricInvalid() throws Exception {
+        assertDropped(
+                factory.validate(
+                        items(
+                                "[{\"type\":\"WRITTEN\",\"stem\":\"Explain.\","
+                                        + "\"modelAnswer\":\"Answer.\"}]"),
+                        requested(GeneratedQuestionType.WRITTEN, 1)),
+                GeneratedQuestionType.WRITTEN,
+                RUBRIC_INVALID);
+    }
+
+    @Test
+    void writtenRubricShapeAndNonFiniteScoreDrop() throws Exception {
+        // Rubric that is not an array.
+        assertDropped(
+                factory.validate(
+                        items(
+                                "[{\"type\":\"WRITTEN\",\"stem\":\"Explain.\","
+                                        + "\"modelAnswer\":\"Answer.\",\"rubric\":{}}]"),
+                        requested(GeneratedQuestionType.WRITTEN, 1)),
+                GeneratedQuestionType.WRITTEN,
+                RUBRIC_INVALID);
+        // Six criteria exceeds the 3-5 band.
+        String six =
+                "\"rubric\":[{\"criterion\":\"A\",\"maxScore\":5},{\"criterion\":\"B\",\"maxScore\":5},"
+                        + "{\"criterion\":\"C\",\"maxScore\":5},{\"criterion\":\"D\",\"maxScore\":5},"
+                        + "{\"criterion\":\"E\",\"maxScore\":5},{\"criterion\":\"F\",\"maxScore\":5}]";
+        assertDropped(
+                factory.validate(
+                        items(
+                                "[{\"type\":\"WRITTEN\",\"stem\":\"Explain.\","
+                                        + "\"modelAnswer\":\"Answer.\","
+                                        + six
+                                        + "}]"),
+                        requested(GeneratedQuestionType.WRITTEN, 1)),
+                GeneratedQuestionType.WRITTEN,
+                RUBRIC_INVALID);
+        // A max score beyond double range parses as infinity.
+        assertDropped(
+                factory.validate(
+                        items(
+                                "[{\"type\":\"WRITTEN\",\"stem\":\"Explain.\","
+                                        + "\"modelAnswer\":\"Answer.\",\"rubric\":["
+                                        + "{\"criterion\":\"Accuracy\",\"maxScore\":1e999},"
+                                        + "{\"criterion\":\"Reasoning\",\"maxScore\":5},"
+                                        + "{\"criterion\":\"Clarity\",\"maxScore\":5}]}]"),
+                        requested(GeneratedQuestionType.WRITTEN, 1)),
+                GeneratedQuestionType.WRITTEN,
+                RUBRIC_INVALID);
+    }
+
+    @Test
+    void numericTextualValuesDropAndNonTextUnitDefaultsToEmpty() throws Exception {
+        // answerValue as a string is not a number.
+        assertDropped(
+                factory.validate(
+                        items(
+                                "[{\"type\":\"NUMERIC\",\"stem\":\"Compute.\","
+                                        + "\"answerValue\":\"3.5\",\"workedSolution\":\"Work.\"}]"),
+                        requested(GeneratedQuestionType.NUMERIC, 1)),
+                GeneratedQuestionType.NUMERIC,
+                SCHEMA_INVALID);
+        // tolerance as a string is not a number.
+        assertDropped(
+                factory.validate(
+                        items(
+                                "[{\"type\":\"NUMERIC\",\"stem\":\"Compute.\",\"answerValue\":3.5,"
+                                        + "\"tolerance\":\"wide\",\"workedSolution\":\"Work.\"}]"),
+                        requested(GeneratedQuestionType.NUMERIC, 1)),
+                GeneratedQuestionType.NUMERIC,
+                SCHEMA_INVALID);
+        // Blank worked solution.
+        assertDropped(
+                factory.validate(
+                        items(
+                                "[{\"type\":\"NUMERIC\",\"stem\":\"Compute.\",\"answerValue\":3.5,"
+                                        + "\"workedSolution\":\"  \"}]"),
+                        requested(GeneratedQuestionType.NUMERIC, 1)),
+                GeneratedQuestionType.NUMERIC,
+                SCHEMA_INVALID);
+        // A non-text unit is ignored (defaults to empty), not a drop.
+        ValidationOutcome outcome =
+                factory.validate(
+                        items(
+                                "[{\"type\":\"NUMERIC\",\"stem\":\"Compute.\",\"answerValue\":3.5,"
+                                        + "\"unit\":7,\"workedSolution\":\"Work.\"}]"),
+                        requested(GeneratedQuestionType.NUMERIC, 1));
+        assertThat(outcome.drafts()).hasSize(1);
+        assertThat(outcome.drafts().get(0).payload().get("unit").asText()).isEmpty();
+    }
+
+    @Test
+    void writtenMissingPiecesAndBadRubricEntriesDrop() throws Exception {
+        String rubric =
+                "\"rubric\":[{\"criterion\":\"Accuracy\",\"maxScore\":5},"
+                        + "{\"criterion\":\"Reasoning\",\"maxScore\":5},"
+                        + "{\"criterion\":\"Clarity\",\"maxScore\":5}]";
+        // Missing model answer.
+        assertDropped(
+                factory.validate(
+                        items("[{\"type\":\"WRITTEN\",\"stem\":\"Explain.\"," + rubric + "}]"),
+                        requested(GeneratedQuestionType.WRITTEN, 1)),
+                GeneratedQuestionType.WRITTEN,
+                SCHEMA_INVALID);
+        // Over-long stem.
+        assertDropped(
+                factory.validate(
+                        items(
+                                "[{\"type\":\"WRITTEN\",\"stem\":\""
+                                        + "x".repeat(501)
+                                        + "\",\"modelAnswer\":\"Answer.\","
+                                        + rubric
+                                        + "}]"),
+                        requested(GeneratedQuestionType.WRITTEN, 1)),
+                GeneratedQuestionType.WRITTEN,
+                FIELD_TOO_LONG);
+        // A rubric entry that is not an object.
+        assertDropped(
+                factory.validate(
+                        items(
+                                "[{\"type\":\"WRITTEN\",\"stem\":\"Explain.\","
+                                        + "\"modelAnswer\":\"Answer.\",\"rubric\":[\"Accuracy\","
+                                        + "{\"criterion\":\"Reasoning\",\"maxScore\":5},"
+                                        + "{\"criterion\":\"Clarity\",\"maxScore\":5}]}]"),
+                        requested(GeneratedQuestionType.WRITTEN, 1)),
+                GeneratedQuestionType.WRITTEN,
+                RUBRIC_INVALID);
+        // A blank criterion.
+        assertDropped(
+                factory.validate(
+                        items(
+                                "[{\"type\":\"WRITTEN\",\"stem\":\"Explain.\","
+                                        + "\"modelAnswer\":\"Answer.\",\"rubric\":["
+                                        + "{\"criterion\":\" \",\"maxScore\":5},"
+                                        + "{\"criterion\":\"Reasoning\",\"maxScore\":5},"
+                                        + "{\"criterion\":\"Clarity\",\"maxScore\":5}]}]"),
+                        requested(GeneratedQuestionType.WRITTEN, 1)),
+                GeneratedQuestionType.WRITTEN,
+                RUBRIC_INVALID);
+        // A non-numeric max score.
+        assertDropped(
+                factory.validate(
+                        items(
+                                "[{\"type\":\"WRITTEN\",\"stem\":\"Explain.\","
+                                        + "\"modelAnswer\":\"Answer.\",\"rubric\":["
+                                        + "{\"criterion\":\"Accuracy\",\"maxScore\":\"five\"},"
+                                        + "{\"criterion\":\"Reasoning\",\"maxScore\":5},"
+                                        + "{\"criterion\":\"Clarity\",\"maxScore\":5}]}]"),
+                        requested(GeneratedQuestionType.WRITTEN, 1)),
+                GeneratedQuestionType.WRITTEN,
+                RUBRIC_INVALID);
+    }
+
+    @Test
     void emptyArrayYieldsZeroCounts() throws Exception {
         ValidationOutcome outcome =
                 factory.validate(

@@ -509,6 +509,105 @@ class GenerationWorkerTest {
     }
 
     @Test
+    void materialWithNullOrBlankTextFailsAsMaterialDeleted() throws Exception {
+        BackgroundJob nullTextJob = newJob("{\"MCQ\":1}");
+        Material noText = materialRepository.findById(material.getMaterialId()).orElseThrow();
+        noText.setExtractedText(null);
+        materialRepository.save(noText);
+
+        assertThat(worker.runOnce()).isTrue();
+        assertThat(generator.invocations).hasValue(0);
+        BackgroundJob failedNull = reload(nullTextJob);
+        assertThat(failedNull.getStatus()).isEqualTo(BackgroundJobStatus.FAILED);
+        assertThat(failedNull.getFailureKind()).isEqualTo(GenerationFailureKind.MATERIAL_DELETED);
+
+        BackgroundJob blankTextJob = newJob("{\"MCQ\":1}");
+        Material blankText = materialRepository.findById(material.getMaterialId()).orElseThrow();
+        blankText.setExtractedText("   ");
+        materialRepository.save(blankText);
+
+        assertThat(worker.runOnce()).isTrue();
+        assertThat(generator.invocations).hasValue(0);
+        assertThat(reload(blankTextJob).getFailureKind())
+                .isEqualTo(GenerationFailureKind.MATERIAL_DELETED);
+    }
+
+    @Test
+    void hashChangedDuringGenerationFailsAsMaterialDeleted() throws Exception {
+        BackgroundJob job = newJob("{\"MCQ\":1}");
+        generator.behavior =
+                call -> {
+                    // The chapter was re-extracted while the model worked:
+                    // its content hash no longer matches the frozen one.
+                    Material changed =
+                            materialRepository
+                                    .findById(material.getMaterialId())
+                                    .orElseThrow();
+                    changed.setContentHash("b".repeat(64));
+                    materialRepository.save(changed);
+                    return new Success(questions(mcq("Stale source draft")), 10L, 5L, null, null);
+                };
+
+        assertThat(worker.runOnce()).isTrue();
+
+        assertThat(questionRepository.findAll()).isEmpty();
+        BackgroundJob saved = reload(job);
+        assertThat(saved.getStatus()).isEqualTo(BackgroundJobStatus.FAILED);
+        assertThat(saved.getFailureKind()).isEqualTo(GenerationFailureKind.MATERIAL_DELETED);
+    }
+
+    @Test
+    void difficultyBandsMapOntoTheQuestionScale() throws Exception {
+        BackgroundJob easyJob = newJob("{\"MCQ\":1}");
+        easyJob.setDifficulty(GenerationDifficulty.EASY);
+        jobRepository.save(easyJob);
+        generator.behavior =
+                call -> new Success(questions(mcq("Easy draft")), 10L, 5L, null, null);
+        assertThat(worker.runOnce()).isTrue();
+        assertThat(questionRepository.findAll().get(0).getDifficulty()).isEqualTo((short) 1);
+
+        BackgroundJob hardJob = newJob("{\"MCQ\":1}");
+        hardJob.setDifficulty(GenerationDifficulty.HARD);
+        jobRepository.save(hardJob);
+        generator.behavior =
+                call -> new Success(questions(mcq("Hard draft")), 10L, 5L, null, null);
+        assertThat(worker.runOnce()).isTrue();
+        assertThat(
+                        questionRepository.findAll().stream()
+                                .filter(q -> q.getGenerationJobId().equals(hardJob.getId()))
+                                .findFirst()
+                                .orElseThrow()
+                                .getDifficulty())
+                .isEqualTo((short) 5);
+    }
+
+    @Test
+    void missingQuestionTypeLeavesTheJobRunningForReclaim() throws Exception {
+        questionTypeRepository.delete(
+                questionTypeRepository.findByCode("WRITTEN").orElseThrow());
+        BackgroundJob job = newJob("{\"WRITTEN\":1}");
+        generator.behavior =
+                call ->
+                        new Success(
+                                questions(
+                                        "{\"type\":\"WRITTEN\",\"stem\":\"Explain fractions.\","
+                                                + "\"modelAnswer\":\"Parts of a whole.\","
+                                                + "\"rubric\":[{\"criterion\":\"Accuracy\",\"maxScore\":5},"
+                                                + "{\"criterion\":\"Reasoning\",\"maxScore\":5},"
+                                                + "{\"criterion\":\"Clarity\",\"maxScore\":5}]}"),
+                                10L,
+                                5L,
+                                null,
+                                null);
+
+        assertThat(worker.runOnce()).isTrue();
+
+        BackgroundJob saved = reload(job);
+        assertThat(saved.getStatus()).isEqualTo(BackgroundJobStatus.RUNNING);
+        assertThat(questionRepository.findAll()).isEmpty();
+    }
+
+    @Test
     void claimIsExclusiveUntilTheLeaseExpires() throws Exception {
         BackgroundJob job = newJob("{\"MCQ\":1}");
 

@@ -7,16 +7,29 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.learnium.generation.GeneratedQuestionType;
+import com.learnium.generation.GenerationResultCounts;
 import com.learnium.model.common.UserStatus;
+import com.learnium.model.content.BackgroundJob;
+import com.learnium.model.content.BackgroundJobStatus;
+import com.learnium.model.content.GenerationDifficulty;
+import com.learnium.model.content.GenerationFailureKind;
+import com.learnium.model.content.Material;
+import com.learnium.model.content.Question;
+import com.learnium.model.content.QuestionStatus;
 import com.learnium.model.content.Topic;
 import com.learnium.model.master.Grade;
 import com.learnium.model.master.GradeSubject;
+import com.learnium.model.master.QuestionType;
 import com.learnium.model.master.Subject;
 import com.learnium.model.user.Centre;
 import com.learnium.model.user.UserAccount;
 import com.learnium.model.user.UserRole;
 import com.learnium.repository.content.BackgroundJobRepository;
+import com.learnium.repository.content.MaterialRepository;
+import com.learnium.repository.content.QuestionRepository;
 import com.learnium.repository.content.TopicRepository;
+import com.learnium.repository.master.QuestionTypeRepository;
 import com.learnium.repository.master.GradeRepository;
 import com.learnium.repository.master.GradeSubjectRepository;
 import com.learnium.repository.master.SubjectRepository;
@@ -24,6 +37,9 @@ import com.learnium.repository.user.CentreRepository;
 import com.learnium.repository.user.UserAccountRepository;
 import com.learnium.testsupport.AuthFixtures;
 import com.learnium.testsupport.CommittedDataCleanup;
+import java.time.Instant;
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -71,6 +87,9 @@ class GenerationFlowTest {
     @Autowired private GradeSubjectRepository gradeSubjectRepository;
     @Autowired private TopicRepository topicRepository;
     @Autowired private BackgroundJobRepository jobRepository;
+    @Autowired private MaterialRepository materialRepository;
+    @Autowired private QuestionRepository questionRepository;
+    @Autowired private QuestionTypeRepository questionTypeRepository;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private JdbcTemplate jdbcTemplate;
 
@@ -323,6 +342,131 @@ class GenerationFlowTest {
     }
 
     @Test
+    void getJobIsVisibleToItsTeacherCreator() throws Exception {
+        JsonNode job =
+                readTree(
+                        generate(teacherToken, materialId, validBody())
+                                .andExpect(status().isAccepted())
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString());
+
+        mockMvc.perform(
+                        get("/api/v1/generation-jobs/" + job.get("id").asString())
+                                .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING"));
+    }
+
+    @Test
+    void createWithoutCountsIsRejected() throws Exception {
+        String body = "{\"topicId\":\"" + fractionsTopic.getTopicId() + "\"}";
+
+        generate(teacherToken, materialId, body)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LRN-GEN-003"));
+    }
+
+    @Test
+    void createWithBlankDifficultyDefaultsToMedium() throws Exception {
+        String body =
+                "{\"topicId\":\""
+                        + fractionsTopic.getTopicId()
+                        + "\",\"counts\":{\"MCQ\":1},\"difficulty\":\"\"}";
+
+        generate(teacherToken, materialId, body)
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.difficulty").value("MEDIUM"));
+    }
+
+    @Test
+    void getJobShowsCountsUsageAndFailureOnceFinished() throws Exception {
+        JsonNode created =
+                readTree(
+                        generate(teacherToken, materialId, validBody())
+                                .andExpect(status().isAccepted())
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString());
+        BackgroundJob job =
+                jobRepository
+                        .findById(UUID.fromString(created.get("id").asString()))
+                        .orElseThrow();
+        EnumMap<GeneratedQuestionType, GenerationResultCounts.TypeResult> byType =
+                new EnumMap<>(GeneratedQuestionType.class);
+        for (GeneratedQuestionType type : GeneratedQuestionType.values()) {
+            byType.put(type, new GenerationResultCounts.TypeResult(0, 0, 0, 0, Map.of()));
+        }
+        byType.put(
+                GeneratedQuestionType.MCQ,
+                new GenerationResultCounts.TypeResult(3, 3, 0, 3, Map.of("SCHEMA_INVALID", 3)));
+        job.setStatus(BackgroundJobStatus.FAILED);
+        job.setFailureKind(GenerationFailureKind.ZERO_VALID);
+        job.setResultCounts(new GenerationResultCounts(byType).toJson());
+        job.setUsageInputTokens(120L);
+        job.setUsageOutputTokens(45L);
+        job.setFinishedAt(Instant.parse("2026-10-29T01:00:00Z"));
+        jobRepository.save(job);
+
+        mockMvc.perform(
+                        get("/api/v1/generation-jobs/" + job.getId())
+                                .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.failureKind").value("ZERO_VALID"))
+                .andExpect(jsonPath("$.usageInputTokens").value(120))
+                .andExpect(jsonPath("$.usageOutputTokens").value(45))
+                .andExpect(jsonPath("$.usageThinkingTokens").isEmpty())
+                .andExpect(jsonPath("$.finishedAt").isNotEmpty())
+                .andExpect(jsonPath("$.resultCounts.MCQ.requested").value(3))
+                .andExpect(jsonPath("$.resultCounts.MCQ.received").value(3))
+                .andExpect(jsonPath("$.resultCounts.MCQ.accepted").value(0))
+                .andExpect(jsonPath("$.resultCounts.MCQ.dropped").value(3))
+                .andExpect(jsonPath("$.resultCounts.MCQ.dropReasons.SCHEMA_INVALID").value(3));
+    }
+
+    @Test
+    void listQuestionsReturnsDraftsNewestFirstWithProvenance() throws Exception {
+        JsonNode created =
+                readTree(
+                        generate(teacherToken, materialId, validBody())
+                                .andExpect(status().isAccepted())
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString());
+        UUID jobId = UUID.fromString(created.get("id").asString());
+        Material material = materialRepository.findById(materialId).orElseThrow();
+        QuestionType mcq =
+                questionTypeRepository
+                        .findByCode("MCQ")
+                        .orElseGet(
+                                () -> {
+                                    QuestionType type = new QuestionType();
+                                    type.setCode("MCQ");
+                                    type.setName("MCQ");
+                                    return questionTypeRepository.save(type);
+                                });
+        Question older = saveDraft(material, mcq, jobId, "Older draft?", "a");
+        Thread.sleep(10);
+        Question newer = saveDraft(material, mcq, jobId, "Newer draft?", "b");
+
+        mockMvc.perform(
+                        get("/api/v1/materials/" + materialId + "/questions")
+                                .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[0].questionId").value(newer.getQuestionId().toString()))
+                .andExpect(jsonPath("$.content[0].type").value("MCQ"))
+                .andExpect(jsonPath("$.content[0].payload.stem").value("Newer draft?"))
+                .andExpect(jsonPath("$.content[0].correctRef").value("b"))
+                .andExpect(jsonPath("$.content[0].generationJobId").value(jobId.toString()))
+                .andExpect(jsonPath("$.content[0].provider").value("gemini"))
+                .andExpect(jsonPath("$.content[0].model").value("fake-model"))
+                .andExpect(jsonPath("$.content[0].promptVersion").value("gen-prompt-v1"))
+                .andExpect(jsonPath("$.content[1].questionId").value(older.getQuestionId().toString()));
+    }
+
+    @Test
     void generationEndpointsRequireAuthentication() throws Exception {
         mockMvc.perform(
                         post("/api/v1/materials/" + materialId + "/generate")
@@ -332,6 +476,30 @@ class GenerationFlowTest {
     }
 
     // ---- helpers ------------------------------------------------------------
+
+    private Question saveDraft(
+            Material material, QuestionType type, UUID jobId, String stem, String correctRef)
+            throws Exception {
+        Question question = new Question();
+        question.setCentre(material.getCentre());
+        question.setTopic(fractionsTopic);
+        question.setQuestionType(type);
+        question.setMaterial(material);
+        question.setDifficulty((short) 3);
+        question.setPayload(
+                new com.fasterxml.jackson.databind.ObjectMapper()
+                        .readTree("{\"stem\":\"" + stem + "\",\"options\":[]}"));
+        question.setCorrectRef(correctRef);
+        question.setStatus(QuestionStatus.DRAFT);
+        question.setGenerationJobId(jobId);
+        question.setGenerationProvider("gemini");
+        question.setGeneratedByModel("fake-model");
+        question.setPromptVersion("gen-prompt-v1");
+        question.setPayloadSchemaVersion("gen-payload-v1");
+        question.setContentHash(materialHash);
+        question.setCreatedBy(teacherA.getUserId());
+        return questionRepository.save(question);
+    }
 
     private Topic saveTopic(GradeSubject gradeSubject, String name) {
         Topic topic = new Topic();

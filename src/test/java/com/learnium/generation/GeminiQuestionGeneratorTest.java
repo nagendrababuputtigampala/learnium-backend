@@ -195,6 +195,65 @@ class GeminiQuestionGeneratorTest {
     }
 
     @Test
+    void absentFinishReasonIsTreatedAsACompletedResponse() throws Exception {
+        transport.responding(envelope(MODEL_JSON, null, false));
+
+        assertThat(generator().generate(GenerationRequests.oneMcq())).isInstanceOf(Success.class);
+    }
+
+    @Test
+    void candidatesThatAreNotAnArrayAreMalformed() {
+        transport.responding("{\"candidates\":{}}");
+
+        assertThat(((Failure) generator().generate(GenerationRequests.oneMcq())).kind())
+                .isEqualTo(GenerationFailureKind.MALFORMED_RESPONSE);
+    }
+
+    @Test
+    void partsThatAreNotAnArrayAreMalformed() throws Exception {
+        ObjectNode root = JSON.createObjectNode();
+        ObjectNode candidate = root.putArray("candidates").addObject();
+        candidate.put("finishReason", "STOP");
+        candidate.putObject("content").putObject("parts");
+        transport.responding(JSON.writeValueAsString(root));
+
+        assertThat(((Failure) generator().generate(GenerationRequests.oneMcq())).kind())
+                .isEqualTo(GenerationFailureKind.MALFORMED_RESPONSE);
+    }
+
+    @Test
+    void partsWithoutTextAreMalformed() throws Exception {
+        ObjectNode root = JSON.createObjectNode();
+        ObjectNode candidate = root.putArray("candidates").addObject();
+        candidate.put("finishReason", "STOP");
+        candidate.putObject("content").putArray("parts").addObject();
+        transport.responding(JSON.writeValueAsString(root));
+
+        assertThat(((Failure) generator().generate(GenerationRequests.oneMcq())).kind())
+                .isEqualTo(GenerationFailureKind.MALFORMED_RESPONSE);
+    }
+
+    @Test
+    void questionsThatAreNotAnArrayAreMalformed() throws Exception {
+        transport.responding(envelope("{\"questions\":{}}", "STOP", false));
+
+        assertThat(((Failure) generator().generate(GenerationRequests.oneMcq())).kind())
+                .isEqualTo(GenerationFailureKind.MALFORMED_RESPONSE);
+    }
+
+    @Test
+    void nullApiKeyIsAModelError() {
+        GenerationProperties properties = new GenerationProperties();
+        properties.getGemini().setApiKey(null);
+        GeminiQuestionGenerator generator = new GeminiQuestionGenerator(properties, transport);
+
+        Failure failure = (Failure) generator.generate(GenerationRequests.oneMcq());
+
+        assertThat(failure.kind()).isEqualTo(GenerationFailureKind.MODEL_ERROR);
+        assertThat(transport.captured()).isNull();
+    }
+
+    @Test
     void missingApiKeyIsAModelErrorAndNeverCallsOut() {
         GenerationProperties properties = new GenerationProperties();
         properties.getGemini().setApiKey("");

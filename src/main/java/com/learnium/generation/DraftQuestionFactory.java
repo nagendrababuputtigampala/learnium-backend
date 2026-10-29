@@ -126,7 +126,9 @@ public final class DraftQuestionFactory {
     }
 
     private static GeneratedQuestionType typeOf(JsonNode item) {
-        if (item == null || !item.isObject()) {
+        // Items come straight from the parsed array, so item is never a
+        // Java null (a JSON null literal arrives as a NullNode).
+        if (!item.isObject()) {
             return null;
         }
         String type = JsonFields.textOrNull(item, "type");

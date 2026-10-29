@@ -75,6 +75,14 @@ class OllamaQuestionGeneratorTest {
     }
 
     @Test
+    void questionsThatAreNotAnArrayAreMalformed() throws Exception {
+        transport.responding(envelope("{\"questions\":{}}", "stop"));
+
+        assertThat(((Failure) generator().generate(GenerationRequests.oneMcq())).kind())
+                .isEqualTo(GenerationFailureKind.MALFORMED_RESPONSE);
+    }
+
+    @Test
     void lengthDoneReasonIsTruncated() throws Exception {
         transport.responding(envelope("{\"questions\":[", "length"));
 
