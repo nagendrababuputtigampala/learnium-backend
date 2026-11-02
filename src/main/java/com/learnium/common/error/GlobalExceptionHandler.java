@@ -30,6 +30,11 @@ public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private static final String MDC_TRACE_ID = "traceId";
     private static final String TRACE_ID_FALLBACK = "unknown";
+    private final ApiErrorMetrics errorMetrics;
+
+    public GlobalExceptionHandler(ApiErrorMetrics errorMetrics) {
+        this.errorMetrics = errorMetrics;
+    }
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiErrorResponse> handleBusinessException(BusinessException ex) {
@@ -154,6 +159,7 @@ public class GlobalExceptionHandler {
             String message,
             Map<String, String> fieldErrors,
             HttpHeaders headers) {
+        errorMetrics.record(errorCode);
         ApiErrorResponse body = ApiErrorResponse.builder()
                 .code(errorCode.getCode())
                 .message(message)

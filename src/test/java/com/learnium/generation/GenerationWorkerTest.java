@@ -115,6 +115,7 @@ class GenerationWorkerTest {
 
     /** Programmable generator: behaviour per call number, optionally blocking on one call. */
     static final class FakeGenerator implements QuestionGenerator {
+        volatile GenerationRequest lastRequest;
         final AtomicInteger invocations = new AtomicInteger();
         volatile IntFunction<GenerationOutcome> behavior =
                 call -> new Failure(GenerationFailureKind.MODEL_ERROR, "UnsetBehaviour");
@@ -124,6 +125,7 @@ class GenerationWorkerTest {
 
         @Override
         public GenerationOutcome generate(GenerationRequest request) {
+            lastRequest = request;
             int call = invocations.incrementAndGet();
             if (call == blockOnCall) {
                 entered.countDown();
@@ -261,6 +263,8 @@ class GenerationWorkerTest {
         assertThat(worker.runOnce()).isTrue();
 
         BackgroundJob saved = reload(job);
+        assertThat(generator.lastRequest.provider()).isEqualTo(job.getProvider());
+        assertThat(generator.lastRequest.model()).isEqualTo(job.getModel());
         assertThat(saved.getStatus()).isEqualTo(BackgroundJobStatus.SUCCEEDED);
         assertThat(saved.getAttempts()).isEqualTo(1);
         assertThat(saved.getFinishedAt()).isNotNull();

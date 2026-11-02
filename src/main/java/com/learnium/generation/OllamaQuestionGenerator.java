@@ -10,8 +10,6 @@ import com.learnium.generation.GenerationOutcome.Success;
 import com.learnium.generation.ModelTransport.ModelRequest;
 import com.learnium.model.content.GenerationFailureKind;
 import java.util.Map;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 
 /**
  * Ollama adapter (local development provider): free and keyless, at the
@@ -20,8 +18,6 @@ import org.springframework.stereotype.Component;
  * response schema, same outcome contract as Gemini; usage comes from
  * the eval counters and there is no thinking-token split.
  */
-@Component
-@ConditionalOnProperty(name = "learnium.generation.provider", havingValue = "ollama")
 public class OllamaQuestionGenerator implements QuestionGenerator {
 
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -64,7 +60,7 @@ public class OllamaQuestionGenerator implements QuestionGenerator {
     private ObjectNode buildRequestBody(
             PromptBuilder.Prompt prompt, GenerationRequest request, GenerationProperties.Ollama config) {
         ObjectNode body = JSON.createObjectNode();
-        body.put("model", config.getModel());
+        body.put("model", request.model() == null ? config.getModel() : request.model());
         body.put("stream", false);
         body.put("think", config.isThink());
         body.set("format", GenerationSchema.schema(request));

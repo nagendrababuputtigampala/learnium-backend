@@ -1,5 +1,14 @@
 # Progress — feature/port-domain-model (backend)
 
+## M0–M3 closure hardening (2026-11-02)
+
+- CI failure fixed: cryptography failure tests now use scoped mocks rather than removing JVM-wide security providers, which could poison SSL initialization on Java 17. CI tests Java 17 and 25.
+- Generation now executes the provider/model frozen on each job, even after the configured default changes. Added routing and worker-boundary regression tests.
+- `learnium.api.errors` records MVC/security errors with bounded code/status tags; real-chain tests verify each error is counted once.
+- Added isolated Compose HTTP/SMTP acceptance, a three-chapter teacher-review evidence collector/scorer, and an as-built V1–V12 ER diagram/exporter. Docker contexts exclude generated files and host dependencies.
+- Verified: clean Maven verification on Java 25 and Docker Java 17 — 491 tests, no failures/errors, four optional PostgreSQL checks skipped, full coverage gate passed. Frontend retry UI fixed and verified: 332 tests, full coverage, build passed. Isolated full-stack acceptance passed.
+- Acceptance and future grading scope are recorded in `docs/m0-m3-closure.md`. Teacher quality approval, brief UI/Grafana acceptance and green checks on the pushed commit remain release evidence.
+
 - Done: M0 skeleton — Spring Boot 4 / Java 17 app, LRN error foundation,
   structured JSON logging + traceId filter, security baseline + ping endpoint,
   Flyway V1 baseline, Dockerfile + docker-compose + CI. `mvn verify` green:

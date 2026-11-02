@@ -23,7 +23,8 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 class GlobalExceptionHandlerTest {
 
-    private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
+    private final GlobalExceptionHandler handler = new GlobalExceptionHandler(
+            new ApiErrorMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry()));
 
     @AfterEach
     void clearMdc() {

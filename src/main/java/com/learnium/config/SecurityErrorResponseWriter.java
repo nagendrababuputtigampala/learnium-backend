@@ -1,6 +1,7 @@
 package com.learnium.config;
 
 import com.learnium.common.error.ApiErrorResponse;
+import com.learnium.common.error.ApiErrorMetrics;
 import com.learnium.common.error.ErrorCode;
 import com.learnium.common.logging.TraceIdFilter;
 import jakarta.servlet.http.HttpServletResponse;
@@ -26,12 +27,15 @@ public class SecurityErrorResponseWriter {
     private static final String TRACE_ID_FALLBACK = "unknown";
 
     private final ObjectMapper objectMapper;
+    private final ApiErrorMetrics errorMetrics;
 
-    public SecurityErrorResponseWriter(ObjectMapper objectMapper) {
+    public SecurityErrorResponseWriter(ObjectMapper objectMapper, ApiErrorMetrics errorMetrics) {
         this.objectMapper = objectMapper;
+        this.errorMetrics = errorMetrics;
     }
 
     public void writeError(HttpServletResponse response, ErrorCode errorCode) throws IOException {
+        errorMetrics.record(errorCode);
         ApiErrorResponse body =
                 ApiErrorResponse.builder()
                         .code(errorCode.getCode())

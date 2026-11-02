@@ -118,10 +118,16 @@ metrics are produced in-process and exported over OTLP only when
 `OTEL_EXPORTER_OTLP_ENDPOINT` is set (see `application.yml` —
 `management.otlp.tracing.endpoint`, `management.otlp.metrics.export.url`,
 `TRACING_SAMPLING`, `OTEL_METRICS_STEP`). Point it at Grafana Cloud today or at
-Datadog/Splunk/Dynatrace later: the vendor is configuration, never code. Error
-counters per LRN code will be incremented by the metrics-aware exception
-handling in a later task; the tracing side already propagates the same
-`traceId` the logs carry.
+Datadog/Splunk/Dynatrace later: the vendor is configuration, never code.
+`learnium.api.errors` counts MVC and security errors with bounded `code` and
+`status` tags. The tracing side propagates the same `traceId` the logs carry.
+
+## Milestone acceptance
+
+See [the M0–M3 closure checklist](docs/m0-m3-closure.md) for repeatable acceptance
+commands, remaining teacher/UX sign-off, and the generation-only scope of M3.
+Run `python3 scripts/compose_acceptance.py` to build a disposable full stack and
+exercise real HTTP/SMTP flows without changing the running development stack.
 
 ### Layering
 

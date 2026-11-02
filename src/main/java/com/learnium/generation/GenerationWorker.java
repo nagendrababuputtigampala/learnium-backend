@@ -79,7 +79,9 @@ public class GenerationWorker {
                                     claim.subjectName(),
                                     claim.counts(),
                                     claim.difficulty(),
-                                    claim.payloadSchemaVersion()));
+                                    claim.payloadSchemaVersion(),
+                                    claim.provider(),
+                                    claim.model()));
         } catch (RuntimeException e) {
             // Adapters classify their own failures; anything escaping is
             // a model error by definition here.

@@ -17,7 +17,16 @@ public record GenerationRequest(
         String subjectName,
         Map<GeneratedQuestionType, Integer> counts,
         GenerationDifficulty difficulty,
-        String payloadSchemaVersion) {
+        String payloadSchemaVersion,
+        String provider,
+        String model) {
+
+    public GenerationRequest(String sourceText, String topicName, String gradeName,
+            String subjectName, Map<GeneratedQuestionType, Integer> counts,
+            GenerationDifficulty difficulty, String payloadSchemaVersion) {
+        this(sourceText, topicName, gradeName, subjectName, counts, difficulty,
+                payloadSchemaVersion, null, null);
+    }
 
     public GenerationRequest {
         EnumMap<GeneratedQuestionType, Integer> copy = new EnumMap<>(GeneratedQuestionType.class);

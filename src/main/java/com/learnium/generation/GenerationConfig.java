@@ -10,6 +10,11 @@ import org.springframework.context.annotation.Configuration;
 @EnableConfigurationProperties(GenerationProperties.class)
 public class GenerationConfig {
 
+    @Bean
+    public QuestionGenerator questionGenerator(GenerationProperties properties, ModelTransport transport) {
+        return new RoutingQuestionGenerator(properties, transport);
+    }
+
     /**
      * The one clock the generation module reads (job creation day bounds,
      * claim leases, retry backoff), so tests can substitute a mutable

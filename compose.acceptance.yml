@@ -1,0 +1,40 @@
+# Disposable acceptance stack. Host ports are allocated dynamically; no dev volumes are used.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: learnium
+      POSTGRES_USER: learnium
+      POSTGRES_PASSWORD: acceptance-only
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U learnium"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  mailpit:
+    image: axllent/mailpit
+    ports: ["127.0.0.1::8025"]
+  backend:
+    build: .
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/learnium
+      DB_USERNAME: learnium
+      DB_PASSWORD: acceptance-only
+      JWT_SECRET: acceptance-only-signing-secret-not-for-production
+      PLATFORM_PROVISIONING_KEY: ${ACCEPTANCE_PROVISIONING_KEY:?Set by the acceptance runner}
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      MAIL_DISPATCH_DELAY_MS: 200
+      GENERATION_WORKER_ENABLED: "false"
+      GEMINI_API_KEY: ""
+      DEBUG: "false"
+    ports: ["127.0.0.1::8080"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+  frontend:
+    build: ../learnium-frontend
+    ports: ["127.0.0.1::80"]
+    depends_on: [backend]

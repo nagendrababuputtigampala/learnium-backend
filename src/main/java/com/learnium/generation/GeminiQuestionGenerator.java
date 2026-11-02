@@ -9,8 +9,6 @@ import com.learnium.generation.GenerationOutcome.Success;
 import com.learnium.generation.ModelTransport.ModelRequest;
 import com.learnium.model.content.GenerationFailureKind;
 import java.util.Map;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,11 +21,6 @@ import org.slf4j.LoggerFactory;
  * MAX_TOKENS finish → TRUNCATED; an unparseable or off-contract body →
  * MALFORMED_RESPONSE.
  */
-@Component
-@ConditionalOnProperty(
-        name = "learnium.generation.provider",
-        havingValue = "gemini",
-        matchIfMissing = true)
 public class GeminiQuestionGenerator implements QuestionGenerator {
 
     private static final String API_BASE = "https://generativelanguage.googleapis.com/v1beta/models/";
@@ -46,6 +39,7 @@ public class GeminiQuestionGenerator implements QuestionGenerator {
     @Override
     public GenerationOutcome generate(GenerationRequest request) {
         GenerationProperties.Gemini config = properties.getGemini();
+        String model = request.model() == null ? config.getModel() : request.model();
         if (config.getApiKey() == null || config.getApiKey().isBlank()) {
             // No key configured: a setup error, surfaced as a model error
             // rather than a crash — the job records it and can be retried
@@ -60,7 +54,7 @@ public class GeminiQuestionGenerator implements QuestionGenerator {
             response =
                     transport.send(
                             new ModelRequest(
-                                    API_BASE + config.getModel() + ":generateContent",
+                                    API_BASE + model + ":generateContent",
                                     Map.of(
                                             "x-goog-api-key", config.getApiKey(),
                                             "Content-Type", "application/json"),
@@ -68,7 +62,7 @@ public class GeminiQuestionGenerator implements QuestionGenerator {
                                     config.getTimeoutSeconds()));
         } catch (ModelTransportException e) {
             log.warn("Gemini request failed: model={}, httpStatus={}, cause={}",
-                    config.getModel(), e.getStatusCode(),
+                    model, e.getStatusCode(),
                     e.getCause() == null ? null : e.getCause().getClass().getSimpleName());
             return new Failure(GenerationFailureKind.MODEL_ERROR, e.getClass().getSimpleName());
         }
