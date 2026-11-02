@@ -3,8 +3,6 @@ package com.learnium.security;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.security.Provider;
-import java.security.Security;
 import org.junit.jupiter.api.Test;
 
 /** Raw-token generation + SHA-256 hashing (refresh/account token storage). */
@@ -29,18 +27,15 @@ class TokenHashingTest {
     @Test
     void sha256HexFailsWhenSha256IsUnavailable() {
         // Force class initialization first: TokenHashing's static SecureRandom
-        // must not be created inside the provider-removal window below.
+        // must not be created inside the scoped digest-failure mock below.
         TokenHashing.newRawToken();
-        // SHA-256 comes from the SUN provider; removing it simulates a broken
-        // runtime so the defensive catch is exercised for real.
-        Provider sun = Security.getProvider("SUN");
-        Security.removeProvider("SUN");
-        try {
+        // Simulate lookup failure on this thread without changing JVM-wide providers.
+        try (var mockedDigest = org.mockito.Mockito.mockStatic(java.security.MessageDigest.class)) {
+            mockedDigest.when(() -> java.security.MessageDigest.getInstance("SHA-256"))
+                    .thenThrow(new java.security.NoSuchAlgorithmException("test failure"));
             assertThatThrownBy(() -> TokenHashing.sha256Hex("anything"))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("SHA-256");
-        } finally {
-            Security.addProvider(sun);
         }
     }
 
@@ -53,15 +48,13 @@ class TokenHashingTest {
         assertThat(java.util.HexFormat.of().formatHex(digest.digest()))
                 .isEqualTo(TokenHashing.sha256Hex("abc"));
 
-        // …and its defensive catch behaves exactly like sha256Hex's.
-        Provider sun = Security.getProvider("SUN");
-        Security.removeProvider("SUN");
-        try {
+        // Its defensive catch is isolated from other threads and SSL initialization.
+        try (var mockedDigest = org.mockito.Mockito.mockStatic(java.security.MessageDigest.class)) {
+            mockedDigest.when(() -> java.security.MessageDigest.getInstance("SHA-256"))
+                    .thenThrow(new java.security.NoSuchAlgorithmException("test failure"));
             assertThatThrownBy(TokenHashing::newSha256Digest)
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("SHA-256");
-        } finally {
-            Security.addProvider(sun);
         }
     }
 }

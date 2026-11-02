@@ -8,9 +8,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.learnium.admin.CatalogService;
+import com.learnium.admin.TopicCreationService.CreatedTopic;
 import com.learnium.mail.PayloadCipher;
 import com.learnium.model.common.UserStatus;
 import com.learnium.model.master.Grade;
+import com.learnium.model.content.Topic;
 import com.learnium.model.master.GradeSubject;
 import com.learnium.model.master.Subject;
 import com.learnium.model.user.Batch;
@@ -20,6 +23,7 @@ import com.learnium.model.user.MemberRole;
 import com.learnium.model.user.UserAccount;
 import com.learnium.model.user.UserRole;
 import com.learnium.repository.auth.EmailOutboxRepository;
+import com.learnium.repository.content.TopicRepository;
 import com.learnium.repository.master.GradeRepository;
 import com.learnium.repository.master.GradeSubjectRepository;
 import com.learnium.repository.master.SubjectRepository;
@@ -30,6 +34,12 @@ import com.learnium.repository.user.UserAccountRepository;
 import com.learnium.testsupport.AuthFixtures;
 import com.learnium.testsupport.CommittedDataCleanup;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,6 +51,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -71,6 +82,8 @@ class AdminFlowTest {
     @Autowired private GradeRepository gradeRepository;
     @Autowired private SubjectRepository subjectRepository;
     @Autowired private GradeSubjectRepository gradeSubjectRepository;
+    @Autowired private TopicRepository topicRepository;
+    @Autowired private CatalogService catalogService;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private EmailOutboxRepository emailOutboxRepository;
     @Autowired private PayloadCipher payloadCipher;
@@ -753,6 +766,283 @@ class AdminFlowTest {
             }
         }
         assertThat(found).isTrue();
+    }
+
+    private Topic createTopic(GradeSubject gs, String name) {
+        Topic topic = new Topic();
+        topic.setGradeSubject(gs);
+        topic.setTopicName(name);
+        return topicRepository.save(topic);
+    }
+
+    private GradeSubject createGradeSubject(String gradeCode, String gradeName, String subjectName) {
+        Grade grade = new Grade();
+        grade.setCode(gradeCode);
+        grade.setName(gradeName);
+        grade = gradeRepository.save(grade);
+        Subject subject = new Subject();
+        subject.setSubjectName(subjectName);
+        subject = subjectRepository.save(subject);
+        GradeSubject gs = new GradeSubject();
+        gs.setGrade(grade);
+        gs.setSubject(subject);
+        return gradeSubjectRepository.save(gs);
+    }
+
+    @Test
+    void gradeSubjectTopicsListOwnTopicsInNameOrder() throws Exception {
+        Topic fractions = createTopic(gradeSubject, "Fractions");
+        Topic algebra = createTopic(gradeSubject, "Algebra");
+        Topic decimals = createTopic(gradeSubject, "Decimals");
+        GradeSubject science = createGradeSubject("G7", "Grade 7", "Science");
+        createTopic(science, "Cells");
+
+        String tess = tokenFor("tess@alpha.test");
+
+        mockMvc.perform(
+                        get("/api/v1/master/grade-subjects/"
+                                        + gradeSubject.getGradeSubjectId()
+                                        + "/topics")
+                                .header("Authorization", "Bearer " + tess))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].name").value("Algebra"))
+                .andExpect(jsonPath("$[0].topicId").value(algebra.getTopicId().toString()))
+                .andExpect(jsonPath("$[1].name").value("Decimals"))
+                .andExpect(jsonPath("$[1].topicId").value(decimals.getTopicId().toString()))
+                .andExpect(jsonPath("$[2].name").value("Fractions"))
+                .andExpect(jsonPath("$[2].topicId").value(fractions.getTopicId().toString()));
+    }
+
+    @Test
+    void gradeSubjectTopicsEmptyForGradeSubjectWithoutTopics() throws Exception {
+        GradeSubject empty = createGradeSubject("G6", "Grade 6", "History");
+
+        String admin = tokenFor("admin@alpha.test");
+
+        mockMvc.perform(
+                        get("/api/v1/master/grade-subjects/" + empty.getGradeSubjectId() + "/topics")
+                                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void gradeSubjectTopicsUnknownIdReturns404() throws Exception {
+        String admin = tokenFor("admin@alpha.test");
+
+        mockMvc.perform(
+                        get("/api/v1/master/grade-subjects/" + UUID.randomUUID() + "/topics")
+                                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("LRN-SYS-404"));
+    }
+
+    @Test
+    void gradeSubjectTopicsRequireAuthentication() throws Exception {
+        mockMvc.perform(
+                        get("/api/v1/master/grade-subjects/"
+                                + gradeSubject.getGradeSubjectId()
+                                + "/topics"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("LRN-AUTH-001"));
+    }
+
+    // ---------- topic creation (create-or-return) ----------
+
+    private ResultActions postTopic(String token, UUID gradeSubjectId, String name)
+            throws Exception {
+        return mockMvc.perform(
+                post("/api/v1/master/grade-subjects/" + gradeSubjectId + "/topics")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"" + name + "\"}"));
+    }
+
+    private String topicIdOf(ResultActions actions) throws Exception {
+        String body = actions.andReturn().getResponse().getContentAsString();
+        return objectMapper.readTree(body).get("topicId").asString();
+    }
+
+    @Test
+    void createTopicReturns201AndPersistsTheRow() throws Exception {
+        String tess = tokenFor("tess@alpha.test");
+
+        ResultActions created = postTopic(tess, gradeSubject.getGradeSubjectId(), "Fractions");
+        created.andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name").value("Fractions"))
+                .andExpect(jsonPath("$.topicId").isNotEmpty());
+
+        var rows = topicRepository.findByGradeSubjectId(gradeSubject.getGradeSubjectId());
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).getTopicId().toString()).isEqualTo(topicIdOf(created));
+        assertThat(rows.get(0).isActive()).isTrue();
+        assertThat(rows.get(0).getSortOrder()).isZero();
+    }
+
+    @Test
+    void createTopicAgainReturns200WithTheSameTopic() throws Exception {
+        String tess = tokenFor("tess@alpha.test");
+        UUID gsId = gradeSubject.getGradeSubjectId();
+
+        String firstId = topicIdOf(postTopic(tess, gsId, "Fractions").andExpect(status().isCreated()));
+
+        postTopic(tess, gsId, "Fractions")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.topicId").value(firstId))
+                .andExpect(jsonPath("$.name").value("Fractions"));
+        assertThat(topicRepository.findByGradeSubjectId(gsId)).hasSize(1);
+    }
+
+    @Test
+    void createTopicWithDifferentCasingReturnsTheOriginal() throws Exception {
+        String tess = tokenFor("tess@alpha.test");
+        UUID gsId = gradeSubject.getGradeSubjectId();
+
+        String firstId = topicIdOf(postTopic(tess, gsId, "Fractions").andExpect(status().isCreated()));
+
+        // "fractions" is the same topic: the original row (and its casing)
+        // comes back, and no second row appears.
+        postTopic(tess, gsId, "fractions")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.topicId").value(firstId))
+                .andExpect(jsonPath("$.name").value("Fractions"));
+        assertThat(topicRepository.findByGradeSubjectId(gsId)).hasSize(1);
+    }
+
+    @Test
+    void createTopicTrimsTheNameBeforeStoring() throws Exception {
+        String tess = tokenFor("tess@alpha.test");
+        UUID gsId = gradeSubject.getGradeSubjectId();
+
+        String firstId =
+                topicIdOf(
+                        postTopic(tess, gsId, "  Decimals  ")
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.name").value("Decimals")));
+
+        postTopic(tess, gsId, "Decimals")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.topicId").value(firstId));
+        assertThat(topicRepository.findByGradeSubjectId(gsId)).hasSize(1);
+    }
+
+    @Test
+    void createTopicBlankNameFailsValidation() throws Exception {
+        String tess = tokenFor("tess@alpha.test");
+        UUID gsId = gradeSubject.getGradeSubjectId();
+
+        postTopic(tess, gsId, "")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LRN-VAL-001"));
+        postTopic(tess, gsId, "   ")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LRN-VAL-001"));
+        assertThat(topicRepository.findByGradeSubjectId(gsId)).isEmpty();
+    }
+
+    @Test
+    void createTopicOverLongNameFailsValidation() throws Exception {
+        String tess = tokenFor("tess@alpha.test");
+
+        postTopic(tess, gradeSubject.getGradeSubjectId(), "x".repeat(201))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LRN-VAL-001"));
+    }
+
+    @Test
+    void createTopicUnknownGradeSubjectReturns404() throws Exception {
+        String tess = tokenFor("tess@alpha.test");
+
+        postTopic(tess, UUID.randomUUID(), "Fractions")
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("LRN-SYS-404"));
+    }
+
+    @Test
+    void createTopicRejectsStudentsAndAnonymousCallers() throws Exception {
+        UUID gsId = gradeSubject.getGradeSubjectId();
+
+        mockMvc.perform(
+                        post("/api/v1/master/grade-subjects/" + gsId + "/topics")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"name\":\"Fractions\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("LRN-AUTH-001"));
+
+        String student = studentToken();
+        mockMvc.perform(
+                        post("/api/v1/master/grade-subjects/" + gsId + "/topics")
+                                .header("Authorization", "Bearer " + student)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"name\":\"Fractions\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("LRN-AUTH-003"));
+        assertThat(topicRepository.findByGradeSubjectId(gsId)).isEmpty();
+    }
+
+    @Test
+    void concurrentTopicCreatesEndWithOneTopic() throws Exception {
+        UUID gsId = gradeSubject.getGradeSubjectId();
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            CountDownLatch ready = new CountDownLatch(2);
+            CountDownLatch go = new CountDownLatch(1);
+            Callable<CreatedTopic> submit =
+                    () -> {
+                        ready.countDown();
+                        go.await();
+                        return catalogService.createTopic(gsId, "Fractions");
+                    };
+            Future<CreatedTopic> first = pool.submit(submit);
+            Future<CreatedTopic> second = pool.submit(submit);
+            assertThat(ready.await(30, TimeUnit.SECONDS)).isTrue();
+            go.countDown();
+
+            CreatedTopic a = first.get(60, TimeUnit.SECONDS);
+            CreatedTopic b = second.get(60, TimeUnit.SECONDS);
+
+            // Both callers succeeded with the same topic; exactly one of
+            // them created it — the unique constraint arbitrates the race
+            // and the loser recovers with the winning row.
+            assertThat(a.topic().topicId()).isEqualTo(b.topic().topicId());
+            assertThat(a.created()).isNotEqualTo(b.created());
+            assertThat(topicRepository.findByGradeSubjectId(gsId)).hasSize(1);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    private String studentToken() throws Exception {
+        String admin = tokenFor("admin@alpha.test");
+        JsonNode batch = createBatch(admin, "Topic Batch");
+        String batchId = batch.get("batchId").asString();
+        String addedBody =
+                mockMvc.perform(
+                                post("/api/v1/batches/" + batchId + "/students")
+                                        .header("Authorization", "Bearer " + admin)
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content("{\"fullName\":\"Simran Kaur\"}"))
+                        .andExpect(status().isCreated())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        String pin = objectMapper.readTree(addedBody).get("pin").asString();
+        String body =
+                mockMvc.perform(
+                                post("/api/v1/auth/student-session")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                "{\"batchId\":\""
+                                                        + batchId
+                                                        + "\",\"fullName\":\"Simran Kaur\",\"pin\":\""
+                                                        + pin
+                                                        + "\"}"))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        return objectMapper.readTree(body).get("accessToken").asString();
     }
 
     @Test

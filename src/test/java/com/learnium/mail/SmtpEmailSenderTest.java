@@ -3,10 +3,12 @@ package com.learnium.mail;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import jakarta.mail.Session;
+import jakarta.mail.internet.AddressException;
 import jakarta.mail.internet.MimeMessage;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
@@ -39,5 +41,19 @@ class SmtpEmailSenderTest {
 
         assertThatThrownBy(() -> sender.send(new EmailMessage("a@b.test", "S", "<p>x</p>", "x")))
                 .isInstanceOf(MailSendException.class);
+    }
+
+    @Test
+    void rejectsMalformedRecipientBeforeSending() {
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        when(mailSender.createMimeMessage())
+                .thenReturn(new MimeMessage(Session.getInstance(new Properties())));
+        SmtpEmailSender sender = new SmtpEmailSender(mailSender, "no-reply@learnium.local");
+
+        assertThatThrownBy(() -> sender.send(
+                        new EmailMessage("invalid@@example.test", "Subject", "<p>Hi</p>", "Hi")))
+                .isInstanceOf(AddressException.class);
+
+        verify(mailSender, never()).send(any(MimeMessage.class));
     }
 }

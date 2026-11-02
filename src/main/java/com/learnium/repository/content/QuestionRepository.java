@@ -19,4 +19,11 @@ public interface QuestionRepository extends JpaRepository<Question, UUID> {
             @Param("centreId") UUID centreId,
             @Param("status") QuestionStatus status,
             Pageable pageable);
+
+    /** Draft preview for one material: that material's questions in this centre, paged. */
+    Page<Question> findByCentreCentreIdAndMaterialMaterialId(
+            UUID centreId, UUID materialId, Pageable pageable);
+
+    /** How many questions one generation job has committed (exactly-once checks). */
+    long countByGenerationJobId(UUID generationJobId);
 }

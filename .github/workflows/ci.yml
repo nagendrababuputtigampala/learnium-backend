@@ -9,16 +9,21 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java: ["17", "25"]
     steps:
       - uses: actions/checkout@v4
-      - name: Set up JDK 17
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: ${{ matrix.java }}
           cache: maven
       - name: Build, test and enforce coverage gate
         run: mvn -B verify
+      - name: Quality gate evidence-tool tests
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
 
   postgres-migration:
     name: Migration test on real PostgreSQL
@@ -51,4 +56,5 @@ jobs:
           LEARINUM_PG_URL: jdbc:postgresql://localhost:5432/learnium
           LEARINUM_PG_USERNAME: learnium
           LEARINUM_PG_PASSWORD: learnium
+          GENERATION_WORKER_ENABLED: "false"
         run: mvn -B test -Dtest=PostgresMigrationTest -Dsurefire.failIfNoSpecifiedTests=false

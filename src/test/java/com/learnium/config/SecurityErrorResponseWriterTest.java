@@ -18,7 +18,9 @@ class SecurityErrorResponseWriterTest {
 
     private final ObjectMapper objectMapper = JsonMapper.builder().build();
     private final SecurityErrorResponseWriter writer =
-            new SecurityErrorResponseWriter(objectMapper);
+            new SecurityErrorResponseWriter(objectMapper,
+                    new com.learnium.common.error.ApiErrorMetrics(
+                            new io.micrometer.core.instrument.simple.SimpleMeterRegistry()));
 
     @AfterEach
     void clearMdc() {

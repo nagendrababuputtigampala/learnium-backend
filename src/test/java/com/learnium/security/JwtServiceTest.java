@@ -216,16 +216,13 @@ class JwtServiceTest {
 
     @Test
     void constructorFailsWhenSha256IsUnavailable() {
-        // SHA-256 comes from the SUN provider; removing it simulates a broken
-        // runtime so the defensive catch in deriveKey is exercised for real.
-        java.security.Provider sun = java.security.Security.getProvider("SUN");
-        java.security.Security.removeProvider("SUN");
-        try {
+        // Scoped lookup failure leaves global providers and SSL initialization intact.
+        try (var digest = org.mockito.Mockito.mockStatic(java.security.MessageDigest.class)) {
+            digest.when(() -> java.security.MessageDigest.getInstance("SHA-256"))
+                    .thenThrow(new java.security.NoSuchAlgorithmException("test failure"));
             org.assertj.core.api.Assertions.assertThatThrownBy(() -> service(SECRET, false))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("SHA-256");
-        } finally {
-            java.security.Security.addProvider(sun);
         }
     }
 

@@ -86,32 +86,26 @@ class PayloadCipherTest {
 
     @Test
     void missingSha256ProviderFailsKeyDerivation() {
-        // SHA-256 comes from the SUN provider; removing it simulates a
-        // broken runtime so the defensive catch is exercised for real.
-        java.security.Provider sun = java.security.Security.getProvider("SUN");
-        java.security.Security.removeProvider("SUN");
-        try {
+        // Scoped lookup failure leaves global providers and SSL initialization intact.
+        try (var digest = org.mockito.Mockito.mockStatic(java.security.MessageDigest.class)) {
+            digest.when(() -> java.security.MessageDigest.getInstance("SHA-256"))
+                    .thenThrow(new java.security.NoSuchAlgorithmException("test failure"));
             assertThatThrownBy(() -> new PayloadCipher("key", null))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("SHA-256");
-        } finally {
-            java.security.Security.addProvider(sun);
         }
     }
 
     @Test
     void missingCipherProviderFailsEncryption() {
-        // AES/GCM comes from SunJCE; without it the Cipher lookup fails and
-        // encrypt surfaces the wrapped IllegalStateException.
+        // Exercise encryption failure without removing a JVM-wide crypto provider.
         PayloadCipher cipher = new PayloadCipher("key", null);
-        java.security.Provider sunJce = java.security.Security.getProvider("SunJCE");
-        java.security.Security.removeProvider("SunJCE");
-        try {
+        try (var ciphers = org.mockito.Mockito.mockStatic(javax.crypto.Cipher.class)) {
+            ciphers.when(() -> javax.crypto.Cipher.getInstance("AES/GCM/NoPadding"))
+                    .thenThrow(new java.security.NoSuchAlgorithmException("test failure"));
             assertThatThrownBy(() -> cipher.encrypt(samplePayload()))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("encryption failed");
-        } finally {
-            java.security.Security.addProvider(sunJce);
         }
     }
 
