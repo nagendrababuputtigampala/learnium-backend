@@ -1,5 +1,21 @@
 # Progress — feature/review-and-bank (backend)
 
+## Final coverage and database slice (2026-11-02)
+
+- MCQ answer indices that overflow a Java integer are rejected by the shared generator/edit
+  validator. Added boundary tests for written totals and matching immutable fields.
+- Added real PostgreSQL tests for approver/source composite tenant foreign keys and the
+  exact V13 column/index contract.
+- Final `mvn -o -B clean verify`: 541 tests, 0 failures/errors, 23 optional PostgreSQL
+  tests skipped (518 passed). JaCoCo: 100% lines (2831/2831) and branches (759/759).
+- Disposable PostgreSQL 16 run: all 35 migration/review checks passed, including the
+  endpoint/role/state matrix and simultaneous-edit test.
+- Full isolated Compose acceptance passed fresh migrations, production builds, nginx
+  routes/proxy, M2 HTTP/SMTP and generation-to-review/bank/fork flows. Python evidence
+  tooling: 3 tests passed. Frontend companion: 374 tests, all coverage gates passed.
+- Open PRs target dev; no merge is part of this work. Browser automation is unavailable;
+  frontend UI evidence is from Testing Library interactions and HTTP integration.
+
 ## Contract completion slice (2026-11-02)
 
 - Audited the supplied branch-1 brief against the existing implementation. List responses

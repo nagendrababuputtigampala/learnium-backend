@@ -403,6 +403,7 @@ class QuestionReviewFlowTest {
             var noKey = base.deepCopy(); noKey.remove("correctIndex"); invalid.add(noKey);
             for (int index : List.of(-1, 4)) invalid.add(base.deepCopy().put("correctIndex", index));
             invalid.add(base.deepCopy().put("correctIndex", 1.5));
+            invalid.add(base.deepCopy().put("correctIndex", 4294967296L));
             invalid.add(base.deepCopy().put("correctIndex", "0"));
         }
         if (type == GeneratedQuestionType.FILL_BLANK) {
@@ -459,6 +460,10 @@ class QuestionReviewFlowTest {
                     .contentType("application/json").content(body)).andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("LRN-VAL-001"));
         }
+        String matching = body(q, content(GeneratedQuestionType.MCQ));
+        matching = matching.substring(0, matching.length() - 1) + ",\"type\":\"MCQ\",\"gradeSubjectId\":\"" + pairing.getGradeSubjectId() + "\"}";
+        mvc.perform(put("/api/v1/questions/" + q.getQuestionId()).with(as(owner))
+                .contentType("application/json").content(matching)).andExpect(status().isOk());
         mvc.perform(get("/api/v1/questions").with(as(owner)))
                 .andExpect(jsonPath("$.content[0].stemPreview").value("Which is half?"))
                 .andExpect(jsonPath("$.content[0].payload").doesNotExist())

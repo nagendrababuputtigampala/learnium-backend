@@ -188,6 +188,7 @@ public final class DraftQuestionFactory {
         JsonNode correctIndex = JsonFields.childOrNull(item, "correctIndex");
         if (correctIndex == null
                 || !correctIndex.isIntegralNumber()
+                || !correctIndex.canConvertToInt()
                 || correctIndex.asInt() < 0
                 || correctIndex.asInt() > 3) {
             return Verdict.drop(ANSWER_KEY_INVALID, "correctIndex");

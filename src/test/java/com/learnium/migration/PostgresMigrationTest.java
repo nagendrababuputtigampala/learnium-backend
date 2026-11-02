@@ -111,6 +111,22 @@ class PostgresMigrationTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
+
+    @Test void reviewMetadataEnforcesCentreFksWithoutExtraColumns() {
+        UUID a = insertCentre("Review A"), b = insertCentre("Review B");
+        UUID userA = insertUser(a), userB = insertUser(b);
+        UUID questionA = insertQuestion(a, insertMaterial(a, userA));
+        UUID questionB = insertQuestion(b, insertMaterial(b, userB));
+        assertThatThrownBy(() -> jdbcTemplate.update("UPDATE learnium.questions SET approved_by = ? WHERE question_id = ?", userB, questionA))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbcTemplate.update("UPDATE learnium.questions SET source_question_id = ? WHERE question_id = ?", questionB, questionA))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        jdbcTemplate.update("UPDATE learnium.questions SET approved_by = ?, approved_at = CURRENT_TIMESTAMP WHERE question_id = ?", userA, questionA);
+        assertThat(jdbcTemplate.queryForList("SELECT column_name FROM information_schema.columns WHERE table_schema = 'learnium' AND table_name = 'questions'", String.class))
+                .contains("approved_by", "approved_at", "source_question_id", "version").doesNotContain("row_revision");
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'learnium' AND indexname = 'idx_questions_centre_status'", Long.class)).isEqualTo(1L);
+    }
+
     private UUID insertCentre(String name) {
         UUID id = UUID.randomUUID();
         jdbcTemplate.update(
@@ -149,7 +165,7 @@ class PostgresMigrationTest {
         return id;
     }
 
-    private void insertQuestion(UUID centreId, UUID materialId) {
+    private UUID insertQuestion(UUID centreId, UUID materialId) {
         UUID gradeSubjectId =
                 jdbcTemplate.queryForObject(
                         "SELECT grade_subject_id FROM learnium.grade_subjects LIMIT 1", UUID.class);
@@ -164,18 +180,20 @@ class PostgresMigrationTest {
         UUID questionTypeId =
                 jdbcTemplate.queryForObject(
                         "SELECT question_type_id FROM learnium.question_types LIMIT 1", UUID.class);
+        UUID questionId = UUID.randomUUID();
         jdbcTemplate.update(
                 "INSERT INTO learnium.questions"
                         + " (question_id, centre_id, topic_id, question_type_id, material_id,"
                         + " payload, correct_ref, created_at, updated_at)"
                         + " VALUES (?, ?, ?, ?, ?, CAST(? AS jsonb), 'options[0]',"
                         + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-                UUID.randomUUID(),
+                questionId,
                 centreId,
                 topicId,
                 questionTypeId,
                 materialId,
                 "{\"prompt\":\"1/2 + 1/4?\"}");
+        return questionId;
     }
 
     private UUID insertBatch(UUID centreId) {
