@@ -112,7 +112,7 @@ class PostgresMigrationTest {
     }
 
 
-    @Test void reviewMetadataEnforcesCentreFksWithoutExtraColumns() {
+    @Test void publishedReviewMetadataEnforcesCentreFks() {
         UUID a = insertCentre("Review A"), b = insertCentre("Review B");
         UUID userA = insertUser(a), userB = insertUser(b);
         UUID questionA = insertQuestion(a, insertMaterial(a, userA));
@@ -123,7 +123,7 @@ class PostgresMigrationTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
         jdbcTemplate.update("UPDATE learnium.questions SET approved_by = ?, approved_at = CURRENT_TIMESTAMP WHERE question_id = ?", userA, questionA);
         assertThat(jdbcTemplate.queryForList("SELECT column_name FROM information_schema.columns WHERE table_schema = 'learnium' AND table_name = 'questions'", String.class))
-                .contains("approved_by", "approved_at", "source_question_id", "version").doesNotContain("row_revision");
+                .contains("approved_by", "approved_at", "source_question_id", "version", "row_revision");
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'learnium' AND indexname = 'idx_questions_centre_status'", Long.class)).isEqualTo(1L);
     }
 

@@ -19,7 +19,7 @@ public interface QuestionRepository extends JpaRepository<Question, UUID> {
             select q.questionId as questionId, qt.code as type, q.status as status,
               gs.gradeSubjectId as gradeSubjectId, g.name as gradeName, s.subjectName as subjectName,
               t.topicId as topicId, t.topicName as topicName, q.difficulty as difficulty,
-              q.payload as payload, q.correctRef as correctRef, (q.version - 1) as revision, q.version as version,
+              q.payload as payload, q.correctRef as correctRef, q.revision as revision, q.version as version,
               q.createdBy as createdBy, q.createdAt as createdAt, q.approvedBy as approvedBy,
               q.approvedAt as approvedAt, q.sourceQuestionId as sourceQuestionId,
               m.materialId as materialId, m.title as materialTitle,

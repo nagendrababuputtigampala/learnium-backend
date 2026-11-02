@@ -1,11 +1,25 @@
 # Progress — feature/review-and-bank (backend)
 
+## Published migration compatibility (2026-11-02)
+
+- Remote refresh revealed backend PR #12 was merged before this request began. The
+  remaining backend fixes will be delivered as a follow-up PR to dev.
+- Preserve published V13, its checksum, existing revision column/indexes and the established
+  revision mechanism. This supersedes the attempted V13 simplification in the earlier slice;
+  existing databases can validate and start without a Flyway repair or schema rewrite.
+- This follow-up introduces no schema changes. After restoring the published migration and
+  revision mapping, `mvn -o -B clean verify` passed: 541 tests, 0 failures/errors, 23 optional
+  PostgreSQL tests skipped (518 passed), 100% lines (2831/2831) and branches (759/759).
+- A fresh PostgreSQL 16 database passed all 35 migration/review checks with the published V13.
+  Frontend final evidence remains 374 passing tests with 100% coverage. The earlier numbers
+  below are slice history; these are the final backend code/coverage results.
+
 ## Final coverage and database slice (2026-11-02)
 
 - MCQ answer indices that overflow a Java integer are rejected by the shared generator/edit
   validator. Added boundary tests for written totals and matching immutable fields.
 - Added real PostgreSQL tests for approver/source composite tenant foreign keys and the
-  exact V13 column/index contract.
+  published V13 column/index contract.
 - Final `mvn -o -B clean verify`: 541 tests, 0 failures/errors, 23 optional PostgreSQL
   tests skipped (518 passed). JaCoCo: 100% lines (2831/2831) and branches (759/759).
 - Disposable PostgreSQL 16 run: all 35 migration/review checks passed, including the
@@ -24,6 +38,7 @@
   Shared generation/edit validation bounds written rubric totals to 100 and checks declared totals.
 - V13 adds only approval actor/time and fork lineage; concurrency reuses the existing version
   column and row lock. The centre/status index already exists in V3.
+  This migration adjustment was superseded by the compatibility slice below.
 - Green slice: 70 targeted tests passed, including an endpoint/role/state authorization matrix,
   generation/edit rejection parity and immutable fork checks for every type.
 - Clean full verification and fresh PostgreSQL evidence will be recorded in the next slice.

@@ -90,6 +90,7 @@ public class QuestionReviewService {
         question.setDifficulty(request.difficulty());
         question.setPayload(validated.payload());
         question.setCorrectRef(validated.correctRef());
+        question.setVersion(question.getVersion() + 1);
         questions.saveAndFlush(question);
         return get(caller, id);
     }

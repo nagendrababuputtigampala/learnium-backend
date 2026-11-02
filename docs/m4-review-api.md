@@ -47,8 +47,12 @@ total derive it from the rubric through the shared validator. New criteria recei
 
 Approve/reject bodies are `{"revision": <latest-revision>}`. Approval always validates the
 saved version; the UI disables approval while there are unsaved changes. `revision` is
-the optimistic concurrency token (`version - 1`), backed by the existing version column.
-Saves and decisions increment it; transactional row locking serializes concurrent writers.
+the optimistic concurrency token, separate from the content version. Saves and decisions
+increment it; transactional row locking serializes concurrent writers.
+
+V13 was already merged in backend PR #12 before this follow-up. Its published schema
+(including `row_revision` and review indexes) and checksum are preserved for existing databases;
+this follow-up adds no schema changes.
 
 ## Errors
 
