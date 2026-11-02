@@ -7,6 +7,11 @@ UPDATE exam_templates t SET grade_subject_id =
 ALTER TABLE exam_templates ALTER COLUMN grade_subject_id SET NOT NULL;
 ALTER TABLE exam_template_questions ADD COLUMN marks numeric(6,2) NOT NULL DEFAULT 1;
 UPDATE exam_template_questions SET marks = points;
+-- Freeze definition identity too: later definition name/kind edits cannot relabel a sitting.
+ALTER TABLE exam_instances ADD COLUMN definition_name varchar(120) NOT NULL DEFAULT '';
+ALTER TABLE exam_instances ADD COLUMN definition_kind varchar(24) NOT NULL DEFAULT 'SCORED_TEST';
+UPDATE exam_instances i SET definition_name = (SELECT t.template_name FROM exam_templates t WHERE t.exam_template_id = i.exam_template_id),
+    definition_kind = (SELECT t.kind FROM exam_templates t WHERE t.exam_template_id = i.exam_template_id);
 ALTER TABLE exam_instances ADD COLUMN time_limit_seconds integer;
 ALTER TABLE exam_instances ADD COLUMN max_attempts integer NOT NULL DEFAULT 1;
 UPDATE exam_instances SET max_attempts = 2 WHERE retakes_allowed = true;

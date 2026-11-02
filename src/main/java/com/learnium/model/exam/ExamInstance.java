@@ -46,6 +46,11 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 public class ExamInstance extends AuditableEntity {
+    @Column(name = "definition_name", nullable = false, length = 120)
+    private String definitionName = "";
+    @Column(name = "definition_kind", nullable = false, length = 24)
+    private String definitionKind = "SCORED_TEST";
+
     @Column(name = "time_limit_seconds")
     private Integer timeLimitSeconds;
     @Column(name = "max_attempts", nullable = false)

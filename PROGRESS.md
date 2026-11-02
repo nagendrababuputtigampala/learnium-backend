@@ -10,7 +10,13 @@
 - Reuses existing creator, item-order, camera and integrity columns. Published V1–V13
   migrations remain unchanged. Composite tenant FKs protect new snapshot/job links.
 - Green: 21 migration, tenancy and exam-chain persistence tests passed.
-- Next: owned definition and publishing APIs, then the marking worker, then frontend.
+- S2 green: 13 API/migration tests passed. Owned definition CRUD and decimal marks,
+  grade/kind validation, atomic publish with full question and active-roster freezes,
+  per-publish item selection/marks, current-assignment instance access, code regeneration,
+  idempotent late adds and early close are implemented.
+- V14 also freezes the definition name and kind so later definition edits cannot relabel
+  earlier instances. Existing order/integrity/camera columns remain reused.
+- Next: marking worker tests and coverage closure, then frontend.
 
 # Progress — feature/review-and-bank (backend)
 
