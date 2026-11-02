@@ -55,13 +55,13 @@ public final class DraftQuestionFactory {
     /** Validation outcome: the surviving drafts plus the per-type tallies. */
     public record ValidationOutcome(GenerationResultCounts counts, List<DraftQuestion> drafts) {}
 
-    private record Verdict(DraftQuestion draft, String stemKey, String dropReason) {
+    private record Verdict(DraftQuestion draft, String stemKey, String dropReason, String field) {
         static Verdict ok(DraftQuestion draft, String stemKey) {
-            return new Verdict(draft, stemKey, null);
+            return new Verdict(draft, stemKey, null, null);
         }
 
-        static Verdict drop(String reason) {
-            return new Verdict(null, null, reason);
+        static Verdict drop(String reason, String field) {
+            return new Verdict(null, null, reason, field);
         }
     }
 
@@ -142,6 +142,14 @@ public final class DraftQuestionFactory {
         }
     }
 
+    /** Shared single-question validation for teacher edits and approval. */
+    public record ReviewValidation(DraftQuestion draft, String reason, String field) {}
+
+    public ReviewValidation validateForReview(GeneratedQuestionType type, JsonNode item) {
+        Verdict result = validateItem(type, item);
+        return new ReviewValidation(result.draft(), result.dropReason(), result.field());
+    }
+
     private Verdict validateItem(GeneratedQuestionType type, JsonNode item) {
         return switch (type) {
             case MCQ -> validateMcq(item);
@@ -155,34 +163,34 @@ public final class DraftQuestionFactory {
     private Verdict validateMcq(JsonNode item) {
         String stemReason = textProblem(item, "stem", STEM_MAX);
         if (stemReason != null) {
-            return Verdict.drop(stemReason);
+            return Verdict.drop(stemReason, "stem");
         }
         JsonNode options = JsonFields.childOrNull(item, "options");
         if (options == null || !options.isArray() || options.size() != 4) {
-            return Verdict.drop(SCHEMA_INVALID);
+            return Verdict.drop(SCHEMA_INVALID, "options");
         }
         List<String> texts = new ArrayList<>();
         Set<String> distinct = new HashSet<>();
         for (JsonNode option : options) {
             String text = JsonFields.textOrNull(option, "text");
             if (text == null || text.isBlank()) {
-                return Verdict.drop(SCHEMA_INVALID);
+                return Verdict.drop(SCHEMA_INVALID, "options");
             }
             if (text.length() > OPTION_MAX) {
-                return Verdict.drop(FIELD_TOO_LONG);
+                return Verdict.drop(FIELD_TOO_LONG, "options");
             }
             texts.add(text);
             distinct.add(normalize(text));
         }
         if (distinct.size() != texts.size()) {
-            return Verdict.drop(SCHEMA_INVALID);
+            return Verdict.drop(SCHEMA_INVALID, "options");
         }
         JsonNode correctIndex = JsonFields.childOrNull(item, "correctIndex");
         if (correctIndex == null
                 || !correctIndex.isIntegralNumber()
                 || correctIndex.asInt() < 0
                 || correctIndex.asInt() > 3) {
-            return Verdict.drop(ANSWER_KEY_INVALID);
+            return Verdict.drop(ANSWER_KEY_INVALID, "correctIndex");
         }
         ObjectNode payload = JSON.createObjectNode();
         payload.put("stem", JsonFields.textOrNull(item, "stem"));
@@ -212,17 +220,17 @@ public final class DraftQuestionFactory {
         }
         String stemReason = textProblem(stem, STEM_MAX);
         if (stemReason != null) {
-            return Verdict.drop(stemReason);
+            return Verdict.drop(stemReason, "stemWithBlank");
         }
         if (countOccurrences(stem, BLANK_MARKER) != 1) {
-            return Verdict.drop(SCHEMA_INVALID);
+            return Verdict.drop(SCHEMA_INVALID, "stemWithBlank");
         }
         String answer = JsonFields.textOrNull(item, "answer");
         if (answer == null || answer.isBlank()) {
-            return Verdict.drop(SCHEMA_INVALID);
+            return Verdict.drop(SCHEMA_INVALID, "answer");
         }
         if (answer.length() > FILL_BLANK_ANSWER_MAX) {
-            return Verdict.drop(FIELD_TOO_LONG);
+            return Verdict.drop(FIELD_TOO_LONG, "answer");
         }
         ObjectNode payload = JSON.createObjectNode();
         payload.put("stemWithBlank", stem);
@@ -234,11 +242,11 @@ public final class DraftQuestionFactory {
     private Verdict validateFlashcard(JsonNode item) {
         String frontReason = textProblem(item, "front", FLASHCARD_FRONT_MAX);
         if (frontReason != null) {
-            return Verdict.drop(frontReason);
+            return Verdict.drop(frontReason, "front");
         }
         String backReason = textProblem(item, "back", FLASHCARD_BACK_MAX);
         if (backReason != null) {
-            return Verdict.drop(backReason);
+            return Verdict.drop(backReason, "back");
         }
         ObjectNode payload = JSON.createObjectNode();
         payload.put("front", JsonFields.textOrNull(item, "front"));
@@ -251,11 +259,11 @@ public final class DraftQuestionFactory {
     private Verdict validateNumeric(JsonNode item) {
         String stemReason = textProblem(item, "stem", STEM_MAX);
         if (stemReason != null) {
-            return Verdict.drop(stemReason);
+            return Verdict.drop(stemReason, "stem");
         }
         JsonNode answerValue = JsonFields.childOrNull(item, "answerValue");
         if (answerValue == null || !answerValue.isNumber() || !Double.isFinite(answerValue.asDouble())) {
-            return Verdict.drop(SCHEMA_INVALID);
+            return Verdict.drop(SCHEMA_INVALID, "answerValue");
         }
         double tolerance = 0;
         JsonNode toleranceNode = JsonFields.childOrNull(item, "tolerance");
@@ -263,7 +271,7 @@ public final class DraftQuestionFactory {
             if (!toleranceNode.isNumber()
                     || !Double.isFinite(toleranceNode.asDouble())
                     || toleranceNode.asDouble() < 0) {
-                return Verdict.drop(SCHEMA_INVALID);
+                return Verdict.drop(SCHEMA_INVALID, "tolerance");
             }
             tolerance = toleranceNode.asDouble();
         }
@@ -272,11 +280,11 @@ public final class DraftQuestionFactory {
             unit = "";
         }
         if (unit.length() > UNIT_MAX) {
-            return Verdict.drop(FIELD_TOO_LONG);
+            return Verdict.drop(FIELD_TOO_LONG, "unit");
         }
         String solutionReason = textProblem(item, "workedSolution", WORKED_SOLUTION_MAX);
         if (solutionReason != null) {
-            return Verdict.drop(solutionReason);
+            return Verdict.drop(solutionReason, "workedSolution");
         }
         ObjectNode correctRefNode = JSON.createObjectNode();
         correctRefNode.put("value", answerValue.asDouble());
@@ -284,7 +292,7 @@ public final class DraftQuestionFactory {
         correctRefNode.put("unit", unit);
         String correctRef = correctRefNode.toString();
         if (correctRef.length() > CORRECT_REF_MAX) {
-            return Verdict.drop(FIELD_TOO_LONG);
+            return Verdict.drop(FIELD_TOO_LONG, "answerValue");
         }
         ObjectNode payload = JSON.createObjectNode();
         payload.put("stem", JsonFields.textOrNull(item, "stem"));
@@ -300,15 +308,15 @@ public final class DraftQuestionFactory {
     private Verdict validateWritten(JsonNode item) {
         String stemReason = textProblem(item, "stem", STEM_MAX);
         if (stemReason != null) {
-            return Verdict.drop(stemReason);
+            return Verdict.drop(stemReason, "stem");
         }
         String modelAnswerReason = textProblem(item, "modelAnswer", MODEL_ANSWER_MAX);
         if (modelAnswerReason != null) {
-            return Verdict.drop(modelAnswerReason);
+            return Verdict.drop(modelAnswerReason, "modelAnswer");
         }
         JsonNode rubric = JsonFields.childOrNull(item, "rubric");
         if (rubric == null || !rubric.isArray() || rubric.size() < 3 || rubric.size() > 5) {
-            return Verdict.drop(RUBRIC_INVALID);
+            return Verdict.drop(RUBRIC_INVALID, "rubric");
         }
         ObjectNode payload = JSON.createObjectNode();
         payload.put("stem", JsonFields.textOrNull(item, "stem"));
@@ -318,10 +326,10 @@ public final class DraftQuestionFactory {
         for (JsonNode criterionNode : rubric) {
             String criterion = JsonFields.textOrNull(criterionNode, "criterion");
             if (criterion == null || criterion.isBlank()) {
-                return Verdict.drop(RUBRIC_INVALID);
+                return Verdict.drop(RUBRIC_INVALID, "rubric");
             }
             if (criterion.length() > CRITERION_MAX) {
-                return Verdict.drop(FIELD_TOO_LONG);
+                return Verdict.drop(FIELD_TOO_LONG, "rubric");
             }
             JsonNode maxScore = JsonFields.childOrNull(criterionNode, "maxScore");
             if (maxScore == null
@@ -329,7 +337,7 @@ public final class DraftQuestionFactory {
                     || !Double.isFinite(maxScore.asDouble())
                     || maxScore.asDouble() <= 0
                     || maxScore.asDouble() > 100) {
-                return Verdict.drop(RUBRIC_INVALID);
+                return Verdict.drop(RUBRIC_INVALID, "rubric");
             }
             index++;
             ObjectNode entry = payloadRubric.addObject();

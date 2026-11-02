@@ -306,7 +306,8 @@ public class GenerationJobService {
                 question.getGeneratedByModel(),
                 question.getPromptVersion(),
                 question.getGenerationJobId(),
-                question.getCreatedAt());
+                question.getCreatedAt(),
+                question.getStatus().name());
     }
 
     /** Entity JSON is Jackson 2; the web layer renders Jackson 3 — bridge by text. */

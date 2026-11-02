@@ -60,7 +60,7 @@ class PostgresMigrationTest {
                 jdbcTemplate.queryForObject(
                         "SELECT COUNT(*) FROM learnium.flyway_schema_history WHERE success = true",
                         Long.class);
-        assertThat(applied).isGreaterThanOrEqualTo(7L);
+        assertThat(applied).isGreaterThanOrEqualTo(13L);
     }
 
     @Test

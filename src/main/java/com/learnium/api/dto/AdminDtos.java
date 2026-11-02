@@ -32,7 +32,7 @@ public final class AdminDtos {
             String gradeName,
             UUID subjectId,
             String subjectName,
-            String label) {}
+            String label, UUID gradeId) {}
 
     public record TopicDto(UUID topicId, String name) {}
 

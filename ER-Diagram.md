@@ -1,7 +1,7 @@
 # Learnium — as-built entity relationships
 
 Source: PostgreSQL catalogue metadata from the migrated `learnium` schema.
-Flyway versions: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12.
+Flyway versions: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13.
 
 Regenerate with `python3 scripts/export_er_diagram.py --container CONTAINER`.
 
@@ -312,6 +312,10 @@ erDiagram
         character_varying_32_ prompt_version
         character_varying_32_ payload_schema_version
         character_varying_64_ content_hash
+        uuid approved_by FK
+        timestamp_with_time_zone approved_at
+        uuid source_question_id FK
+        bigint row_revision
     }
     refresh_token {
         uuid refresh_token_id PK
@@ -468,8 +472,10 @@ erDiagram
     questions ||--o{ question_attempts : fk_question_attempts_centre_question
     exam_attempts ||--o{ question_attempts : question_attempts_attempt_id_fkey
     questions ||--o{ question_attempts : question_attempts_question_id_fkey
+    user_account |o--o{ questions : fk_questions_approver_centre
     materials |o--o{ questions : fk_questions_centre_material
     background_job |o--o{ questions : fk_questions_generation_job
+    questions |o--o{ questions : fk_questions_source_centre
     centres ||--o{ questions : questions_centre_id_fkey
     materials |o--o{ questions : questions_material_id_fkey
     question_types ||--o{ questions : questions_question_type_id_fkey
@@ -543,8 +549,10 @@ erDiagram
 | question_attempts | centre_id, question_id | questions | centre_id, question_id |
 | question_attempts | attempt_id | exam_attempts | attempt_id |
 | question_attempts | question_id | questions | question_id |
+| questions | centre_id, approved_by | user_account | centre_id, user_id |
 | questions | centre_id, material_id | materials | centre_id, material_id |
 | questions | centre_id, generation_job_id | background_job | centre_id, id |
+| questions | centre_id, source_question_id | questions | centre_id, question_id |
 | questions | centre_id | centres | centre_id |
 | questions | material_id | materials | material_id |
 | questions | question_type_id | question_types | question_type_id |

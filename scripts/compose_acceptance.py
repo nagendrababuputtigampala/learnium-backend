@@ -4,9 +4,10 @@ import os
 from pathlib import Path
 import secrets
 import subprocess
-import sys
 import time
 import urllib.request
+from m2_acceptance import run as m2_acceptance
+from m4_review_acceptance import run as m4_acceptance
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -44,10 +45,11 @@ def main():
             with urllib.request.urlopen(frontend + path, timeout=10) as response:
                 if response.status != 200:
                     raise RuntimeError("Frontend route/proxy check failed")
-        subprocess.run([sys.executable, str(ROOT / "scripts/m2_acceptance.py"),
-                        "--base-url", frontend + "/api/v1", "--mailpit-url", mailpit],
-                       env=env, check=True)
-        print("PASS: Compose build, fresh PostgreSQL migrations, nginx routes/proxy, M2 HTTP/SMTP")
+        # Share synthetic credentials only in process memory; never print or persist them.
+        os.environ["ACCEPTANCE_PROVISIONING_KEY"] = env["ACCEPTANCE_PROVISIONING_KEY"]
+        sessions = m2_acceptance(frontend + "/api/v1", mailpit)
+        m4_acceptance(frontend + "/api/v1", sessions)
+        print("PASS: Compose build, fresh PostgreSQL migrations, nginx routes/proxy, M2 HTTP/SMTP and M4 review/bank")
     finally:
         compose("down", "--volumes", "--remove-orphans")
 
