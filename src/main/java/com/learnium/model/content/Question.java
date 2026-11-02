@@ -46,9 +46,8 @@ import org.hibernate.type.SqlTypes;
 @NoArgsConstructor
 public class Question extends AuditableEntity {
 
-    @Version
-    @Column(name = "row_revision", nullable = false)
-    private long revision;
+    /** Revision uses the existing version column; no additional schema is needed. */
+    public long getRevision() { return version - 1L; }
 
     @Column(name = "approved_by")
     private UUID approvedBy;
@@ -91,6 +90,7 @@ public class Question extends AuditableEntity {
     @Column(name = "correct_ref", nullable = false, length = 50)
     private String correctRef;
 
+    @Version
     @Column(name = "version", nullable = false)
     private int version = 1;
 

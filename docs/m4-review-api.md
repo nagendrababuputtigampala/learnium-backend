@@ -6,12 +6,16 @@ questions are shared with all centre staff. Student requests are rejected.
 
 | Method | Path | Behavior |
 |---|---|---|
-| GET | `/questions?status=DRAFT` | Paged review queue; `APPROVED` selects the bank and `REJECTED` the private archive. |
+| GET | `/questions?status=DRAFT` | Paged summary-only review queue; `APPROVED` selects the bank and `REJECTED` the private archive. |
 | GET | `/questions/{id}` | Visible detail, including staff-only payload/answer key, revision, topic/difficulty and approval/provenance. |
 | PUT | `/questions/{id}` | Validate and save a draft; increment content version and concurrency revision. |
 | POST | `/questions/{id}/approve` | Revalidate saved content, stamp actor/time and atomically approve. |
 | POST | `/questions/{id}/reject` | Reject a draft, including structurally invalid content. |
 | POST | `/questions/{id}/forks` | Copy an approved question into a new draft owned by the caller; returns 201. |
+
+List responses contain a bounded `stemPreview` plus type, topic, difficulty, status,
+material, creator and approval metadata. Payloads and answer keys are returned only by detail
+and mutation endpoints. Projections use joins, without serializing entities or loading PDF text.
 
 List filters: `materialId`, `gradeSubjectId`, `gradeId`, `subjectId`, `topicId`, `type`,
 `difficulty` (1–5), `status`, `page`, `size` (capped at 100). Pagination is stable by
@@ -33,14 +37,18 @@ group for forks without source material. Scalar projections do not load/return P
 }
 ```
 
-`content` uses the M3 raw per-type field names. Type is server-owned; providing a different
-`content.type` fails. The stored payload is normalized by the shared factory. Written
+`content` uses the M3 raw per-type field names. Type and grade/subject are server-owned; changing `type`, `content.type`, or
+`gradeSubjectId` returns 400 `LRN-VAL-001`. A topic outside the original pairing,
+an inactive topic or a missing topic also returns 400. The stored payload is normalized by the shared factory. Written
 criteria retain their server IDs across edits/reordering; omit an ID for a new criterion.
-Unknown/duplicate IDs are rejected. New criteria receive distinct IDs within the saved draft.
+Unknown/duplicate IDs are rejected. Written payloads include `maxScore`, equal to the
+sum of criterion scores and at most 100. Legacy generation payloads without a declared
+total derive it from the rubric through the shared validator. New criteria receive distinct IDs within the saved draft.
 
 Approve/reject bodies are `{"revision": <latest-revision>}`. Approval always validates the
 saved version; the UI disables approval while there are unsaved changes. `revision` is
-the optimistic concurrency token, separate from the content's `version`.
+the optimistic concurrency token (`version - 1`), backed by the existing version column.
+Saves and decisions increment it; transactional row locking serializes concurrent writers.
 
 ## Errors
 

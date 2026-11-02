@@ -1,5 +1,17 @@
 # Progress — feature/review-and-bank (backend)
 
+## Contract completion slice (2026-11-02)
+
+- Audited the supplied branch-1 brief against the existing implementation. List responses
+  now expose bounded summaries only; detail/mutations retain the complete staff payload.
+- Forbidden type/pairing changes and invalid topic assignments return 400 LRN-VAL-001.
+  Shared generation/edit validation bounds written rubric totals to 100 and checks declared totals.
+- V13 adds only approval actor/time and fork lineage; concurrency reuses the existing version
+  column and row lock. The centre/status index already exists in V3.
+- Green slice: 70 targeted tests passed, including an endpoint/role/state authorization matrix,
+  generation/edit rejection parity and immutable fork checks for every type.
+- Clean full verification and fresh PostgreSQL evidence will be recorded in the next slice.
+
 ## M4 branch 1 — review and bank (2026-11-02)
 
 - Implemented creator/admin draft review, five question editors, shared validator errors,

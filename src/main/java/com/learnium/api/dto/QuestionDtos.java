@@ -10,9 +10,18 @@ public final class QuestionDtos {
 
     /** Content uses the M3 generator shape; type, grade/subject and provenance are server-owned. */
     public record EditRequest(@NotNull @PositiveOrZero Long revision,
-            @NotNull UUID topicId, @Min(1) @Max(5) short difficulty, @NotNull java.util.Map<String, Object> content) {}
+            @NotNull UUID topicId, @Min(1) @Max(5) short difficulty, @NotNull java.util.Map<String, Object> content, String type, UUID gradeSubjectId) {
+        public EditRequest(Long revision, UUID topicId, short difficulty, java.util.Map<String, Object> content) {
+            this(revision, topicId, difficulty, content, null, null);
+        }
+    }
 
     public record DecisionRequest(@NotNull @PositiveOrZero Long revision) {}
+
+    public record QuestionListDto(UUID questionId, String type, String status, String stemPreview,
+            UUID gradeSubjectId, String gradeName, String subjectName, UUID topicId, String topicName,
+            short difficulty, UUID materialId, String materialTitle, UUID createdBy, Instant createdAt,
+            UUID approvedBy, Instant approvedAt) {}
 
     public record QuestionDto(UUID questionId, String type, String status, UUID gradeSubjectId,
             String gradeName, String subjectName, UUID topicId, String topicName, short difficulty,

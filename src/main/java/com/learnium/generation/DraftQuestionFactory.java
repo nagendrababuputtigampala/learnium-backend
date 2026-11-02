@@ -323,6 +323,7 @@ public final class DraftQuestionFactory {
         payload.put("modelAnswer", JsonFields.textOrNull(item, "modelAnswer"));
         ArrayNode payloadRubric = payload.putArray("rubric");
         int index = 0;
+        java.math.BigDecimal total = java.math.BigDecimal.ZERO;
         for (JsonNode criterionNode : rubric) {
             String criterion = JsonFields.textOrNull(criterionNode, "criterion");
             if (criterion == null || criterion.isBlank()) {
@@ -339,12 +340,23 @@ public final class DraftQuestionFactory {
                     || maxScore.asDouble() > 100) {
                 return Verdict.drop(RUBRIC_INVALID, "rubric");
             }
+            total = total.add(maxScore.decimalValue());
             index++;
             ObjectNode entry = payloadRubric.addObject();
             entry.put("id", "crit-" + index);
             entry.put("criterion", criterion);
             entry.put("maxScore", maxScore.asDouble());
         }
+        if (total.compareTo(java.math.BigDecimal.valueOf(100)) > 0) {
+            return Verdict.drop(RUBRIC_INVALID, "rubric");
+        }
+        JsonNode declaredMax = JsonFields.childOrNull(item, "maxScore");
+        if (declaredMax != null && (!declaredMax.isNumber()
+                || !Double.isFinite(declaredMax.asDouble())
+                || total.compareTo(declaredMax.decimalValue()) != 0)) {
+            return Verdict.drop(RUBRIC_INVALID, "maxScore");
+        }
+        payload.put("maxScore", total.doubleValue());
         return Verdict.ok(
                 new DraftQuestion(GeneratedQuestionType.WRITTEN, payload, "modelAnswer"),
                 stemKey(JsonFields.textOrNull(item, "stem")));

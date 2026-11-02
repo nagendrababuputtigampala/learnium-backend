@@ -315,7 +315,6 @@ erDiagram
         uuid approved_by FK
         timestamp_with_time_zone approved_at
         uuid source_question_id FK
-        bigint row_revision
     }
     refresh_token {
         uuid refresh_token_id PK

@@ -36,7 +36,7 @@ public class QuestionReviewService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<QuestionDto> list(LearniumPrincipal caller, String status,
+    public PageResponse<QuestionListDto> list(LearniumPrincipal caller, String status,
             UUID materialId, UUID gradeSubjectId, UUID gradeId, UUID subjectId,
             UUID topicId, String type, String difficulty, Pageable pageable) {
         QuestionStatus parsedStatus;
@@ -55,7 +55,7 @@ public class QuestionReviewService {
                 Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by("questionId")));
         return PageResponse.from(questions.search(caller.centreId(), caller.userId(), isAdmin(caller),
                 null, parsedStatus, materialId, gradeSubjectId, gradeId, subjectId, topicId,
-                type, parsedDifficulty, page), row -> dto(row, caller));
+                type, parsedDifficulty, page), row -> listDto(row, caller));
     }
 
     @Transactional(readOnly = true)
@@ -70,11 +70,16 @@ public class QuestionReviewService {
     public QuestionDto edit(LearniumPrincipal caller, UUID id, EditRequest request) {
         Question question = requireVisible(caller, id);
         requireDraft(question, request.revision());
+        if ((request.type() != null && !request.type().equals(question.getQuestionType().getCode()))
+                || (request.gradeSubjectId() != null && !request.gradeSubjectId().equals(
+                        question.getTopic().getGradeSubject().getGradeSubjectId()))) {
+            throw badRequest("content", "Question type and grade/subject cannot be changed");
+        }
         Topic topic = topics.findById(request.topicId())
-                .orElseThrow(() -> invalid("topicId", "Choose a valid topic"));
+                .orElseThrow(() -> badRequest("topicId", "Choose a valid topic"));
         if (!topic.getGradeSubject().getGradeSubjectId().equals(
                 question.getTopic().getGradeSubject().getGradeSubjectId()) || !topic.isActive()) {
-            throw invalid("topicId", "Topic must be active and belong to the original grade and subject");
+            throw badRequest("topicId", "Topic must be active and belong to the original grade and subject");
         }
         com.fasterxml.jackson.databind.JsonNode content = JSON.valueToTree(request.content());
         var validated = validate(question, content);
@@ -85,7 +90,6 @@ public class QuestionReviewService {
         question.setDifficulty(request.difficulty());
         question.setPayload(validated.payload());
         question.setCorrectRef(validated.correctRef());
-        question.setVersion(question.getVersion() + 1);
         questions.saveAndFlush(question);
         return get(caller, id);
     }
@@ -166,7 +170,7 @@ public class QuestionReviewService {
         if (!content.isObject()) throw invalid("content", "Content must be a question object");
         String type = question.getQuestionType().getCode();
         if (content.has("type") && !type.equals(content.path("type").asText())) {
-            throw invalid("content.type", "Question type cannot be changed");
+            throw badRequest("content.type", "Question type cannot be changed");
         }
         var outcome = validator.validateForReview(GeneratedQuestionType.valueOf(type), content);
         if (outcome.draft() == null) {
@@ -185,6 +189,26 @@ public class QuestionReviewService {
             throw invalid("content." + outcome.field(), message);
         }
         return outcome.draft();
+    }
+
+    private BusinessException badRequest(String field, String message) {
+        return new BusinessException(ErrorCode.VAL_FAILED, "Validation failed", Map.of(field, message));
+    }
+
+    private QuestionListDto listDto(QuestionSummary q, LearniumPrincipal caller) {
+        var payload = q.getPayload();
+        String field = switch (q.getType()) {
+            case "FILL_BLANK" -> "stemWithBlank";
+            case "FLASHCARD" -> "front";
+            default -> "stem";
+        };
+        String preview = payload.path(field).asText("");
+        boolean sourceVisible = isAdmin(caller) || caller.userId().equals(q.getCreatedBy());
+        return new QuestionListDto(q.getQuestionId(), q.getType(), q.getStatus().name(),
+                preview.substring(0, Math.min(preview.length(), 200)), q.getGradeSubjectId(),
+                q.getGradeName(), q.getSubjectName(), q.getTopicId(), q.getTopicName(), q.getDifficulty(),
+                sourceVisible ? q.getMaterialId() : null, sourceVisible ? q.getMaterialTitle() : null,
+                q.getCreatedBy(), q.getCreatedAt(), q.getApprovedBy(), q.getApprovedAt());
     }
 
     private BusinessException invalid(String field, String message) {
