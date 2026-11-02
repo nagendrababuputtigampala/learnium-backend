@@ -180,6 +180,10 @@
                     <!-- Preserve JaCoCo's agent and load Mockito at JVM startup,
                          without requiring dynamic self-attachment on newer JDKs. -->
                     <argLine>@{argLine} -javaagent:"${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar"</argLine>
+                    <systemPropertyVariables>
+                        <!-- Local DEBUG must not enable framework request-body logs in tests. -->
+                        <debug>false</debug>
+                    </systemPropertyVariables>
                 </configuration>
             </plugin>
             <plugin>
