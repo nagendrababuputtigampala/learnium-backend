@@ -36,6 +36,13 @@ public class GlobalExceptionHandler {
         this.errorMetrics = errorMetrics;
     }
 
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidParameter(
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex) {
+        return buildResponse(ErrorCode.VAL_FAILED, "Invalid request parameter",
+                Map.of(ex.getName(), "Invalid value"));
+    }
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiErrorResponse> handleBusinessException(BusinessException ex) {
         ErrorCode errorCode = ex.getErrorCode();
@@ -44,7 +51,7 @@ public class GlobalExceptionHandler {
         } else {
             log.warn("Business error {}: {}", errorCode.getCode(), ex.getMessage());
         }
-        return buildResponse(errorCode, ex.getMessage(), null);
+        return buildResponse(errorCode, ex.getMessage(), ex.getFieldErrors());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

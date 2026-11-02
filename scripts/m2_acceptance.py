@@ -17,6 +17,11 @@ def main():
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--mailpit-url", required=True)
     args = parser.parse_args()
+    return run(args.base_url, args.mailpit_url)
+
+
+def run(base_url, mailpit_url):
+    args = argparse.Namespace(base_url=base_url, mailpit_url=mailpit_url)
     key = os.environ["ACCEPTANCE_PROVISIONING_KEY"]
     suffix = secrets.token_hex(5)
     password = "Acceptance@123-" + suffix
@@ -124,6 +129,9 @@ def main():
     request("/auth/refresh", {"refreshToken": teacher_login["refreshToken"]}, expected=401)
     print("PASS: onboarding, SMTP links, invite reuse, login/refresh, roles, batches, roster/PINs, "
           "lockout/reset/deactivation, centre settings, cross-centre isolation, password reset")
+
+    return {"adminEmail": email, "password": password, "teacherEmail": teacher_email,
+            "teacherPassword": new_password, "otherAdminToken": other}
 
 
 if __name__ == "__main__":

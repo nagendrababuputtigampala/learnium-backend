@@ -17,6 +17,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.util.UUID;
+import java.time.Instant;
+import jakarta.persistence.Version;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -43,6 +45,19 @@ import org.hibernate.type.SqlTypes;
 @Setter
 @NoArgsConstructor
 public class Question extends AuditableEntity {
+
+    @Version
+    @Column(name = "row_revision", nullable = false)
+    private long revision;
+
+    @Column(name = "approved_by")
+    private UUID approvedBy;
+
+    @Column(name = "approved_at")
+    private Instant approvedAt;
+
+    @Column(name = "source_question_id")
+    private UUID sourceQuestionId;
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -72,7 +87,7 @@ public class Question extends AuditableEntity {
     @Column(name = "payload", nullable = false, columnDefinition = "jsonb")
     private JsonNode payload;
 
-    // IMPORTANT: never send to FE
+    // Answer keys are staff-only; never expose them through student APIs.
     @Column(name = "correct_ref", nullable = false, length = 50)
     private String correctRef;
 

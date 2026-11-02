@@ -56,7 +56,11 @@ public enum ErrorCode {
             "Question counts must total between 1 and 40"),
     GEN_DAILY_LIMIT(
             "LRN-GEN-004", HttpStatus.TOO_MANY_REQUESTS, "Daily generation limit reached"),
-    GEN_JOB_NOT_FOUND("LRN-GEN-005", HttpStatus.NOT_FOUND, "Generation job not found");
+    GEN_JOB_NOT_FOUND("LRN-GEN-005", HttpStatus.NOT_FOUND, "Generation job not found"),
+    QST_IMMUTABLE("LRN-QST-001", HttpStatus.CONFLICT, "Only drafts can be changed; fork an approved question"),
+    QST_NOT_FOUND("LRN-QST-002", HttpStatus.NOT_FOUND, "Question not found"),
+    QST_INVALID("LRN-QST-003", HttpStatus.UNPROCESSABLE_CONTENT, "Question validation failed"),
+    QST_STALE("LRN-QST-004", HttpStatus.CONFLICT, "This question changed; reload before trying again");
 
     private final String code;
     private final HttpStatus status;

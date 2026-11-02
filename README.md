@@ -1,5 +1,8 @@
 # Learnium Backend
 
+M4 review and bank: [API contract](docs/m4-review-api.md) ·
+[settled milestone policies](docs/m4-requirements.md).
+
 Spring Boot 4 / Java 17 backend for the Learnium tutoring-centre platform:
 teachers upload a chapter, AI drafts questions, the teacher approves them, students
 take tests, and centres get per-batch weak-topic reporting with parent sharing.

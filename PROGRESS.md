@@ -1,4 +1,23 @@
-# Progress — feature/port-domain-model (backend)
+# Progress — feature/review-and-bank (backend)
+
+## M4 branch 1 — review and bank (2026-11-02)
+
+- Implemented creator/admin draft review, five question editors, shared validator errors,
+  approval metadata, immutable approved content, private forks with lineage, paged bank
+  filters and revision checks with transactional locking. Flyway V13 adds review metadata.
+- Recorded all ten accepted policies in `docs/m4-requirements.md`, including highest
+  confirmed score superseding task 69, flashcard separation and UTC scheduling scope.
+- Verified: native `mvn -B verify` and Java 17 container `mvn -B clean verify` pass.
+  Each reports 523 tests, zero failures/errors, 18 optional PostgreSQL
+  checks skipped and all coverage gates passed. The separate real PostgreSQL run passes
+  all 22 migration/review checks, including concurrent edits.
+- Isolated Compose acceptance passes fresh migrations, production builds, onboarding,
+  generation through an Ollama-compatible fixture, review/approval/bank/fork and tenancy
+  boundaries. This fixture validates integration; it does not assess real model quality.
+- Next: review/merge branch 1, then `feature/publish` for definitions, publishing, frozen
+  roster/items, live controls and marking engine. Student players and marking UI stay M5.
+
+# Earlier progress — feature/port-domain-model (backend)
 
 ## M0–M3 closure hardening (2026-11-02)
 

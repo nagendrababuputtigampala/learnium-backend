@@ -57,7 +57,8 @@ public class CatalogService {
                                         gs.getGrade().getName(),
                                         gs.getSubject().getSubjectId(),
                                         gs.getSubject().getSubjectName(),
-                                        gs.getGrade().getName() + " · " + gs.getSubject().getSubjectName()))
+                                        gs.getGrade().getName() + " · " + gs.getSubject().getSubjectName(),
+                                        gs.getGrade().getGradeId()))
                 .toList();
     }
 

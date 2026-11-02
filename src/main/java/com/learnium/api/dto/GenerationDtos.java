@@ -73,5 +73,6 @@ public final class GenerationDtos {
             String model,
             String promptVersion,
             UUID generationJobId,
-            Instant createdAt) {}
+            Instant createdAt,
+            String status) {}
 }

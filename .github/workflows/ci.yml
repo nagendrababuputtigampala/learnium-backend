@@ -57,4 +57,4 @@ jobs:
           LEARINUM_PG_USERNAME: learnium
           LEARINUM_PG_PASSWORD: learnium
           GENERATION_WORKER_ENABLED: "false"
-        run: mvn -B test -Dtest=PostgresMigrationTest -Dsurefire.failIfNoSpecifiedTests=false
+        run: mvn -B test -Dtest=PostgresMigrationTest,PostgresQuestionReviewTest -Dsurefire.failIfNoSpecifiedTests=false
