@@ -16,7 +16,13 @@
   idempotent late adds and early close are implemented.
 - V14 also freezes the definition name and kind so later definition edits cannot relabel
   earlier instances. Existing order/integrity/camera columns remain reused.
-- Next: marking worker tests and coverage closure, then frontend.
+- S3 green: 31 API, migration, generation-claim and marking tests passed. The marking
+  adapter supports Ollama/Gemini structured responses, validates exact criterion identity
+  and score bounds, and persists a complete keyed breakdown only after validation.
+- Marking jobs freeze provider/model/prompt/rubric/answer, isolate generation quotas and
+  claim scans, retry transient failures only, reject stale completions and exhaust at two
+  claims. A late result cannot overwrite a teacher confirmation. No answer text is logged.
+- Next: full backend coverage/real PostgreSQL verification, then frontend.
 
 # Progress — feature/review-and-bank (backend)
 

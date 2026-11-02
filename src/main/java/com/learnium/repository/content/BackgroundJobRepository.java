@@ -15,6 +15,16 @@ import org.springframework.data.repository.query.Param;
 
 public interface BackgroundJobRepository extends JpaRepository<BackgroundJob, UUID> {
 
+    @Modifying
+    @Query("update BackgroundJob j set j.status = com.learnium.model.content.BackgroundJobStatus.RUNNING, j.claimToken = :token, j.claimGeneration = j.claimGeneration + 1, j.leaseExpiresAt = :lease, j.attempts = j.attempts + 1, j.updatedAt = :now where j.id = :id and j.jobType = 'MARKING' and j.attempts < 2 and ((j.status = com.learnium.model.content.BackgroundJobStatus.PENDING and j.nextAttemptAt <= :now) or (j.status = com.learnium.model.content.BackgroundJobStatus.RUNNING and j.leaseExpiresAt < :now))")
+    int claimMarking(UUID id, UUID token, Instant lease, Instant now);
+    Optional<BackgroundJob> findByQuestionAttemptId(UUID id);
+    @Query("select j.id from BackgroundJob j where j.jobType = 'MARKING' and j.attempts < 2 and ((j.status = com.learnium.model.content.BackgroundJobStatus.PENDING and j.nextAttemptAt <= :now) or (j.status = com.learnium.model.content.BackgroundJobStatus.RUNNING and j.leaseExpiresAt < :now)) order by j.createdAt, j.id")
+    List<UUID> markingCandidates(Instant now, Pageable pageable);
+    @Modifying
+    @Query("update BackgroundJob j set j.status = com.learnium.model.content.BackgroundJobStatus.FAILED, j.failureKind = com.learnium.model.content.GenerationFailureKind.MODEL_ERROR, j.finishedAt = :now, j.claimToken = null, j.leaseExpiresAt = null where j.jobType = 'MARKING' and j.attempts >= 2 and j.status = com.learnium.model.content.BackgroundJobStatus.RUNNING and j.leaseExpiresAt < :now")
+    int expireMarkingBudget(Instant now);
+
     /** One job inside its centre, with the associations the API renders. */
     @Query(
             "select j from BackgroundJob j"
@@ -26,19 +36,21 @@ public interface BackgroundJobRepository extends JpaRepository<BackgroundJob, UU
     /** Ids of jobs due for a claim, oldest first: pending and due, or running with a dead lease. */
     @Query(
             "select j.id from BackgroundJob j"
-                    + " where (j.status = com.learnium.model.content.BackgroundJobStatus.PENDING"
+                    + " where j.jobType = 'GENERATION' and ((j.status = com.learnium.model.content.BackgroundJobStatus.PENDING"
                     + " and j.nextAttemptAt <= :now)"
                     + " or (j.status = com.learnium.model.content.BackgroundJobStatus.RUNNING"
-                    + " and j.leaseExpiresAt < :now)"
+                    + " and j.leaseExpiresAt < :now))"
                     + " order by j.createdAt asc")
     List<UUID> findClaimCandidateIds(@Param("now") Instant now, Pageable pageable);
 
     /** Daily-cap count for one teacher (the audit created_by) since a day boundary. */
+    @Query("select count(j) from BackgroundJob j where j.jobType = 'GENERATION' and j.centre.centreId = :centreId and j.createdBy = :createdBy and j.createdAt >= :since")
     long countByCentreCentreIdAndCreatedByAndCreatedAtGreaterThanEqual(
-            UUID centreId, UUID createdBy, Instant since);
+            @Param("centreId") UUID centreId, @Param("createdBy") UUID createdBy, @Param("since") Instant since);
 
     /** Daily-cap count for a whole centre since a day boundary. */
-    long countByCentreCentreIdAndCreatedAtGreaterThanEqual(UUID centreId, Instant since);
+    @Query("select count(j) from BackgroundJob j where j.jobType = 'GENERATION' and j.centre.centreId = :centreId and j.createdAt >= :since")
+    long countByCentreCentreIdAndCreatedAtGreaterThanEqual(@Param("centreId") UUID centreId, @Param("since") Instant since);
 
     /** A claimed job with every association the worker's request needs, fetched in one query. */
     @Query(
