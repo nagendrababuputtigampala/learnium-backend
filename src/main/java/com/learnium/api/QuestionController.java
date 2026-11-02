@@ -19,7 +19,7 @@ public class QuestionController {
     public QuestionController(QuestionReviewService service) { this.service = service; }
 
     @GetMapping
-    public PageResponse<QuestionDto> list(@RequestParam(defaultValue = "DRAFT") String status,
+    public PageResponse<QuestionListDto> list(@RequestParam(defaultValue = "DRAFT") String status,
             @RequestParam(required = false) UUID materialId, @RequestParam(required = false) UUID gradeSubjectId,
             @RequestParam(required = false) UUID gradeId, @RequestParam(required = false) UUID subjectId,
             @RequestParam(required = false) UUID topicId, @RequestParam(required = false) String type,

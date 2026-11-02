@@ -759,4 +759,14 @@ class DraftQuestionFactoryTest {
         assertThat(result(outcome, GeneratedQuestionType.MCQ).requested()).isEqualTo(2);
         assertThat(result(outcome, GeneratedQuestionType.NUMERIC).requested()).isZero();
     }
+    @Test void writtenTotalsAreBoundedAndDeclaredTotalsMustMatch() throws Exception {
+        var base = (com.fasterxml.jackson.databind.node.ObjectNode) JSON.readTree(WRITTEN);
+        var valid = factory.validateForReview(GeneratedQuestionType.WRITTEN, base).draft();
+        double total = valid.payload().path("maxScore").asDouble();
+        assertThat(factory.validateForReview(GeneratedQuestionType.WRITTEN, base.deepCopy().put("maxScore", total)).draft()).isNotNull();
+        assertThat(factory.validateForReview(GeneratedQuestionType.WRITTEN, base.deepCopy().put("maxScore", Double.POSITIVE_INFINITY)).reason()).isEqualTo(RUBRIC_INVALID);
+        assertThat(factory.validateForReview(GeneratedQuestionType.WRITTEN, base.deepCopy().put("maxScore", "six")).reason()).isEqualTo(RUBRIC_INVALID);
+        assertThat(factory.validateForReview(GeneratedQuestionType.WRITTEN, base.deepCopy().put("maxScore", total + 1)).reason()).isEqualTo(RUBRIC_INVALID);
+    }
+
 }

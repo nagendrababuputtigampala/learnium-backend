@@ -172,7 +172,7 @@ class QuestionReviewFlowTest {
         mvc.perform(put("/api/v1/questions/"+q.getQuestionId()).with(as(owner)).contentType("application/json")
                 .content(body(q,"[]"))).andExpect(status().isBadRequest());
         mvc.perform(put("/api/v1/questions/"+q.getQuestionId()).with(as(owner)).contentType("application/json")
-                .content(body(q,"{\"type\":\"NUMERIC\"}"))).andExpect(status().isUnprocessableContent());
+                .content(body(q,"{\"type\":\"NUMERIC\"}"))).andExpect(status().isBadRequest());
         mvc.perform(post("/api/v1/questions/"+q.getQuestionId()+"/approve").with(as(owner))
                 .contentType("application/json").content("{\"revision\":999}"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("LRN-QST-004"));
@@ -190,7 +190,7 @@ class QuestionReviewFlowTest {
             otherTopic.setActive(false); topics.saveAndFlush(otherTopic);
             mvc.perform(put("/api/v1/questions/"+q.getQuestionId()).with(as(owner)).contentType("application/json")
                     .content(body(q,content(GeneratedQuestionType.MCQ)).replace(otherTopic.getTopicId().toString(),target.toString())))
-                    .andExpect(status().isUnprocessableContent());
+                    .andExpect(status().isBadRequest());
         }
     }
 
@@ -200,6 +200,7 @@ class QuestionReviewFlowTest {
         var rubric = (com.fasterxml.jackson.databind.node.ArrayNode) content.path("rubric");
         rubric.addObject().put("criterion", "Extra").put("maxScore", 1);
         rubric.addObject().put("criterion", "Another").put("maxScore", 1);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) content).put("maxScore", 5);
         mvc.perform(put("/api/v1/questions/"+q.getQuestionId()).with(as(owner)).contentType("application/json")
                 .content(body(q,content.toString()))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.payload.rubric[0].id").value("crit-1"))
@@ -221,7 +222,7 @@ class QuestionReviewFlowTest {
         foreignTopic = topics.saveAndFlush(foreignTopic);
         mvc.perform(put("/api/v1/questions/"+q.getQuestionId()).with(as(owner)).contentType("application/json")
                 .content(body(q,content(GeneratedQuestionType.MCQ)).replace(otherTopic.getTopicId().toString(),foreignTopic.getTopicId().toString())))
-                .andExpect(status().isUnprocessableContent());
+                .andExpect(status().isBadRequest());
         var content = (com.fasterxml.jackson.databind.node.ObjectNode) JSON.readTree(content(GeneratedQuestionType.MCQ));
         content.put("type","MCQ");
         mvc.perform(put("/api/v1/questions/"+q.getQuestionId()).with(as(owner)).contentType("application/json")
@@ -340,4 +341,156 @@ class QuestionReviewFlowTest {
         mvc.perform(get("/api/v1/questions")).andExpect(status().isUnauthorized());
         mvc.perform(post("/api/v1/questions/"+UUID.randomUUID()+"/forks").with(as(owner))).andExpect(status().isNotFound());
     }
+    @Test void authorizationMatrixCoversEveryEndpointAndReviewState() throws Exception {
+        var student = authentication(new UsernamePasswordAuthenticationToken(
+                LearniumPrincipal.student(UUID.randomUUID(), centre.getCentreId(), UUID.randomUUID(), UUID.randomUUID()),
+                null, List.of(new SimpleGrantedAuthority("ROLE_STUDENT"))));
+        var actors = List.of(as(owner), admin(), as(colleague), as(foreign), student);
+        for (QuestionStatus state : QuestionStatus.values()) {
+            for (int actor = 0; actor < actors.size(); actor++) {
+                boolean visible = actor < 2 || (actor == 2 && state == QuestionStatus.APPROVED);
+                for (String endpoint : List.of("detail", "edit", "approve", "reject", "forks")) {
+                    Question q = draft(GeneratedQuestionType.MCQ);
+                    q.setStatus(state); questions.saveAndFlush(q);
+                    String url = "/api/v1/questions/" + q.getQuestionId();
+                    var request = switch (endpoint) {
+                        case "detail" -> get(url);
+                        case "edit" -> put(url).contentType("application/json").content(body(q, content(GeneratedQuestionType.MCQ)));
+                        default -> post(url + "/" + endpoint).contentType("application/json").content(decision(q));
+                    };
+                    int expected = actor == 4 ? 403 : !visible ? 404 : switch (endpoint) {
+                        case "detail" -> 200;
+                        case "forks" -> state == QuestionStatus.APPROVED ? 201 : 409;
+                        default -> state == QuestionStatus.DRAFT ? 200 : 409;
+                    };
+                    mvc.perform(request.with(actors.get(actor))).andExpect(status().is(expected));
+                }
+                var list = mvc.perform(get("/api/v1/questions?status=" + state).with(actors.get(actor)))
+                        .andExpect(status().is(actor == 4 ? 403 : 200));
+                if (actor == 3 || (actor == 2 && state != QuestionStatus.APPROVED)) {
+                    list.andExpect(jsonPath("$.totalElements").value(0));
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest @EnumSource(GeneratedQuestionType.class)
+    void generationContentDropRulesAreRejectedOnEdit(GeneratedQuestionType type) throws Exception {
+        Question q = draft(type);
+        var base = (com.fasterxml.jackson.databind.node.ObjectNode) JSON.readTree(content(type));
+        List<com.fasterxml.jackson.databind.node.ObjectNode> invalid = new ArrayList<>();
+        Map<String, Integer> lengths = switch (type) {
+            case MCQ -> Map.of("stem", 500);
+            case FILL_BLANK -> Map.of("stemWithBlank", 500, "answer", 50);
+            case FLASHCARD -> Map.of("front", 500, "back", 2000);
+            case NUMERIC -> Map.of("stem", 500, "workedSolution", 4000);
+            case WRITTEN -> Map.of("stem", 500, "modelAnswer", 4000);
+        };
+        lengths.forEach((field, max) -> {
+            var missing = base.deepCopy(); missing.remove(field); invalid.add(missing);
+            invalid.add(base.deepCopy().put(field, " "));
+            invalid.add(base.deepCopy().put(field, 42));
+            invalid.add(base.deepCopy().put(field, "x".repeat(max + 1)));
+        });
+        if (type == GeneratedQuestionType.MCQ) {
+            var missing = base.deepCopy(); missing.remove("options"); invalid.add(missing);
+            invalid.add(base.deepCopy().put("options", "four"));
+            var few = base.deepCopy(); ((com.fasterxml.jackson.databind.node.ArrayNode) few.path("options")).remove(3); invalid.add(few);
+            for (String value : List.of("", "1/2", "x".repeat(201))) {
+                var bad = base.deepCopy(); ((com.fasterxml.jackson.databind.node.ObjectNode) bad.path("options").get(1)).put("text", value); invalid.add(bad);
+            }
+            var noText = base.deepCopy(); ((com.fasterxml.jackson.databind.node.ObjectNode) noText.path("options").get(1)).remove("text"); invalid.add(noText);
+            var noKey = base.deepCopy(); noKey.remove("correctIndex"); invalid.add(noKey);
+            for (int index : List.of(-1, 4)) invalid.add(base.deepCopy().put("correctIndex", index));
+            invalid.add(base.deepCopy().put("correctIndex", 1.5));
+            invalid.add(base.deepCopy().put("correctIndex", 4294967296L));
+            invalid.add(base.deepCopy().put("correctIndex", "0"));
+        }
+        if (type == GeneratedQuestionType.FILL_BLANK) {
+            invalid.add(base.deepCopy().put("stemWithBlank", "No blank"));
+            invalid.add(base.deepCopy().put("stemWithBlank", "Two _____ _____ blanks"));
+            invalid.add(base.deepCopy().put("stemWithBlank", "Short ____ blank"));
+        }
+        if (type == GeneratedQuestionType.NUMERIC) {
+            var missing = base.deepCopy(); missing.remove("answerValue"); invalid.add(missing);
+            invalid.add(base.deepCopy().put("answerValue", "two"));
+            invalid.add(base.deepCopy().put("answerValue", 1.2345678901234567).put("tolerance", 0.12345678901234567)); // correct_ref limit
+            invalid.add(base.deepCopy().put("tolerance", -1));
+            invalid.add(base.deepCopy().put("tolerance", "wide"));
+            invalid.add(base.deepCopy().put("unit", "u".repeat(21)));
+        }
+        if (type == GeneratedQuestionType.WRITTEN) {
+            var missing = base.deepCopy(); missing.remove("rubric"); invalid.add(missing);
+            invalid.add(base.deepCopy().put("rubric", "criteria"));
+            for (int size : List.of(2, 6)) {
+                var bad = base.deepCopy(); var rubric = bad.putArray("rubric");
+                for (int j = 0; j < size; j++) rubric.addObject().put("criterion", "A").put("maxScore", 1);
+                invalid.add(bad);
+            }
+            for (String text : List.of(" ", "x".repeat(201))) {
+                var bad = base.deepCopy(); ((com.fasterxml.jackson.databind.node.ObjectNode) bad.path("rubric").get(0)).put("criterion", text); invalid.add(bad);
+            }
+            for (int score : List.of(0, -1, 101, 99)) {
+                var bad = base.deepCopy(); ((com.fasterxml.jackson.databind.node.ObjectNode) bad.path("rubric").get(0)).put("maxScore", score); invalid.add(bad);
+            }
+            for (String field : List.of("criterion", "maxScore")) {
+                var bad = base.deepCopy(); ((com.fasterxml.jackson.databind.node.ObjectNode) bad.path("rubric").get(0)).remove(field); invalid.add(bad);
+            }
+            var badScore = base.deepCopy(); ((com.fasterxml.jackson.databind.node.ObjectNode) badScore.path("rubric").get(0)).put("maxScore", "one"); invalid.add(badScore);
+            var badEntry = base.deepCopy(); ((com.fasterxml.jackson.databind.node.ArrayNode) badEntry.path("rubric")).set(0, JSON.getNodeFactory().textNode("A")); invalid.add(badEntry);
+            invalid.add(base.deepCopy().put("maxScore", 4));
+            invalid.add(base.deepCopy().put("maxScore", "three"));
+        }
+        var factory = new DraftQuestionFactory();
+        for (var bad : invalid) {
+            bad.put("type", type.name());
+            assertThat(factory.validate(JSON.createArrayNode().add(bad), Map.of(type, 1)).drafts()).isEmpty();
+            mvc.perform(put("/api/v1/questions/" + q.getQuestionId()).with(as(owner))
+                    .contentType("application/json").content(body(q, bad.toString())))
+                    .andExpect(status().isUnprocessableContent()).andExpect(jsonPath("$.fieldErrors").isNotEmpty());
+        }
+    }
+
+    @Test void refusesServerOwnedFieldsAndListsOnlySummaryData() throws Exception {
+        Question q = draft(GeneratedQuestionType.MCQ);
+        for (String fixed : List.of("\"type\":\"NUMERIC\"", "\"gradeSubjectId\":\"" + UUID.randomUUID() + "\"")) {
+            String body = body(q, content(GeneratedQuestionType.MCQ));
+            body = body.substring(0, body.length() - 1) + "," + fixed + "}";
+            mvc.perform(put("/api/v1/questions/" + q.getQuestionId()).with(as(owner))
+                    .contentType("application/json").content(body)).andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("LRN-VAL-001"));
+        }
+        String matching = body(q, content(GeneratedQuestionType.MCQ));
+        matching = matching.substring(0, matching.length() - 1) + ",\"type\":\"MCQ\",\"gradeSubjectId\":\"" + pairing.getGradeSubjectId() + "\"}";
+        mvc.perform(put("/api/v1/questions/" + q.getQuestionId()).with(as(owner))
+                .contentType("application/json").content(matching)).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/questions").with(as(owner)))
+                .andExpect(jsonPath("$.content[0].stemPreview").value("Which is half?"))
+                .andExpect(jsonPath("$.content[0].payload").doesNotExist())
+                .andExpect(jsonPath("$.content[0].correctRef").doesNotExist());
+    }
+
+    @ParameterizedTest @EnumSource(GeneratedQuestionType.class)
+    void forkCopiesContentAndLineageWithoutMutatingApprovedOriginal(GeneratedQuestionType type) throws Exception {
+        Question q = draft(type);
+        mvc.perform(post("/api/v1/questions/" + q.getQuestionId() + "/approve").with(admin())
+                .contentType("application/json").content(decision(q)))
+                .andExpect(status().isOk());
+        var before = JSON.readTree(mvc.perform(get("/api/v1/questions/" + q.getQuestionId()).with(as(owner)))
+                .andReturn().getResponse().getContentAsString());
+        var fork = JSON.readTree(mvc.perform(post("/api/v1/questions/" + q.getQuestionId() + "/forks").with(as(colleague)))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());
+        for (String field : List.of("payload", "correctRef", "topicId", "difficulty", "type")) {
+            assertThat(fork.path(field)).isEqualTo(before.path(field));
+        }
+        assertThat(fork.path("approvedBy").isNull()).isTrue();
+        assertThat(fork.path("approvedAt").isNull()).isTrue();
+        assertThat(fork.path("createdBy").asText()).isEqualTo(colleague.getUserId().toString());
+        assertThat(fork.path("sourceQuestionId").asText()).isEqualTo(q.getQuestionId().toString());
+        var after = JSON.readTree(mvc.perform(get("/api/v1/questions/" + q.getQuestionId()).with(as(owner)))
+                .andReturn().getResponse().getContentAsString());
+        assertThat(after).isEqualTo(before);
+        assertThat(Instant.parse(before.path("approvedAt").asText())).isBeforeOrEqualTo(Instant.now());
+    }
+
 }

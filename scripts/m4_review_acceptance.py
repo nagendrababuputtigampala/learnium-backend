@@ -47,6 +47,7 @@ def run(base, sessions):
     assert request("/questions?status=DRAFT", teacher)["totalElements"] == 0
     mcq = next(q for q in drafts if q["type"] == "MCQ")
     original_id = mcq["questionId"]
+    mcq = request("/questions/" + original_id, admin)
     request("/questions/" + original_id, teacher, expected=404)
     content = dict(mcq["payload"], correctIndex=0, stem="Which fraction is one half?")
     edit = {"revision": mcq["revision"], "topicId": mcq["topicId"], "difficulty": 3, "content": content}
@@ -56,6 +57,7 @@ def run(base, sessions):
     approved = request("/questions/" + original_id + "/approve", admin, {"revision": saved["revision"]})
     assert approved["status"] == "APPROVED" and approved["approvedAt"] and approved["approvedBy"]
     written = next(q for q in drafts if q["type"] == "WRITTEN")
+    written = request("/questions/" + written["questionId"], admin)
     request("/questions/" + written["questionId"] + "/approve", admin, {"revision": written["revision"]})
     request("/questions/" + original_id, teacher, edit, method="PUT", expected=409)
     request("/materials/" + material["materialId"], teacher, expected=404)
