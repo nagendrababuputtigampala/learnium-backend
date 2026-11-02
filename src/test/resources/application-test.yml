@@ -22,7 +22,12 @@ learnium:
     type: local
     local-dir: ${java.io.tmpdir}/learnium-test-files
   generation:
+    # Tests pin the provider independently of local runtime configuration.
+    provider: gemini
     # The scheduled worker never fires in tests: suites drive runOnce()
     # manually so job execution is deterministic and no test can reach a
     # real model endpoint.
     worker-enabled: false
+    gemini:
+      # Keep model-freezing assertions independent of local runtime settings.
+      model: gemini-2.0-flash

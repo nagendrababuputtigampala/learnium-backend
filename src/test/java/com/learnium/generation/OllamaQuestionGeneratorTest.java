@@ -58,6 +58,15 @@ class OllamaQuestionGeneratorTest {
         assertThat(body.get("model").asText()).isEqualTo("llama3.1");
         assertThat(body.get("stream").asBoolean()).isFalse();
         assertThat(body.has("format")).isTrue();
+        assertThat(body.path("format").path("properties").path("questions")
+                .path("maxItems").asInt()).isEqualTo(1);
+        assertThat(body.path("format").path("properties").path("questions")
+                .path("items").path("properties").path("options").path("maxItems").asInt())
+                .isEqualTo(4);
+        assertThat(body.path("think").asBoolean()).isFalse();
+        assertThat(body.path("options").path("num_ctx").asInt()).isEqualTo(16384);
+        assertThat(body.path("options").path("num_predict").asInt()).isEqualTo(8192);
+        assertThat(body.path("options").path("temperature").asDouble()).isEqualTo(0.4);
         assertThat(body.get("messages").get(0).get("role").asText()).isEqualTo("system");
         assertThat(body.get("messages").get(1).get("content").asText())
                 .contains("Fractions represent parts of a whole");
@@ -72,6 +81,22 @@ class OllamaQuestionGeneratorTest {
         new OllamaQuestionGenerator(properties, transport).generate(GenerationRequests.oneMcq());
 
         assertThat(transport.captured().url()).isEqualTo("http://localhost:9999/api/chat");
+    }
+
+    @Test
+    void forwardsConfiguredContextOutputAndThinkingSettings() throws Exception {
+        GenerationProperties properties = new GenerationProperties();
+        properties.getOllama().setContextWindowTokens(32768);
+        properties.getOllama().setMaxOutputTokens(4096);
+        properties.getOllama().setThink(true);
+        transport.responding(envelope(MODEL_JSON, "stop"));
+
+        new OllamaQuestionGenerator(properties, transport).generate(GenerationRequests.oneMcq());
+
+        JsonNode body = JSON.readTree(transport.captured().jsonBody());
+        assertThat(body.path("options").path("num_ctx").asInt()).isEqualTo(32768);
+        assertThat(body.path("options").path("num_predict").asInt()).isEqualTo(4096);
+        assertThat(body.path("think").asBoolean()).isTrue();
     }
 
     @Test

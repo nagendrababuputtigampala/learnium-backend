@@ -96,6 +96,11 @@ class GeminiQuestionGeneratorTest {
         JsonNode config = body.get("generationConfig");
         assertThat(config.get("responseMimeType").asText()).isEqualTo("application/json");
         assertThat(config.has("responseSchema")).isTrue();
+        assertThat(config.path("responseSchema").path("properties").path("questions")
+                .path("maxItems").asInt()).isEqualTo(1);
+        assertThat(config.path("responseSchema").path("properties").path("questions")
+                .path("items").path("properties").path("options").path("maxItems").asInt())
+                .isEqualTo(4);
         assertThat(config.get("temperature").asDouble()).isEqualTo(0.4);
         assertThat(config.get("maxOutputTokens").asInt()).isEqualTo(8192);
         assertThat(body.get("systemInstruction").get("parts").get(0).get("text").asText())
@@ -187,6 +192,16 @@ class GeminiQuestionGeneratorTest {
     @Test
     void transportFailureIsAModelError() {
         transport.failing(new ModelTransportException(503));
+
+        Failure failure = (Failure) generator().generate(GenerationRequests.oneMcq());
+
+        assertThat(failure.kind()).isEqualTo(GenerationFailureKind.MODEL_ERROR);
+        assertThat(failure.errorClass()).isEqualTo("ModelTransportException");
+    }
+
+    @Test
+    void connectionFailureIsAModelErrorWithoutExposingItsMessage() {
+        transport.failing(new ModelTransportException(-1, new java.io.IOException("private detail")));
 
         Failure failure = (Failure) generator().generate(GenerationRequests.oneMcq());
 

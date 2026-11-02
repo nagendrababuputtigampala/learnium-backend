@@ -11,6 +11,8 @@ import com.learnium.model.content.GenerationFailureKind;
 import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Gemini adapter (production provider). Uses the provider's structured
@@ -30,6 +32,7 @@ public class GeminiQuestionGenerator implements QuestionGenerator {
 
     private static final String API_BASE = "https://generativelanguage.googleapis.com/v1beta/models/";
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final Logger log = LoggerFactory.getLogger(GeminiQuestionGenerator.class);
 
     private final GenerationProperties properties;
     private final ModelTransport transport;
@@ -51,7 +54,7 @@ public class GeminiQuestionGenerator implements QuestionGenerator {
         }
         // Serializing a tree we built cannot fail, so the node renders
         // itself — no checked-exception ceremony around it.
-        String bodyJson = buildRequestBody(promptBuilder.build(request)).toString();
+        String bodyJson = buildRequestBody(promptBuilder.build(request), request).toString();
         ModelTransport.ModelResponse response;
         try {
             response =
@@ -64,12 +67,15 @@ public class GeminiQuestionGenerator implements QuestionGenerator {
                                     bodyJson,
                                     config.getTimeoutSeconds()));
         } catch (ModelTransportException e) {
+            log.warn("Gemini request failed: model={}, httpStatus={}, cause={}",
+                    config.getModel(), e.getStatusCode(),
+                    e.getCause() == null ? null : e.getCause().getClass().getSimpleName());
             return new Failure(GenerationFailureKind.MODEL_ERROR, e.getClass().getSimpleName());
         }
         return parseResponse(response.body());
     }
 
-    private ObjectNode buildRequestBody(PromptBuilder.Prompt prompt) {
+    private ObjectNode buildRequestBody(PromptBuilder.Prompt prompt, GenerationRequest request) {
         ObjectNode body = JSON.createObjectNode();
         ObjectNode systemInstruction = body.putObject("systemInstruction");
         systemInstruction.putArray("parts").addObject().put("text", prompt.system());
@@ -78,7 +84,7 @@ public class GeminiQuestionGenerator implements QuestionGenerator {
         content.putArray("parts").addObject().put("text", prompt.user());
         ObjectNode generationConfig = body.putObject("generationConfig");
         generationConfig.put("responseMimeType", "application/json");
-        generationConfig.set("responseSchema", GenerationSchema.schema());
+        generationConfig.set("responseSchema", GenerationSchema.schema(request));
         generationConfig.put("temperature", 0.4);
         generationConfig.put("maxOutputTokens", 8192);
         return body;
@@ -103,6 +109,11 @@ public class GeminiQuestionGenerator implements QuestionGenerator {
         JsonNode candidate = candidates.get(0);
         String finishReason = JsonFields.textOrNull(candidate, "finishReason");
         if ("MAX_TOKENS".equals(finishReason)) {
+            JsonNode usage = JsonFields.childOrNull(root, "usageMetadata");
+            log.warn("Gemini response truncated: inputTokens={}, outputTokens={}, thinkingTokens={}",
+                    JsonFields.longOrNull(usage, "promptTokenCount"),
+                    JsonFields.longOrNull(usage, "candidatesTokenCount"),
+                    JsonFields.longOrNull(usage, "thoughtsTokenCount"));
             return new Failure(GenerationFailureKind.TRUNCATED, null);
         }
         if ("SAFETY".equals(finishReason) || "RECITATION".equals(finishReason)) {

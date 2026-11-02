@@ -79,7 +79,7 @@ learnium:
     # configuration: `ollama` for local development (no key, no cost),
     # `gemini` for production and the quality gate. Jobs freeze the
     # provider/model they were created under.
-    provider: ${GENERATION_PROVIDER:gemini}
+    provider: ${GENERATION_PROVIDER:ollama}
     worker-enabled: ${GENERATION_WORKER_ENABLED:true}
     poll-delay-ms: ${GENERATION_POLL_DELAY_MS:2000}
     lease-duration-seconds: ${GENERATION_LEASE_SECONDS:300}
@@ -90,12 +90,15 @@ learnium:
       # Key from the environment only (secure entry; never committed).
       api-key: ${GEMINI_API_KEY:}
       # Model availability varies per project — verify before the gate.
-      model: ${GEMINI_MODEL:gemini-2.0-flash}
+      model: ${GEMINI_MODEL:gemini-2.5-flash}
       timeout-seconds: ${GEMINI_TIMEOUT_SECONDS:120}
     ollama:
       base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
-      model: ${OLLAMA_MODEL:llama3.1}
+      model: ${OLLAMA_MODEL:qwen3:8b}
       timeout-seconds: ${OLLAMA_TIMEOUT_SECONDS:120}
+      context-window-tokens: ${OLLAMA_CONTEXT_WINDOW_TOKENS:16384}
+      max-output-tokens: ${OLLAMA_MAX_OUTPUT_TOKENS:8192}
+      think: ${OLLAMA_THINK:false}
 
 server:
   port: ${PORT:8080}

@@ -40,7 +40,7 @@ public class OllamaQuestionGenerator implements QuestionGenerator {
         GenerationProperties.Ollama config = properties.getOllama();
         // Serializing a tree we built cannot fail, so the node renders
         // itself — no checked-exception ceremony around it.
-        String bodyJson = buildRequestBody(promptBuilder.build(request), config).toString();
+        String bodyJson = buildRequestBody(promptBuilder.build(request), request, config).toString();
         ModelTransport.ModelResponse response;
         try {
             response =
@@ -62,11 +62,16 @@ public class OllamaQuestionGenerator implements QuestionGenerator {
     }
 
     private ObjectNode buildRequestBody(
-            PromptBuilder.Prompt prompt, GenerationProperties.Ollama config) {
+            PromptBuilder.Prompt prompt, GenerationRequest request, GenerationProperties.Ollama config) {
         ObjectNode body = JSON.createObjectNode();
         body.put("model", config.getModel());
         body.put("stream", false);
-        body.set("format", GenerationSchema.schema());
+        body.put("think", config.isThink());
+        body.set("format", GenerationSchema.schema(request));
+        ObjectNode options = body.putObject("options");
+        options.put("num_ctx", config.getContextWindowTokens());
+        options.put("num_predict", config.getMaxOutputTokens());
+        options.put("temperature", 0.4);
         ArrayNode messages = body.putArray("messages");
         messages.addObject().put("role", "system").put("content", prompt.system());
         messages.addObject().put("role", "user").put("content", prompt.user());

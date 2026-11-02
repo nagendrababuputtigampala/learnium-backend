@@ -65,5 +65,13 @@ public class GenerationProperties {
 
         /** Per-request timeout in seconds (local models can be slow). */
         private long timeoutSeconds = 120;
+
+        /** Explicit context avoids Ollama's hardware-dependent small default. */
+        private int contextWindowTokens = 16384;
+
+        private int maxOutputTokens = 8192;
+
+        /** Structured question generation does not need a separate thinking output. */
+        private boolean think = false;
     }
 }
