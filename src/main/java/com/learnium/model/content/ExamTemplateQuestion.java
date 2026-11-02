@@ -44,6 +44,9 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 public class ExamTemplateQuestion extends AuditableEntity {
+    @Column(name = "marks", nullable = false, precision = 6, scale = 2)
+    private java.math.BigDecimal marks = java.math.BigDecimal.ONE;
+
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

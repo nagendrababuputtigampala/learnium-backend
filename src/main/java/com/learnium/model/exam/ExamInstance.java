@@ -46,6 +46,15 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 public class ExamInstance extends AuditableEntity {
+    @Column(name = "time_limit_seconds")
+    private Integer timeLimitSeconds;
+    @Column(name = "max_attempts", nullable = false)
+    private int maxAttempts = 1;
+    @Column(name = "answer_release_policy", nullable = false, length = 16)
+    private String answerReleasePolicy = "AFTER_CLOSE";
+    @Column(name = "closed_at")
+    private Instant closedAt;
+
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

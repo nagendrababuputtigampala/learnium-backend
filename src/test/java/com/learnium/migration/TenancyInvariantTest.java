@@ -150,6 +150,7 @@ class TenancyInvariantTest {
             throws Exception {
         ExamTemplate template = new ExamTemplate();
         template.setCentre(centre);
+        template.setGradeSubject(f.gradeSubject());
         template.setGrade(f.gradeSubject().getGrade());
         template.setSubject(f.gradeSubject().getSubject());
         template.setTopic(f.topic());

@@ -1,3 +1,17 @@
+# Progress — feature/publish (M4 branch 2)
+
+## S1 — existing exam schema extensions (2026-11-02)
+
+- Pulled both latest dev branches and created feature/publish. Backend dev contains
+  branch 1. Frontend includes the existing branch-1 commits as a dependency while its
+  PR remains separate; no PRs were merged by this work.
+- V14 adds definition kind/pairing, decimal marks, frozen instance content/answer keys,
+  publish settings, assigned-student snapshots, AI breakdowns and typed marking jobs.
+- Reuses existing creator, item-order, camera and integrity columns. Published V1–V13
+  migrations remain unchanged. Composite tenant FKs protect new snapshot/job links.
+- Green: 21 migration, tenancy and exam-chain persistence tests passed.
+- Next: owned definition and publishing APIs, then the marking worker, then frontend.
+
 # Progress — feature/review-and-bank (backend)
 
 ## Published migration compatibility (2026-11-02)
