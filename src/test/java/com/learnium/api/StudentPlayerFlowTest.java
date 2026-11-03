@@ -208,7 +208,7 @@ class StudentPlayerFlowTest extends PublishingFixtures {
             assertThat(payload.has("correctRef")).isFalse(); assertThat(payload.has("answer")).isFalse();
             assertThat(payload.has("answerValue")).isFalse(); assertThat(payload.has("tolerance")).isFalse();
             assertThat(payload.has("workedSolution")).isFalse(); assertThat(payload.has("modelAnswer")).isFalse();
-            assertThat(payload.has("rubric")).isFalse();
+            assertThat(payload.has("rubric")).isFalse(); assertThat(payload.has("correctIndex")).isFalse();
         });
     }
 }

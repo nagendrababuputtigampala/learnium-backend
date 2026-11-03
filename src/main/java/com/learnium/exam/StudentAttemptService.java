@@ -226,7 +226,7 @@ public class StudentAttemptService {
     }
     private JsonNode safePayload(ExamInstanceQuestion item) {
         ObjectNode copy = item.getPayloadSnapshot().deepCopy();
-        copy.remove(List.of("answer", "answerValue", "tolerance", "workedSolution", "modelAnswer", "rubric", "correctRef"));
+        copy.remove(List.of("answer", "answerValue", "tolerance", "workedSolution", "modelAnswer", "rubric", "correctRef", "correctIndex"));
         return copy;
     }
     private JsonNode solution(ExamInstanceQuestion item) {
