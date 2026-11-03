@@ -35,8 +35,8 @@ import org.hibernate.type.SqlTypes;
         schema = "learnium",
         uniqueConstraints = {
             @UniqueConstraint(
-                    name = "uq_question_attempts_attempt_question",
-                    columnNames = {"attempt_id", "question_id"})
+                    name = "uq_question_attempts_attempt_item",
+                    columnNames = {"attempt_id", "exam_instance_question_id"})
         },
         indexes = {
             @Index(name = "idx_question_attempts_attempt", columnList = "attempt_id"),
@@ -63,6 +63,11 @@ public class QuestionAttempt extends AuditableEntity {
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "attempt_id", nullable = false)
     private ExamAttempt attempt;
+
+    /** Frozen published item answered by the student; authoritative within an attempt. */
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "exam_instance_question_id", nullable = false)
+    private ExamInstanceQuestion examInstanceQuestion;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "question_id", nullable = false)

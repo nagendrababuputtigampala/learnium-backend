@@ -43,6 +43,8 @@ class MarkingFlowTest extends PublishingFixtures {
         attempt.setExamInstance(instances.findById(UUID.fromString(instance.path("id").asText())).orElseThrow());
         attempt.setUser(student); attempt.setStartedAt(Instant.now()); examAttempts.saveAndFlush(attempt);
         answer = new QuestionAttempt(); answer.setCentreId(centre.getCentreId()); answer.setAttempt(attempt);
+        answer.setExamInstanceQuestion(frozen.frozen(centre.getCentreId(), attempt.getExamInstance().getExamInstanceId()).stream()
+                .filter(item -> item.getQuestion().getQuestionId().equals(written.getQuestionId())).findFirst().orElseThrow());
         answer.setQuestion(written); answer.setQuestionVersion(written.getVersion()); answer.setCreatedBy(student.getUserId());
         answer.setAnswerPayload(JSON.createObjectNode().put("text", "Two equal parts.")); answer.setMarkingStatus(MarkingStatus.MARKING_PENDING);
         answer = answers.saveAndFlush(answer);

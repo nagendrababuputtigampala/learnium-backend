@@ -59,7 +59,10 @@ public enum ErrorCode {
     TST_INVALID("LRN-TST-001", HttpStatus.BAD_REQUEST, "Invalid test definition"),
     TST_PUBLISHED("LRN-TST-002", HttpStatus.CONFLICT, "A published definition cannot be deleted"),
     TST_PUBLISH_INVALID("LRN-TST-003", HttpStatus.BAD_REQUEST, "Invalid publish or instance operation"),
-    TST_NOT_FOUND("LRN-TST-004", HttpStatus.NOT_FOUND, "Test or instance not found");
+    TST_NOT_FOUND("LRN-TST-004", HttpStatus.NOT_FOUND, "Test or instance not found"),
+    ATT_NOT_ASSIGNED("LRN-ATT-001", HttpStatus.NOT_FOUND, "Test or attempt not found"),
+    ATT_NOT_AVAILABLE("LRN-ATT-002", HttpStatus.CONFLICT, "This test is not currently available"),
+    ATT_EXHAUSTED("LRN-ATT-003", HttpStatus.CONFLICT, "No attempts remain");
 
     private final String code;
     private final HttpStatus status;

@@ -1,7 +1,8 @@
 package com.learnium.model.exam;
 
 public enum ExamAttemptStatus {
-    STARTED,
+    IN_PROGRESS,
     SUBMITTED,
+    AUTO_SUBMITTED,
     INVALIDATED
 }

@@ -21,18 +21,19 @@ class StudentTestServiceTest {
         UUID upcoming = UUID.randomUUID(), closed = UUID.randomUUID(), inProgress = UUID.randomUUID(), open = UUID.randomUUID(), exhausted = UUID.randomUUID();
         var rows = List.of(
                 row(upcoming, now.plusSeconds(60), now.plusSeconds(3600), null, 2, null, null, null, null, false),
-                row(closed, now.minusSeconds(3600), now.plusSeconds(3600), now.minusSeconds(1), 2, 1, ExamAttemptStatus.STARTED, null, null, false),
-                row(inProgress, now.minusSeconds(60), now.plusSeconds(3600), null, 1, 1, ExamAttemptStatus.STARTED, null, null, false),
+                row(closed, now.minusSeconds(3600), now.plusSeconds(3600), now.minusSeconds(1), 2, 1, ExamAttemptStatus.IN_PROGRESS, null, null, false),
+                row(inProgress, now.minusSeconds(60), now.plusSeconds(3600), null, 1, 1, ExamAttemptStatus.IN_PROGRESS, null, null, false),
                 row(open, now.minusSeconds(60), now.plusSeconds(3600), null, 2, 1, ExamAttemptStatus.SUBMITTED, now.minusSeconds(5), new BigDecimal("3.25"), true),
+                row(UUID.randomUUID(), now.minusSeconds(60), now.plusSeconds(3600), null, 2, 1, ExamAttemptStatus.AUTO_SUBMITTED, now.minusSeconds(5), new BigDecimal("1.50"), false),
                 row(exhausted, now.minusSeconds(60), now.plusSeconds(3600), null, 2, 1, ExamAttemptStatus.SUBMITTED, now.minusSeconds(10), BigDecimal.ONE, false),
                 row(exhausted, now.minusSeconds(60), now.plusSeconds(3600), null, 2, 2, ExamAttemptStatus.SUBMITTED, now.minusSeconds(5), new BigDecimal("2.00"), false));
         when(repo.studentTests(centre, user)).thenReturn(rows);
         var result = new StudentTestService(repo, Clock.fixed(now, ZoneOffset.UTC)).tests(caller);
-        assertThat(result).extracting(dto -> dto.state()).containsExactly("UPCOMING", "COMPLETED", "AVAILABLE", "AVAILABLE", "COMPLETED");
+        assertThat(result).extracting(dto -> dto.state()).containsExactly("UPCOMING", "COMPLETED", "AVAILABLE", "AVAILABLE", "AVAILABLE", "COMPLETED");
         assertThat(result.get(3).totalSoFar()).isEqualByComparingTo("3.25");
         assertThat(result.get(3).markingPending()).isTrue();
-        assertThat(result.get(4).attemptsUsed()).isEqualTo(2);
-        assertThat(result.get(4).latestAttemptStatus()).isEqualTo("SUBMITTED");
+        assertThat(result.get(5).attemptsUsed()).isEqualTo(2);
+        assertThat(result.get(5).latestAttemptStatus()).isEqualTo("SUBMITTED");
         assertThat(result.get(1).totalSoFar()).isNull();
     }
 
@@ -57,6 +58,7 @@ class StudentTestServiceTest {
         when(row.getDefinitionKind()).thenReturn("SCORED_TEST"); when(row.getBatchName()).thenReturn("Batch");
         when(row.getOpensAt()).thenReturn(opens); when(row.getClosesAt()).thenReturn(closes); when(row.getClosedAt()).thenReturn(closed);
         when(row.getMaxAttempts()).thenReturn(max); when(row.getAttemptNo()).thenReturn(no); when(row.getAttemptStatus()).thenReturn(status);
+        when(row.getAttemptId()).thenReturn(no == null ? null : UUID.randomUUID());
         when(row.getSubmittedAt()).thenReturn(submitted); when(row.getTotalScore()).thenReturn(score); when(row.getMarkingPending()).thenReturn(pending);
         return row;
     }

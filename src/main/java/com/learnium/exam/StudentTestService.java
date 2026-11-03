@@ -34,12 +34,13 @@ public class StudentTestService {
         String state;
         if (now.isBefore(first.getOpensAt())) state = "UPCOMING";
         else if (closed) state = "COMPLETED";
-        else if (latest != null && latest.getAttemptStatus() == ExamAttemptStatus.STARTED) state = "AVAILABLE";
+        else if (latest != null && latest.getAttemptStatus() == ExamAttemptStatus.IN_PROGRESS) state = "AVAILABLE";
         else state = attempts.size() < first.getMaxAttempts() ? "AVAILABLE" : "COMPLETED";
-        boolean submitted = latest != null && latest.getAttemptStatus() == ExamAttemptStatus.SUBMITTED;
+        boolean submitted = latest != null && (latest.getAttemptStatus() == ExamAttemptStatus.SUBMITTED
+                || latest.getAttemptStatus() == ExamAttemptStatus.AUTO_SUBMITTED);
         return new StudentTestDto(first.getInstanceId(), first.getDefinitionName(), first.getDefinitionKind(),
                 first.getBatchName(), first.getOpensAt(), first.getClosesAt(), first.getMaxAttempts(), attempts.size(),
-                latest == null ? null : latest.getAttemptStatus().name(), state,
+                latest == null ? null : latest.getAttemptId(), latest == null ? null : latest.getAttemptStatus().name(), state,
                 submitted ? latest.getTotalScore() : null, submitted && latest.getMarkingPending());
     }
 }

@@ -231,12 +231,13 @@ class ExamChainPersistenceTest {
         attempt.setTotalQuestions(2);
         attempt = examAttemptRepository.save(attempt);
         assertThat(attempt.getAttemptNo()).isEqualTo(1);
-        assertThat(attempt.getStatus()).isEqualTo(ExamAttemptStatus.STARTED);
+        assertThat(attempt.getStatus()).isEqualTo(ExamAttemptStatus.IN_PROGRESS);
         assertThat(attempt.getTotalScore()).isNull();
 
         QuestionAttempt objective = new QuestionAttempt();
         objective.setCentreId(centre.getCentreId());
         objective.setAttempt(attempt);
+        objective.setExamInstanceQuestion(iq1);
         objective.setQuestion(mcq);
         objective.setQuestionVersion(mcq.getVersion());
         objective.setAnswerPayload(objectMapper.readTree("{\"selected\":\"options[0]\"}"));
@@ -246,6 +247,7 @@ class ExamChainPersistenceTest {
         QuestionAttempt writtenAnswer = new QuestionAttempt();
         writtenAnswer.setCentreId(centre.getCentreId());
         writtenAnswer.setAttempt(attempt);
+        writtenAnswer.setExamInstanceQuestion(iq2);
         writtenAnswer.setQuestion(written);
         writtenAnswer.setQuestionVersion(written.getVersion());
         writtenAnswer.setAnswerPayload(objectMapper.readTree("{\"text\":\"Fractions with same value.\"}"));
@@ -372,6 +374,14 @@ class ExamChainPersistenceTest {
         instance.setJoinCode(joinCode);
         instance = examInstanceRepository.save(instance);
 
+        ExamInstanceQuestion instanceQuestion = new ExamInstanceQuestion();
+        instanceQuestion.setCentreId(centre.getCentreId());
+        instanceQuestion.setExamInstance(instance);
+        instanceQuestion.setQuestion(question);
+        instanceQuestion.setQuestionOrder(1);
+        instanceQuestion.setQuestionVersion(question.getVersion());
+        instanceQuestion = examInstanceQuestionRepository.save(instanceQuestion);
+
         ExamAttempt attempt = new ExamAttempt();
         attempt.setCentreId(centre.getCentreId());
         attempt.setExamInstance(instance);
@@ -382,6 +392,7 @@ class ExamChainPersistenceTest {
         QuestionAttempt answer = new QuestionAttempt();
         answer.setCentreId(centre.getCentreId());
         answer.setAttempt(attempt);
+        answer.setExamInstanceQuestion(instanceQuestion);
         answer.setQuestion(question);
         answer.setQuestionVersion(1);
         answer.setAnswerPayload(objectMapper.readTree("{\"selected\":\"options[0]\"}"));

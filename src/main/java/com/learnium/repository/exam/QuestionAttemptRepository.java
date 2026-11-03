@@ -19,4 +19,8 @@ public interface QuestionAttemptRepository extends JpaRepository<QuestionAttempt
                     + " where qa.centreId = :centreId and qa.attempt.attemptId = :attemptId")
     List<QuestionAttempt> findByCentreIdAndAttemptId(
             @Param("centreId") UUID centreId, @Param("attemptId") UUID attemptId);
+
+    @Query("select qa from QuestionAttempt qa where qa.centreId = :centreId and qa.attempt.attemptId = :attemptId"
+            + " and qa.examInstanceQuestion.examInstanceQuestionId = :itemId")
+    java.util.Optional<QuestionAttempt> findSaved(UUID centreId, UUID attemptId, UUID itemId);
 }

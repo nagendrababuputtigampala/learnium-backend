@@ -1,5 +1,21 @@
 # Progress — feature/student-flow (M5)
 
+## Checkpoint B — student player and practice (2026-11-03)
+
+- Flyway V16 completes the ported attempt model with server deadlines, the four-state
+  lifecycle and a tenant-safe frozen-item answer link unique within each attempt.
+- Added assignment-scoped start/resume, owned attempt retrieval, typed idempotent autosave,
+  first-writer submission, objective grading, written marking-job enqueueing and retakes.
+  Pre-release responses remove every answer key, model answer, rubric and worked solution.
+- Added the scheduled auto-submit path over the same grading transaction, including early
+  instance closure, and release-policy-aware results with pending/confirmed written states.
+- Flashcard practice returns frozen assigned cards in-window without creating attempts,
+  answers, scores or other server-side practice progress.
+- Final clean verification: 606 tests run, 565 passed and 41 optional PostgreSQL tests
+  skipped; zero failures/errors. The enforced JaCoCo gates are 100% lines (3461/3461)
+  and branches (1287/1287).
+- Checkpoint B is complete and committed before Part 3; no Part 3 work has started.
+
 ## Checkpoint A — student accounts and Tests home (2026-11-03)
 
 - Flyway V15 replaces roster PIN sessions with centre-linked student accounts: centres
