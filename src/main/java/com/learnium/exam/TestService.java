@@ -17,6 +17,7 @@ import com.learnium.repository.user.*;
 import com.learnium.security.LearniumPrincipal;
 import java.math.BigDecimal;
 import java.time.*;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -155,8 +156,10 @@ public class TestService {
         Batch batch = batch(caller, request.batchId());
         if (!batch.isActive() || !batch.getGradeSubject().getGradeSubjectId().equals(template.getGradeSubject().getGradeSubjectId()))
             throw invalid(ErrorCode.TST_PUBLISH_INVALID, "batchId", "Choose an active batch for this grade and subject");
-        Instant now = clock.instant(), opens = request.opensAt() == null ? now : request.opensAt();
-        if (request.closesAt() == null || !request.closesAt().isAfter(opens))
+        Instant now = persistentInstant(clock.instant());
+        Instant opens = persistentInstant(request.opensAt() == null ? now : request.opensAt());
+        Instant closes = persistentInstant(request.closesAt());
+        if (closes == null || !closes.isAfter(opens))
             throw invalid(ErrorCode.TST_PUBLISH_INVALID, "closesAt", "Closing time is required and must be after opening time");
         if (request.timeLimitSeconds() != null && request.timeLimitSeconds() <= 0)
             throw invalid(ErrorCode.TST_PUBLISH_INVALID, "timeLimitSeconds", "Time limit must be positive");
@@ -180,8 +183,8 @@ public class TestService {
         instance.setCentreId(caller.centreId()); instance.setExamTemplate(template); instance.setBatch(batch);
         instance.setPublishedBy(users.getReferenceById(caller.userId())); instance.setCreatedBy(caller.userId());
         instance.setDefinitionName(template.getTemplateName()); instance.setDefinitionKind(template.getKind());
-        instance.setJoinCode(codes.next()); instance.setOpensAt(opens); instance.setClosesAt(request.closesAt());
-        instance.setStatus(now.isBefore(opens) ? ExamInstanceStatus.SCHEDULED : now.isBefore(request.closesAt()) ? ExamInstanceStatus.OPEN : ExamInstanceStatus.CLOSED);
+        instance.setJoinCode(codes.next()); instance.setOpensAt(opens); instance.setClosesAt(closes);
+        instance.setStatus(now.isBefore(opens) ? ExamInstanceStatus.SCHEDULED : now.isBefore(closes) ? ExamInstanceStatus.OPEN : ExamInstanceStatus.CLOSED);
         instance.setTimeLimitSeconds(request.timeLimitSeconds()); instance.setMaxAttempts(maxAttempts);
         instance.setRetakesAllowed(maxAttempts > 1); instance.setAnswerReleasePolicy(release);
         instance.setIntegritySignalsOn(Boolean.TRUE.equals(request.integrityEnabled())); instance.setCameraMode(CameraMode.valueOf(camera));
@@ -217,7 +220,7 @@ public class TestService {
     @Transactional
     public InstanceDto close(LearniumPrincipal caller, UUID id) {
         var instance = manageable(caller, id);
-        if (instance.getClosedAt() == null) instance.setClosedAt(clock.instant());
+        if (instance.getClosedAt() == null) instance.setClosedAt(persistentInstant(clock.instant()));
         instance.setStatus(ExamInstanceStatus.CLOSED); instances.saveAndFlush(instance);
         return instanceDto(instance, true);
     }
@@ -240,7 +243,7 @@ public class TestService {
     }
     private void addAssigned(ExamInstance instance, UserAccount user, UUID actor) {
         var student = new ExamInstanceStudent(); student.setCentreId(instance.getCentreId()); student.setExamInstance(instance);
-        student.setUser(user); student.setAddedBy(actor); student.setAddedAt(clock.instant()); assigned.saveAndFlush(student);
+        student.setUser(user); student.setAddedBy(actor); student.setAddedAt(persistentInstant(clock.instant())); assigned.saveAndFlush(student);
     }
     private ExamTemplate owned(LearniumPrincipal caller, UUID id) {
         return templates.owned(caller.centreId(), caller.userId(), admin(caller), id)
@@ -257,6 +260,7 @@ public class TestService {
     }
     private boolean admin(LearniumPrincipal caller) { return caller.role() == UserRole.CENTRE_ADMIN; }
     private BusinessException invalid(ErrorCode code, String field, String reason) { return new BusinessException(code, code.getDefaultMessage(), Map.of(field, reason)); }
+    private Instant persistentInstant(Instant value) { return value == null ? null : value.truncatedTo(ChronoUnit.MICROS); }
     private List<ExamTemplateQuestion> items(ExamTemplate t) { return templateItems.items(t.getCentre().getCentreId(), List.of(t.getExamTemplateId())); }
     private DefinitionDto detail(ExamTemplate template) { return definition(template, items(template), instances.countByExamTemplateExamTemplateId(template.getExamTemplateId()), true); }
     private DefinitionDto definition(ExamTemplate t, List<ExamTemplateQuestion> items, long count, boolean full) {

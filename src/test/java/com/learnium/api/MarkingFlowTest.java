@@ -3,6 +3,9 @@ package com.learnium.api;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.learnium.generation.*;
 import com.learnium.marking.*;
@@ -31,9 +34,11 @@ class MarkingFlowTest extends PublishingFixtures {
     @Autowired QuestionAttemptRepository answers;
     @Autowired JdbcTemplate jdbc;
     QuestionAttempt answer;
+    JsonNode publishedInstance;
     @BeforeEach void markingSetup() throws Exception {
         markingProperties.setProvider("ollama"); markingProperties.setModel("frozen-marking-model");
         var instance = publish(create().path("id").asText(), publishBody());
+        publishedInstance = instance;
         var attempt = new ExamAttempt(); attempt.setCentreId(centre.getCentreId());
         attempt.setExamInstance(instances.findById(UUID.fromString(instance.path("id").asText())).orElseThrow());
         attempt.setUser(student); attempt.setStartedAt(Instant.now()); examAttempts.saveAndFlush(attempt);
@@ -45,6 +50,11 @@ class MarkingFlowTest extends PublishingFixtures {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
             return new ModelTransport.ModelResponse(200, envelope(false));
         }).when(transport).send(any());
+    }
+    @Test void committedPublishResponseExactlyMatchesReloadedInstance() throws Exception {
+        var reloaded = json(mvc.perform(get("/api/v1/instances/" + publishedInstance.path("id").asText())
+                .with(as(owner))).andExpect(status().isOk()).andReturn());
+        assertThat(reloaded).isEqualTo(publishedInstance);
     }
     String envelope(boolean unknown) {
         var out = JSON.createObjectNode().put("feedback", "Clear explanation"); var criteria = out.putArray("criteria");
