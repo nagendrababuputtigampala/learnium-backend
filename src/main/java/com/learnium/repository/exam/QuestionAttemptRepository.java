@@ -9,6 +9,10 @@ import org.springframework.data.repository.query.Param;
 
 public interface QuestionAttemptRepository extends JpaRepository<QuestionAttempt, UUID> {
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select q from QuestionAttempt q where q.questionAttemptId = :id")
+    java.util.Optional<QuestionAttempt> lockForMarking(UUID id);
+
     /** Centre-scoped: a foreign centre's attempt id returns nothing, never its answers. */
     @Query(
             "select qa from QuestionAttempt qa"

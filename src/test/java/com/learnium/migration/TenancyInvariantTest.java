@@ -140,6 +140,8 @@ class TenancyInvariantTest {
     }
 
     private ExamMode saveQuizMode() {
+        var existing = examModeRepository.findByTestType(ExamModeType.quiz);
+        if (existing.isPresent()) return existing.get();
         ExamMode mode = new ExamMode();
         mode.setTestType(ExamModeType.quiz);
         mode.setTitle("Quiz");
@@ -150,6 +152,7 @@ class TenancyInvariantTest {
             throws Exception {
         ExamTemplate template = new ExamTemplate();
         template.setCentre(centre);
+        template.setGradeSubject(f.gradeSubject());
         template.setGrade(f.gradeSubject().getGrade());
         template.setSubject(f.gradeSubject().getSubject());
         template.setTopic(f.topic());

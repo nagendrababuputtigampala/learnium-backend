@@ -53,6 +53,13 @@ import org.hibernate.type.SqlTypes;
 @Setter
 @NoArgsConstructor
 public class ExamTemplate extends AuditableEntity {
+    @Column(name = "kind", nullable = false, length = 24)
+    private String kind = "SCORED_TEST";
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "grade_subject_id", nullable = false)
+    private com.learnium.model.master.GradeSubject gradeSubject;
+
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

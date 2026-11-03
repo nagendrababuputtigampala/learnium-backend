@@ -1,3 +1,44 @@
+# Progress — feature/publish (M4 branch 2)
+
+## S1 — existing exam schema extensions (2026-11-02)
+
+- Pulled both latest dev branches and created feature/publish. Backend dev contains
+  branch 1. Frontend includes the existing branch-1 commits as a dependency while its
+  PR remains separate; no PRs were merged by this work.
+- V14 adds definition kind/pairing, decimal marks, frozen instance content/answer keys,
+  publish settings, assigned-student snapshots, AI breakdowns and typed marking jobs.
+- Reuses existing creator, item-order, camera and integrity columns. Published V1–V13
+  migrations remain unchanged. Composite tenant FKs protect new snapshot/job links.
+- Green: 21 migration, tenancy and exam-chain persistence tests passed.
+- S2 green: 13 API/migration tests passed. Owned definition CRUD and decimal marks,
+  grade/kind validation, atomic publish with full question and active-roster freezes,
+  per-publish item selection/marks, current-assignment instance access, code regeneration,
+  idempotent late adds and early close are implemented.
+- V14 also freezes the definition name and kind so later definition edits cannot relabel
+  earlier instances. Existing order/integrity/camera columns remain reused.
+- S3 green: 31 API, migration, generation-claim and marking tests passed. The marking
+  adapter supports Ollama/Gemini structured responses, validates exact criterion identity
+  and score bounds, and persists a complete keyed breakdown only after validation.
+- Marking jobs freeze provider/model/prompt/rubric/answer, isolate generation quotas and
+  claim scans, retry transient failures only, reject stale completions and exhaust at two
+  claims. A late result cannot overwrite a teacher confirmation. No answer text is logged.
+- S4 green: 40 targeted/upgrade tests plus the full execution report pass the unchanged
+  100% line/branch gates. Added authorization coverage, legacy V13→V14 backfill evidence,
+  practice/kind boundaries, code-collision handling and current-roster account/role checks.
+- Real PostgreSQL 16: 53 migration/review/publishing/marking tests passed, including new
+  composite tenant FKs. Fresh databases now receive the required exam-mode catalogue rows.
+- Publish, close and roster-assignment timestamps are canonicalized to PostgreSQL's
+  microsecond precision. A committed-transaction regression proves the complete publish
+  response is byte-for-byte stable when the instance is reloaded.
+- Added the API/marking contract, updated settled scope, CI PostgreSQL suites, as-built ER
+  metadata and full-stack publishing acceptance.
+- Final clean verification: 582 tests run, 541 passed and 41 optional PostgreSQL tests
+  skipped; 0 failures/errors. JaCoCo is 100% for instructions (16093/16093), branches
+  (1023/1023), lines (3185/3185), methods (640/640) and classes (189/189).
+- Fresh production-container acceptance passed migrations, nginx routing, authenticated
+  M2 onboarding, M4 review/bank and the complete publish/instance lifecycle.
+- Next: none on this branch — backend branch 2 is ready for review.
+
 # Progress — feature/review-and-bank (backend)
 
 ## Published migration compatibility (2026-11-02)

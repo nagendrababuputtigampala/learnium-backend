@@ -38,6 +38,15 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 public class ExamInstanceQuestion extends AuditableEntity {
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Column(name = "payload_snapshot", nullable = false, columnDefinition = "jsonb")
+    private com.fasterxml.jackson.databind.JsonNode payloadSnapshot = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode();
+    @Column(name = "correct_ref_snapshot", nullable = false, length = 50)
+    private String correctRefSnapshot = "";
+
+    @Column(name = "marks", nullable = false, precision = 6, scale = 2)
+    private java.math.BigDecimal marks = java.math.BigDecimal.ONE;
+
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

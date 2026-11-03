@@ -8,6 +8,7 @@ import time
 import urllib.request
 from m2_acceptance import run as m2_acceptance
 from m4_review_acceptance import run as m4_acceptance
+from m4_publish_acceptance import run as publish_acceptance
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -49,7 +50,8 @@ def main():
         os.environ["ACCEPTANCE_PROVISIONING_KEY"] = env["ACCEPTANCE_PROVISIONING_KEY"]
         sessions = m2_acceptance(frontend + "/api/v1", mailpit)
         m4_acceptance(frontend + "/api/v1", sessions)
-        print("PASS: Compose build, fresh PostgreSQL migrations, nginx routes/proxy, M2 HTTP/SMTP and M4 review/bank")
+        publish_acceptance(frontend + "/api/v1", sessions)
+        print("PASS: Compose build, fresh PostgreSQL migrations, nginx routes/proxy, M2 HTTP/SMTP and M4 review/bank/publish")
     finally:
         compose("down", "--volumes", "--remove-orphans")
 

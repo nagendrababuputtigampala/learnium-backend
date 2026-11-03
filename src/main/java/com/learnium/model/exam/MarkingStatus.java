@@ -7,6 +7,7 @@ package com.learnium.model.exam;
  */
 public enum MarkingStatus {
     AUTO,
+    PENDING,
     MARKING_PENDING,
     CONFIRMED
 }

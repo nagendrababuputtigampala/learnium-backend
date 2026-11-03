@@ -46,6 +46,10 @@ import org.hibernate.type.SqlTypes;
 @Setter
 @NoArgsConstructor
 public class QuestionAttempt extends AuditableEntity {
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "ai_breakdown", columnDefinition = "jsonb")
+    private JsonNode aiBreakdown;
+
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

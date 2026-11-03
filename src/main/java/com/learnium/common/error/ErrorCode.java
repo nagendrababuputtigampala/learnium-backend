@@ -60,7 +60,11 @@ public enum ErrorCode {
     QST_IMMUTABLE("LRN-QST-001", HttpStatus.CONFLICT, "Only drafts can be changed; fork an approved question"),
     QST_NOT_FOUND("LRN-QST-002", HttpStatus.NOT_FOUND, "Question not found"),
     QST_INVALID("LRN-QST-003", HttpStatus.UNPROCESSABLE_CONTENT, "Question validation failed"),
-    QST_STALE("LRN-QST-004", HttpStatus.CONFLICT, "This question changed; reload before trying again");
+    QST_STALE("LRN-QST-004", HttpStatus.CONFLICT, "This question changed; reload before trying again"),
+    TST_INVALID("LRN-TST-001", HttpStatus.BAD_REQUEST, "Invalid test definition"),
+    TST_PUBLISHED("LRN-TST-002", HttpStatus.CONFLICT, "A published definition cannot be deleted"),
+    TST_PUBLISH_INVALID("LRN-TST-003", HttpStatus.BAD_REQUEST, "Invalid publish or instance operation"),
+    TST_NOT_FOUND("LRN-TST-004", HttpStatus.NOT_FOUND, "Test or instance not found");
 
     private final String code;
     private final HttpStatus status;

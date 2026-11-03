@@ -158,6 +158,7 @@ class ExamChainPersistenceTest {
 
         ExamTemplate template = new ExamTemplate();
         template.setCentre(centre);
+        template.setGradeSubject(gradeSubject);
         template.setGrade(grade);
         template.setSubject(subject);
         template.setTopic(topic);
@@ -343,6 +344,7 @@ class ExamChainPersistenceTest {
 
         ExamTemplate template = new ExamTemplate();
         template.setCentre(centre);
+        template.setGradeSubject(gradeSubject);
         template.setGrade(gradeSubject.getGrade());
         template.setSubject(gradeSubject.getSubject());
         template.setTopic(topic);

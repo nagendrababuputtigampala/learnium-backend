@@ -51,6 +51,14 @@ import org.hibernate.type.SqlTypes;
 @Setter
 @NoArgsConstructor
 public class BackgroundJob extends AuditableEntity {
+    @Column(name = "job_type", nullable = false, length = 16)
+    private String jobType = "GENERATION";
+    @Column(name = "question_attempt_id", unique = true)
+    private UUID questionAttemptId;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "marking_input", columnDefinition = "jsonb")
+    private JsonNode markingInput;
+
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -61,25 +69,25 @@ public class BackgroundJob extends AuditableEntity {
     @JoinColumn(name = "centre_id", nullable = false)
     private Centre centre;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "material_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "material_id")
     private Material material;
 
     /** SHA-256 of the material's complete extracted text, frozen at creation. */
-    @Column(name = "content_hash", nullable = false, length = 64)
+    @Column(name = "content_hash", length = 64)
     private String contentHash;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "topic_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "topic_id")
     private Topic topic;
 
     /** Per-type requested counts, keyed by question-type code. */
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "requested_counts", nullable = false, columnDefinition = "jsonb")
+    @Column(name = "requested_counts", columnDefinition = "jsonb")
     private JsonNode requestedCounts;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "difficulty", nullable = false, length = 16)
+    @Column(name = "difficulty", length = 16)
     private GenerationDifficulty difficulty;
 
     @Column(name = "provider", nullable = false, length = 16)

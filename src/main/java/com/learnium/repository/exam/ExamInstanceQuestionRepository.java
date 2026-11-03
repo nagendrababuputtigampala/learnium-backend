@@ -9,6 +9,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface ExamInstanceQuestionRepository extends JpaRepository<ExamInstanceQuestion, UUID> {
 
+    @Query("select iq from ExamInstanceQuestion iq join fetch iq.question q join fetch q.questionType join fetch q.topic where iq.centreId = :centreId and iq.examInstance.examInstanceId = :id order by iq.questionOrder")
+    List<ExamInstanceQuestion> frozen(UUID centreId, UUID id);
+
     @Query(
             "select iq from ExamInstanceQuestion iq"
                     + " where iq.centreId = :centreId"

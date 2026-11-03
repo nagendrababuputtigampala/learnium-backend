@@ -11,6 +11,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface QuestionRepository extends JpaRepository<Question, UUID> {
 
+    @Query("select q from Question q join fetch q.questionType join fetch q.topic t join fetch t.gradeSubject where q.centre.centreId = :centreId and q.questionId in :ids and q.active = true and q.status = com.learnium.model.content.QuestionStatus.APPROVED")
+    java.util.List<Question> approvedForTest(UUID centreId, java.util.List<UUID> ids);
+
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("select q from Question q where q.questionId = :id and q.centre.centreId = :centreId")
     java.util.Optional<Question> findForReview(UUID id, UUID centreId);

@@ -25,11 +25,12 @@ accepted by Nagendra on 2026-11-02. This supersedes conflicting older tracker wo
   draft with lineage; the original remains untouched. Forks must pass review again.
 - A definition belongs to one grade/subject and may span topics. It is either a scored test
   (MCQ/fill-blank/numeric/written) or an unscored flashcard practice set; these are never mixed.
-- Marks support two decimal places. Written rubric scores act as weights; validated totals
-  scale proportionally to the frozen published question marks. No malformed AI breakdown is partially written.
-- Maximum attempts defaults to 1. With retakes, the **highest confirmed score** counts and
-  invalidated attempts are excluded. This deliberately supersedes task 69's earlier
-  “latest valid attempt counts” rule. Unconfirmed written scores do not enter totals.
+- Marks support up to two decimal places. The M4 marking engine validates criterion identity
+  and bounds, stores the raw criterion-score sum, and leaves status PENDING for M5 confirmation.
+  No malformed AI breakdown is partially written.
+- Maximum attempts defaults to 1 and is stored per publish. The branch-2 brief defers
+  which attempt counts to reports; INVALIDATED handling is outside M4. This supersedes
+  the earlier counted-attempt policy for this milestone.
 - Answer-release choices: after closing (default), after submission, or never. Written
   marks stay pending until teacher confirmation.
 - Opening defaults to now; closing is required; time limit is optional. Store UTC and label
