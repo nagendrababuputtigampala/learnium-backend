@@ -1,5 +1,21 @@
 # Progress — feature/student-flow (M5)
 
+## Part 3 — marking queue and confirmation (2026-11-03)
+
+- Flyway V17 replaces the blanket one-job-per-answer constraint with one live marking
+  job per answer while retaining terminal history, and records confirmed criterion
+  breakdowns plus marker/time audit fields.
+- Added manageable-batch/admin marking queues and frozen-answer detail, with READY,
+  MARKING, FAILED and manual NONE states derived from persisted answer/job facts.
+- Added frozen-rubric confirmation with exact criterion/bounds validation, half-up
+  rescaling to published marks, double-confirm protection and an audited manual path.
+  Failed unconfirmed suggestions can be rerun without permitting duplicate live jobs.
+- Database-level tests prove terminal history and the one-live-job invariant; API tests
+  cover scoping, every state, validation, rounding, manual confirmation and rerun rules.
+- Clean verification: 617 tests run, 576 passed and 41 optional PostgreSQL tests skipped;
+  zero failures/errors. JaCoCo remains 100% lines (3581/3581) and branches (1365/1365).
+- Part 3 is complete and committed before Part 4; no dashboard work has started.
+
 ## Checkpoint B — student player and practice (2026-11-03)
 
 - Flyway V16 completes the ported attempt model with server deadlines, the four-state

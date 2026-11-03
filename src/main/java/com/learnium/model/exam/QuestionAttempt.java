@@ -17,6 +17,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -91,6 +92,16 @@ public class QuestionAttempt extends AuditableEntity {
     /** Written answers only: the teacher-confirmed mark — the only one that counts. */
     @Column(name = "confirmed_score")
     private BigDecimal confirmedScore;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "confirmed_breakdown", columnDefinition = "jsonb")
+    private JsonNode confirmedBreakdown;
+
+    @Column(name = "marked_by")
+    private UUID markedBy;
+
+    @Column(name = "marked_at")
+    private Instant markedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "marking_status", nullable = false, length = 20)

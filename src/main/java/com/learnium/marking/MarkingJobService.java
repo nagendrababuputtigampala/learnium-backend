@@ -37,8 +37,25 @@ public class MarkingJobService {
     @Transactional
     public UUID enqueueMarking(UUID questionAttemptId) {
         var answer = attempts.lockForMarking(questionAttemptId).orElseThrow(() -> new BusinessException(ErrorCode.TST_NOT_FOUND));
-        var existing = jobs.findByQuestionAttemptId(questionAttemptId);
-        if (existing.isPresent()) return existing.get().getId();
+        var existing = jobs.findLatestByQuestionAttemptId(questionAttemptId, PageRequest.of(0, 1));
+        if (!existing.isEmpty()) return existing.get(0).getId();
+        return create(answer);
+    }
+
+    @Transactional
+    public UUID rerunMarking(UUID questionAttemptId) {
+        var answer = attempts.lockForMarking(questionAttemptId).orElseThrow(() -> new BusinessException(ErrorCode.TST_NOT_FOUND));
+        if (answer.getMarkingStatus() == MarkingStatus.CONFIRMED)
+            throw new BusinessException(ErrorCode.MRK_RERUN_INVALID);
+        var latest = jobs.findLatestByQuestionAttemptId(questionAttemptId, PageRequest.of(0, 1));
+        if (latest.isEmpty() || latest.get(0).getStatus() != BackgroundJobStatus.FAILED
+                || !jobs.findLiveByQuestionAttemptId(questionAttemptId, PageRequest.of(0, 1)).isEmpty())
+            throw new BusinessException(ErrorCode.MRK_RERUN_INVALID);
+        return create(answer);
+    }
+
+    private UUID create(com.learnium.model.exam.QuestionAttempt answer) {
+        UUID questionAttemptId = answer.getQuestionAttemptId();
         var item = frozen.frozen(answer.getCentreId(), answer.getAttempt().getExamInstance().getExamInstanceId()).stream()
                 .filter(f -> f.getQuestion().getQuestionId().equals(answer.getQuestion().getQuestionId()) && f.getQuestionVersion() == answer.getQuestionVersion())
                 .findFirst().orElseThrow(() -> invalid("Frozen question is missing"));

@@ -62,7 +62,10 @@ public enum ErrorCode {
     TST_NOT_FOUND("LRN-TST-004", HttpStatus.NOT_FOUND, "Test or instance not found"),
     ATT_NOT_ASSIGNED("LRN-ATT-001", HttpStatus.NOT_FOUND, "Test or attempt not found"),
     ATT_NOT_AVAILABLE("LRN-ATT-002", HttpStatus.CONFLICT, "This test is not currently available"),
-    ATT_EXHAUSTED("LRN-ATT-003", HttpStatus.CONFLICT, "No attempts remain");
+    ATT_EXHAUSTED("LRN-ATT-003", HttpStatus.CONFLICT, "No attempts remain"),
+    MRK_INVALID("LRN-MRK-001", HttpStatus.BAD_REQUEST, "Invalid confirmed marking"),
+    MRK_ALREADY_CONFIRMED("LRN-MRK-002", HttpStatus.CONFLICT, "This answer is already confirmed"),
+    MRK_RERUN_INVALID("LRN-MRK-003", HttpStatus.CONFLICT, "Marking cannot be run again");
 
     private final String code;
     private final HttpStatus status;

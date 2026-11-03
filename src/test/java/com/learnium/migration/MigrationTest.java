@@ -38,7 +38,7 @@ class MigrationTest {
                 .extracting(MigrationInfo::getVersion)
                 .extracting(Object::toString)
                 .containsExactly(
-                        "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16");
+                        "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17");
         assertThat(applied)
                 .extracting(MigrationInfo::getState)
                 .containsOnly(MigrationState.SUCCESS);
@@ -248,6 +248,43 @@ class MigrationTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(
                         () -> insertQuestionRow(centreB, topicId, questionTypeId, jobId))
                 .isInstanceOf(org.springframework.dao.DataAccessException.class);
+    }
+
+    @Test
+    void markingJobHistoryAllowsTerminalRowsButOnlyOneLiveJobAfterV17() {
+        java.util.UUID questionAttemptId = java.util.UUID.randomUUID();
+        java.util.UUID centreId = java.util.UUID.randomUUID();
+        jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
+        try {
+            insertMarkingJobRow(centreId, questionAttemptId, "FAILED");
+            insertMarkingJobRow(centreId, questionAttemptId, "SUCCEEDED");
+            insertMarkingJobRow(centreId, questionAttemptId, "PENDING");
+            org.assertj.core.api.Assertions.assertThatThrownBy(
+                            () -> insertMarkingJobRow(centreId, questionAttemptId, "RUNNING"))
+                    .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        } finally {
+            jdbcTemplate.update(
+                    "DELETE FROM learnium.background_job WHERE question_attempt_id = ?",
+                    questionAttemptId);
+            jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
+        }
+    }
+
+    private void insertMarkingJobRow(
+            java.util.UUID centreId, java.util.UUID questionAttemptId, String status) {
+        jdbcTemplate.update(
+                "INSERT INTO learnium.background_job"
+                        + " (id, centre_id, job_type, question_attempt_id, marking_input,"
+                        + " provider, model, prompt_version, payload_schema_version, status,"
+                        + " next_attempt_at, created_at, updated_at)"
+                        + " VALUES (?, ?, 'MARKING', ?, CAST(? AS jsonb), 'ollama', 'test',"
+                        + " 'marking-prompt-v1', 'marking-v1', ?, CURRENT_TIMESTAMP,"
+                        + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                java.util.UUID.randomUUID(),
+                centreId,
+                questionAttemptId,
+                "{\"answer\":\"test\"}",
+                status);
     }
 
     private void insertQuestionRow(
