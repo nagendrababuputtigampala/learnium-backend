@@ -56,6 +56,8 @@ public class IntegrityService {
             event.setOccurredAt(batch.get(i).occurredAt());
             events.save(event);
         }
+        attempt.setIntegrityFlagCount(attempt.getIntegrityFlagCount() + batch.size());
+        attempts.save(attempt);
         return batch.size();
     }
 

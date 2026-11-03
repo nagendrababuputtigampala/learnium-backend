@@ -60,4 +60,22 @@ public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, UUID> 
     @Query("select a.attemptId from ExamAttempt a where a.status = :status"
             + " and (a.deadlineAt <= :now or a.examInstance.closedAt is not null)")
     List<UUID> dueAttemptIds(ExamAttemptStatus status, Instant now);
+
+    /** Staff who manage the attempt's batch (or centre admins) may see and act on it; everyone else gets nothing. */
+    @Query("select a from ExamAttempt a join fetch a.user join fetch a.examInstance i join fetch i.batch"
+            + " where a.centreId = :centreId and a.attemptId = :attemptId"
+            + " and (:admin = true or exists (select m from BatchMembership m where m.centreId = :centreId"
+            + " and m.batch = i.batch and m.user.userId = :userId"
+            + " and m.memberRole = com.learnium.model.user.MemberRole.TEACHER"
+            + " and m.status = com.learnium.model.user.MembershipStatus.ACTIVE))")
+    Optional<ExamAttempt> manageable(UUID centreId, UUID userId, boolean admin, UUID attemptId);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from ExamAttempt a join fetch a.user join fetch a.examInstance i join fetch i.batch"
+            + " where a.centreId = :centreId and a.attemptId = :attemptId"
+            + " and (:admin = true or exists (select m from BatchMembership m where m.centreId = :centreId"
+            + " and m.batch = i.batch and m.user.userId = :userId"
+            + " and m.memberRole = com.learnium.model.user.MemberRole.TEACHER"
+            + " and m.status = com.learnium.model.user.MembershipStatus.ACTIVE))")
+    Optional<ExamAttempt> lockManageable(UUID centreId, UUID userId, boolean admin, UUID attemptId);
 }

@@ -99,6 +99,8 @@ public class StudentAttemptService {
     @Transactional(readOnly = true)
     public AttemptResultDto result(LearniumPrincipal caller, UUID attemptId) {
         ExamAttempt attempt = owned(caller, attemptId);
+        if (attempt.getStatus() == ExamAttemptStatus.INVALIDATED)
+            throw new BusinessException(ErrorCode.ATT_NOT_ASSIGNED);
         if (attempt.getStatus() == ExamAttemptStatus.IN_PROGRESS)
             throw new BusinessException(ErrorCode.ATT_NOT_AVAILABLE, "Submit the attempt before viewing results");
         return resultDto(attempt);
