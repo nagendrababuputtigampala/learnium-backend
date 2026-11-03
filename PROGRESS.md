@@ -1,5 +1,17 @@
 # Progress — feature/student-flow (M5)
 
+## Part 5 — integrity + camera (feature/integrity-camera, Edison-built, 2026-11-03)
+
+- S1 done: Flyway V18 (integrity_events + proctor_snapshots, composite tenancy
+  FKs, CHECK constraints on type/reason), IntegrityEvent + ProctorSnapshot
+  entities and repositories. Design note: proctor_snapshots.attempt_id is
+  NULLABLE with (exam_instance_id, user_id) NOT NULL — the PRE_TEST camera
+  check happens before an attempt exists, so the row is created against
+  instance+student, carries the hashed check token, and is linked to the
+  attempt when the token is consumed at start. MigrationTest 9 green
+  (V1–V18 in order, tenancy FK + CHECK rejection proven).
+- Next: S2 integrity event ingest. Failing tests: none.
+
 ## Part 4 — student dashboard (2026-11-03)
 
 - Added a student-owned dashboard computed live from final attempt and marking facts;
