@@ -1,154 +1,134 @@
 package com.learnium.admin;
 
-import com.learnium.api.dto.BatchDtos.AddStudentResponse;
-import com.learnium.api.dto.BatchDtos.ResetPinResponse;
-import com.learnium.api.dto.BatchDtos.RosterStudentDto;
-import com.learnium.common.error.BusinessException;
-import com.learnium.common.error.ErrorCode;
+import com.learnium.api.dto.BatchDtos.*;
+import com.learnium.auth.AccountFlowService;
+import com.learnium.common.EmailAddresses;
+import com.learnium.common.error.*;
 import com.learnium.model.common.UserStatus;
-import com.learnium.model.user.Batch;
-import com.learnium.model.user.BatchMembership;
-import com.learnium.model.user.MemberRole;
-import com.learnium.model.user.MembershipStatus;
-import com.learnium.model.user.StudentProfile;
-import com.learnium.model.user.UserAccount;
-import com.learnium.model.user.UserRole;
-import com.learnium.repository.user.BatchMembershipRepository;
-import com.learnium.repository.user.StudentProfileRepository;
-import com.learnium.repository.user.UserAccountRepository;
+import com.learnium.model.user.*;
+import com.learnium.repository.user.*;
 import com.learnium.security.LearniumPrincipal;
-import java.security.SecureRandom;
-import java.util.List;
-import java.util.UUID;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import java.util.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Batch rosters. Every operation passes through {@link BatchAccessGuard}
- * first (centre tenancy + teacher assignment), then works centre-scoped.
- * Adding a student creates the account, profile and roster membership in one
- * transaction and returns the generated 4-digit PIN exactly once — only its
- * BCrypt hash is stored.
- */
+/** Centre-scoped batch roster management for real student accounts. */
 @Service
 public class RosterService {
+    private final BatchAccessGuard access;
+    private final BatchMembershipRepository memberships;
+    private final UserAccountRepository users;
+    private final StudentProfileRepository profiles;
+    private final StudentUsernameService usernames;
+    private final AccountFlowService accountFlows;
 
-    private static final SecureRandom RANDOM = new SecureRandom();
-
-    private final BatchAccessGuard batchAccessGuard;
-    private final BatchMembershipRepository batchMembershipRepository;
-    private final UserAccountRepository userAccountRepository;
-    private final StudentProfileRepository studentProfileRepository;
-    private final PasswordEncoder passwordEncoder;
-
-    public RosterService(
-            BatchAccessGuard batchAccessGuard,
-            BatchMembershipRepository batchMembershipRepository,
-            UserAccountRepository userAccountRepository,
-            StudentProfileRepository studentProfileRepository,
-            PasswordEncoder passwordEncoder) {
-        this.batchAccessGuard = batchAccessGuard;
-        this.batchMembershipRepository = batchMembershipRepository;
-        this.userAccountRepository = userAccountRepository;
-        this.studentProfileRepository = studentProfileRepository;
-        this.passwordEncoder = passwordEncoder;
+    public RosterService(BatchAccessGuard access, BatchMembershipRepository memberships,
+            UserAccountRepository users, StudentProfileRepository profiles,
+            StudentUsernameService usernames, AccountFlowService accountFlows) {
+        this.access = access; this.memberships = memberships; this.users = users; this.profiles = profiles;
+        this.usernames = usernames; this.accountFlows = accountFlows;
     }
 
     @Transactional(readOnly = true)
-    public List<RosterStudentDto> listStudents(LearniumPrincipal principal, UUID batchId) {
-        batchAccessGuard.requireBatchAccess(principal, batchId);
-        return batchMembershipRepository
-                .findByCentreIdAndBatchIdAndMemberRole(
-                        principal.centreId(), batchId, MemberRole.STUDENT)
-                .stream()
-                .map(
-                        membership ->
-                                new RosterStudentDto(
-                                        membership.getMembershipId(),
-                                        membership.getUser().getUserId(),
-                                        membership.getUser().getDisplayName(),
-                                        membership.getStatus().name(),
-                                        membership.isPinLocked()))
-                .toList();
+    public List<RosterStudentDto> listStudents(LearniumPrincipal caller, UUID batchId) {
+        access.requireBatchAccess(caller, batchId);
+        return memberships.findByCentreIdAndBatchIdAndMemberRole(caller.centreId(), batchId, MemberRole.STUDENT)
+                .stream().map(this::dto).toList();
     }
 
     @Transactional
-    public AddStudentResponse addStudent(LearniumPrincipal principal, UUID batchId, String fullName) {
-        Batch batch = batchAccessGuard.requireBatchAccess(principal, batchId);
-        return createStudent(batch, fullName.trim());
-    }
-
-    /** Single transaction: either the whole class list lands or none of it does. */
-    @Transactional
-    public List<AddStudentResponse> bulkAddStudents(
-            LearniumPrincipal principal, UUID batchId, List<String> fullNames) {
-        Batch batch = batchAccessGuard.requireBatchAccess(principal, batchId);
-        return fullNames.stream().map(name -> createStudent(batch, name.trim())).toList();
+    public AddStudentResponse addStudent(LearniumPrincipal caller, UUID batchId, AddStudentRequest request) {
+        Batch batch = access.requireBatchAccess(caller, batchId);
+        if (request.userId() != null) return addExisting(caller, batch, request.userId());
+        return createStudent(batch, request.displayName().trim(), request.contactEmail(), request.username());
     }
 
     @Transactional
-    public ResetPinResponse resetPin(LearniumPrincipal principal, UUID batchId, UUID membershipId) {
-        batchAccessGuard.requireBatchAccess(principal, batchId);
-        BatchMembership membership = requireStudentMembership(principal, batchId, membershipId);
-        String pin = newPin();
-        membership.setPinHash(passwordEncoder.encode(pin));
-        membership.setPinFailedAttempts(0);
-        membership.setPinLocked(false);
-        batchMembershipRepository.save(membership);
-        return new ResetPinResponse(pin);
+    public List<AddStudentResponse> bulkAddStudents(LearniumPrincipal caller, UUID batchId, List<String> names) {
+        Batch batch = access.requireBatchAccess(caller, batchId);
+        return names.stream().map(name -> createStudent(batch, name.trim(), null, null)).toList();
     }
 
     @Transactional
-    public void deactivateStudent(LearniumPrincipal principal, UUID batchId, UUID membershipId) {
-        batchAccessGuard.requireBatchAccess(principal, batchId);
-        BatchMembership membership = requireStudentMembership(principal, batchId, membershipId);
-        membership.setStatus(MembershipStatus.INACTIVE);
-        batchMembershipRepository.save(membership);
+    public RosterStudentDto rename(LearniumPrincipal caller, UUID batchId, UUID userId, String requested) {
+        access.requireBatchAccess(caller, batchId);
+        UserAccount student = requireStudent(caller, batchId, userId);
+        String username = usernames.requireAvailable(caller.centreId(), requested, student.getUserId());
+        if (!username.equals(student.getUsername())) {
+            student.setUsername(username); users.saveAndFlush(student);
+        }
+        return dto(memberships.findByCentreIdAndBatchIdAndUserId(caller.centreId(), batchId, userId).orElseThrow());
     }
 
-    private BatchMembership requireStudentMembership(
-            LearniumPrincipal principal, UUID batchId, UUID membershipId) {
-        return batchMembershipRepository
-                .findByCentreIdAndMembershipId(principal.centreId(), membershipId)
-                .filter(
-                        membership ->
-                                membership.getBatch().getBatchId().equals(batchId)
-                                        && membership.getMemberRole() == MemberRole.STUDENT)
+    @Transactional
+    public AddStudentResponse resendInvite(LearniumPrincipal caller, UUID batchId, UUID userId) {
+        access.requireBatchAccess(caller, batchId);
+        UserAccount student = requireStudent(caller, batchId, userId);
+        if (student.getPasswordHash() != null)
+            throw new BusinessException(ErrorCode.VAL_FAILED, "This student has already accepted their invite");
+        if (student.getEmail() == null || student.getEmail().isBlank())
+            throw new BusinessException(ErrorCode.VAL_FAILED, "Add a contact email before resending the invite");
+        accountFlows.resendInvite(student);
+        var membership = memberships.findByCentreIdAndBatchIdAndUserId(caller.centreId(), batchId, userId).orElseThrow();
+        return response(membership, "SENT");
+    }
+
+    @Transactional
+    public void deactivateStudent(LearniumPrincipal caller, UUID batchId, UUID membershipId) {
+        access.requireBatchAccess(caller, batchId);
+        BatchMembership membership = memberships.findByCentreIdAndMembershipId(caller.centreId(), membershipId)
+                .filter(row -> row.getBatch().getBatchId().equals(batchId) && row.getMemberRole() == MemberRole.STUDENT)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CTR_ROSTER_NOT_FOUND));
+        membership.setStatus(MembershipStatus.INACTIVE); memberships.save(membership);
+    }
+
+    private AddStudentResponse addExisting(LearniumPrincipal caller, Batch batch, UUID userId) {
+        UserAccount student = users.findByCentreIdAndUserId(caller.centreId(), userId)
+                .filter(user -> user.getRole() == UserRole.STUDENT)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USR_NOT_FOUND));
+        BatchMembership membership = memberships.findByCentreIdAndBatchIdAndUserId(caller.centreId(), batch.getBatchId(), userId)
+                .orElseGet(() -> membership(batch, student));
+        membership.setStatus(MembershipStatus.ACTIVE); memberships.saveAndFlush(membership);
+        return response(membership, inviteStatus(student));
+    }
+
+    private AddStudentResponse createStudent(Batch batch, String displayName, String contactEmail, String requestedUsername) {
+        UUID centreId = batch.getCentre().getCentreId();
+        UserAccount student = new UserAccount();
+        student.setCentre(batch.getCentre()); student.setRole(UserRole.STUDENT); student.setDisplayName(displayName);
+        student.setEmail(contactEmail == null || contactEmail.isBlank() ? null : EmailAddresses.normalize(contactEmail));
+        student.setUsername(usernames.choose(centreId, displayName, requestedUsername));
+        student.setPasswordHash(null); student.setStatus(UserStatus.ACTIVE); student = users.saveAndFlush(student);
+        StudentProfile profile = new StudentProfile(); profile.setUser(student); profile.setCentreId(centreId);
+        profile.setFullName(displayName); profile.setGrade(batch.getGradeSubject().getGrade()); profiles.save(profile);
+        BatchMembership membership = membership(batch, student); memberships.saveAndFlush(membership);
+        boolean sent = accountFlows.sendStudentInvite(student);
+        return response(membership, sent ? "SENT" : "NOT_SENT");
+    }
+
+    private BatchMembership membership(Batch batch, UserAccount student) {
+        BatchMembership membership = new BatchMembership(); membership.setCentreId(batch.getCentre().getCentreId());
+        membership.setBatch(batch); membership.setUser(student); membership.setMemberRole(MemberRole.STUDENT);
+        membership.setStatus(MembershipStatus.ACTIVE); return membership;
+    }
+
+    private UserAccount requireStudent(LearniumPrincipal caller, UUID batchId, UUID userId) {
+        return memberships.findByCentreIdAndBatchIdAndUserId(caller.centreId(), batchId, userId)
+                .filter(row -> row.getMemberRole() == MemberRole.STUDENT).map(BatchMembership::getUser)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CTR_ROSTER_NOT_FOUND));
     }
 
-    private AddStudentResponse createStudent(Batch batch, String fullName) {
-        UserAccount user = new UserAccount();
-        user.setCentre(batch.getCentre());
-        user.setRole(UserRole.STUDENT);
-        user.setEmail(null);
-        user.setDisplayName(fullName);
-        user.setPasswordHash(null);
-        user.setStatus(UserStatus.ACTIVE);
-        user = userAccountRepository.save(user);
-
-        StudentProfile profile = new StudentProfile();
-        profile.setUser(user);
-        profile.setCentreId(batch.getCentre().getCentreId());
-        profile.setFullName(fullName);
-        profile.setGrade(batch.getGradeSubject().getGrade());
-        studentProfileRepository.save(profile);
-
-        String pin = newPin();
-        BatchMembership membership = new BatchMembership();
-        membership.setCentreId(batch.getCentre().getCentreId());
-        membership.setBatch(batch);
-        membership.setUser(user);
-        membership.setMemberRole(MemberRole.STUDENT);
-        membership.setStatus(MembershipStatus.ACTIVE);
-        membership.setPinHash(passwordEncoder.encode(pin));
-        membership = batchMembershipRepository.save(membership);
-
-        return new AddStudentResponse(membership.getMembershipId(), user.getUserId(), fullName, pin);
+    private RosterStudentDto dto(BatchMembership row) {
+        UserAccount user = row.getUser();
+        return new RosterStudentDto(row.getMembershipId(), user.getUserId(), user.getDisplayName(), user.getUsername(),
+                user.getEmail(), row.getStatus().name(), inviteStatus(user));
     }
-
-    private static String newPin() {
-        return String.format("%04d", RANDOM.nextInt(10_000));
+    private AddStudentResponse response(BatchMembership row, String status) {
+        UserAccount user = row.getUser();
+        return new AddStudentResponse(row.getMembershipId(), user.getUserId(), user.getDisplayName(), user.getUsername(), status);
+    }
+    private String inviteStatus(UserAccount user) {
+        if (user.getPasswordHash() != null) return "ACCEPTED";
+        return user.getEmail() == null ? "NOT_SENT" : "PENDING";
     }
 }

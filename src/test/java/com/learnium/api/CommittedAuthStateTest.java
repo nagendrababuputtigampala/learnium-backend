@@ -14,22 +14,10 @@ import com.learnium.common.error.BusinessException;
 import com.learnium.common.error.ErrorCode;
 import com.learnium.model.auth.AccountTokenPurpose;
 import com.learnium.model.common.UserStatus;
-import com.learnium.model.master.Grade;
-import com.learnium.model.master.GradeSubject;
-import com.learnium.model.master.Subject;
-import com.learnium.model.user.Batch;
-import com.learnium.model.user.BatchMembership;
 import com.learnium.model.user.Centre;
-import com.learnium.model.user.MemberRole;
-import com.learnium.model.user.MembershipStatus;
 import com.learnium.model.user.UserAccount;
 import com.learnium.model.user.UserRole;
 import com.learnium.repository.auth.RefreshTokenRepository;
-import com.learnium.repository.master.GradeRepository;
-import com.learnium.repository.master.GradeSubjectRepository;
-import com.learnium.repository.master.SubjectRepository;
-import com.learnium.repository.user.BatchMembershipRepository;
-import com.learnium.repository.user.BatchRepository;
 import com.learnium.repository.user.CentreRepository;
 import com.learnium.repository.user.UserAccountRepository;
 import com.learnium.testsupport.AuthFixtures;
@@ -72,7 +60,6 @@ class CommittedAuthStateTest {
 
     private static final String PASSWORD = "Passw0rd1";
     private static final String TEACHER_EMAIL = "tess@alpha.test";
-    private static final String STUDENT_PIN = "1234";
 
     @Autowired private MockMvc mockMvc;
     @Autowired private AuthService authService;
@@ -80,18 +67,11 @@ class CommittedAuthStateTest {
     @Autowired private AccountTokenService accountTokenService;
     @Autowired private CentreRepository centreRepository;
     @Autowired private UserAccountRepository userAccountRepository;
-    @Autowired private BatchRepository batchRepository;
-    @Autowired private BatchMembershipRepository batchMembershipRepository;
-    @Autowired private GradeRepository gradeRepository;
-    @Autowired private SubjectRepository subjectRepository;
-    @Autowired private GradeSubjectRepository gradeSubjectRepository;
     @Autowired private RefreshTokenRepository refreshTokenRepository;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private JdbcTemplate jdbcTemplate;
 
     private UserAccount teacher;
-    private Batch batch;
-    private BatchMembership studentMembership;
 
     @AfterEach
     void cleanUp() {
@@ -105,81 +85,9 @@ class CommittedAuthStateTest {
                 AuthFixtures.createStaff(
                         userAccountRepository, passwordEncoder, centre, UserRole.TEACHER,
                         TEACHER_EMAIL, "Tess Teacher", PASSWORD, UserStatus.ACTIVE);
-        Grade grade = new Grade();
-        grade.setCode("G8");
-        grade.setName("Grade 8");
-        grade = gradeRepository.save(grade);
-        Subject subject = new Subject();
-        subject.setSubjectName("Mathematics");
-        subject = subjectRepository.save(subject);
-        GradeSubject gradeSubject = new GradeSubject();
-        gradeSubject.setGrade(grade);
-        gradeSubject.setSubject(subject);
-        gradeSubjectRepository.save(gradeSubject);
-        batch = new Batch();
-        batch.setCentre(centre);
-        batch.setGradeSubject(gradeSubject);
-        batch.setName("Batch B");
-        batch = batchRepository.save(batch);
-
-        UserAccount student =
-                AuthFixtures.createStaff(
-                        userAccountRepository, passwordEncoder, centre, UserRole.STUDENT,
-                        null, "Simran Kaur", null, UserStatus.ACTIVE);
-        studentMembership = new BatchMembership();
-        studentMembership.setCentreId(centre.getCentreId());
-        studentMembership.setBatch(batch);
-        studentMembership.setUser(student);
-        studentMembership.setMemberRole(MemberRole.STUDENT);
-        studentMembership.setStatus(MembershipStatus.ACTIVE);
-        studentMembership.setPinHash(passwordEncoder.encode(STUDENT_PIN));
-        studentMembership = batchMembershipRepository.save(studentMembership);
     }
 
-    // ---------- (1) PIN lockout persists across separate calls ----------
-
-    private void failedStudentSession(String pin) throws Exception {
-        mockMvc.perform(
-                        post("/api/v1/auth/student-session")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        "{\"batchId\":\""
-                                                + batch.getBatchId()
-                                                + "\",\"fullName\":\"Simran Kaur\",\"pin\":\""
-                                                + pin
-                                                + "\"}"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("LRN-AUTH-007"));
-    }
-
-    @Test
-    void fiveFailedPinAttemptsPersistAndTheSixthCallIsLockedOut() throws Exception {
-        for (int i = 0; i < 5; i++) {
-            failedStudentSession("9999");
-        }
-
-        // Read back fresh, committed state: the counter and the lock
-        // survived the five rejected requests (P1-2 regression proof).
-        BatchMembership reloaded =
-                batchMembershipRepository.findById(studentMembership.getMembershipId()).orElseThrow();
-        assertThat(reloaded.getPinFailedAttempts()).isEqualTo(5);
-        assertThat(reloaded.isPinLocked()).isTrue();
-
-        // Even the CORRECT PIN is now refused with the locked error.
-        mockMvc.perform(
-                        post("/api/v1/auth/student-session")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        "{\"batchId\":\""
-                                                + batch.getBatchId()
-                                                + "\",\"fullName\":\"Simran Kaur\",\"pin\":\""
-                                                + STUDENT_PIN
-                                                + "\"}"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("LRN-AUTH-006"));
-    }
-
-    // ---------- (2) refresh replay revocation persists ----------
+    // ---------- refresh replay revocation persists ----------
 
     @Test
     void refreshReplayRevokesTheWholeFamilyInCommittedState() {

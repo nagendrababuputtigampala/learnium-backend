@@ -54,7 +54,7 @@ abstract class PublishingFixtures {
     GradeSubject pairing;
     Topic topic;
     Batch batch;
-    Question mcq, numeric, flashcard, written;
+    Question mcq, fillBlank, numeric, flashcard, written;
     BatchMembership teacherAssignment;
 
     @BeforeEach void setup() throws Exception {
@@ -71,12 +71,14 @@ abstract class PublishingFixtures {
         }
         batch = new Batch(); batch.setCentre(centre); batch.setName("Batch 8"); batch.setGradeSubject(pairing); batches.save(batch);
         teacherAssignment = member(batch, owner); member(batch, student);
-        mcq = question("MCQ"); numeric = question("NUMERIC"); flashcard = question("FLASHCARD"); written = question("WRITTEN");
+        mcq = question("MCQ"); fillBlank = question("FILL_BLANK"); numeric = question("NUMERIC");
+        flashcard = question("FLASHCARD"); written = question("WRITTEN");
         questions.flush(); memberships.flush();
     }
-    Centre centre(String name) { var c = new Centre(); c.setName(name); return centres.save(c); }
+    Centre centre(String name) { var c = new Centre(); c.setName(name); c.setCode("t" + UUID.randomUUID().toString().substring(0, 8)); return centres.save(c); }
     UserAccount user(Centre c, UserRole role) {
         var u = new UserAccount(); u.setCentre(c); u.setRole(role); u.setDisplayName(role + " " + UUID.randomUUID());
+        if (role == UserRole.STUDENT) u.setUsername("s" + UUID.randomUUID().toString().substring(0, 8));
         return users.save(u);
     }
     BatchMembership member(Batch batch, UserAccount user) {
@@ -88,7 +90,8 @@ abstract class PublishingFixtures {
         var qt = types.findByCode(type).orElseGet(() -> { var t = new QuestionType(); t.setCode(type); t.setName(type); return types.save(t); });
         String raw = switch (type) {
             case "MCQ" -> "{\"stem\":\"Which fraction?\",\"options\":[{\"text\":\"a\"},{\"text\":\"b\"},{\"text\":\"c\"},{\"text\":\"d\"}],\"correctIndex\":0}";
-            case "NUMERIC" -> "{\"stem\":\"Calculate\",\"answerValue\":2,\"workedSolution\":\"Work\"}";
+            case "FILL_BLANK" -> "{\"stemWithBlank\":\"One half is _____ percent\",\"answer\":\"Fifty\"}";
+            case "NUMERIC" -> "{\"stem\":\"Calculate\",\"answerValue\":2,\"tolerance\":0.1,\"workedSolution\":\"Work\"}";
             case "FLASHCARD" -> "{\"front\":\"Half\",\"back\":\"Two quarters\"}";
             default -> "{\"stem\":\"Explain halves\",\"modelAnswer\":\"Two equal parts\",\"rubric\":[{\"criterion\":\"A\",\"maxScore\":1},{\"criterion\":\"B\",\"maxScore\":1},{\"criterion\":\"C\",\"maxScore\":1}]}";
         };
@@ -99,7 +102,7 @@ abstract class PublishingFixtures {
     }
     RequestPostProcessor as(UserAccount user) {
         LearniumPrincipal principal = user.getRole() == UserRole.STUDENT
-                ? LearniumPrincipal.student(user.getUserId(), user.getCentre().getCentreId(), batch.getBatchId(), UUID.randomUUID())
+                ? LearniumPrincipal.student(user.getUserId(), user.getCentre().getCentreId())
                 : LearniumPrincipal.staff(user.getUserId(), user.getCentre().getCentreId(), user.getRole());
         return authentication(new UsernamePasswordAuthenticationToken(principal, null,
                 List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole()))));

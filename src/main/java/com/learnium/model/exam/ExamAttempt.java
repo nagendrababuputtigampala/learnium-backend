@@ -67,10 +67,13 @@ public class ExamAttempt extends AuditableEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
-    private ExamAttemptStatus status = ExamAttemptStatus.STARTED;
+    private ExamAttemptStatus status = ExamAttemptStatus.IN_PROGRESS;
 
     @Column(name = "started_at", nullable = false)
     private Instant startedAt;
+
+    @Column(name = "deadline_at")
+    private Instant deadlineAt;
 
     @Column(name = "submitted_at")
     private Instant submittedAt;

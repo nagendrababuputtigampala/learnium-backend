@@ -21,6 +21,7 @@ import com.learnium.repository.master.QuestionTypeRepository;
 import com.learnium.repository.master.SubjectRepository;
 import com.learnium.repository.user.CentreRepository;
 import com.learnium.repository.user.UserAccountRepository;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -54,6 +55,7 @@ class ContentPersistenceTest {
 
     private Fixture fixture(String centreName) {
         Centre centre = new Centre();
+        centre.setCode("t" + UUID.randomUUID().toString().substring(0, 8));
         centre.setName(centreName);
         centre = centreRepository.save(centre);
 

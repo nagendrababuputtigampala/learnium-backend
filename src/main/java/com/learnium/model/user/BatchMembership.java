@@ -20,9 +20,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * The batch roster — the gate for everything a student does. A student appears
- * here (with their PIN hash) before they can join any test in the batch; a
- * teacher appears here before they can run the batch.
+ * The batch roster — the gate for assignments. Student credentials live on
+ * {@link UserAccount}; this row only expresses centre-scoped membership.
  */
 @Entity
 @Table(
@@ -62,18 +61,6 @@ public class BatchMembership extends AuditableEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "member_role", nullable = false, length = 20)
     private MemberRole memberRole;
-
-    /** BCrypt hash of the student's roster PIN; null for teachers. */
-    @Column(name = "pin_hash", length = 255)
-    private String pinHash;
-
-    /** Consecutive failed PIN attempts at the student-session door (students only). */
-    @Column(name = "pin_failed_attempts", nullable = false)
-    private int pinFailedAttempts = 0;
-
-    /** Set once the failed-attempt limit is hit; a teacher PIN reset clears it. */
-    @Column(name = "pin_locked", nullable = false)
-    private boolean pinLocked = false;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)

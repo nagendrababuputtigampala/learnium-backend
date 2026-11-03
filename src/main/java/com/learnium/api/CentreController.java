@@ -3,12 +3,16 @@ package com.learnium.api;
 import com.learnium.admin.CentreService;
 import com.learnium.api.dto.AdminDtos.CentreDto;
 import com.learnium.api.dto.AdminDtos.UpdateCentreRequest;
+import com.learnium.api.dto.BatchDtos.*;
+import com.learnium.common.api.PageResponse;
 import com.learnium.security.CurrentPrincipal;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,5 +38,17 @@ public class CentreController {
     @PreAuthorize("hasRole('CENTRE_ADMIN')")
     public ResponseEntity<CentreDto> updateCentre(@Valid @RequestBody UpdateCentreRequest request) {
         return ResponseEntity.ok(centreService.updateCentre(CurrentPrincipal.require(), request));
+    }
+
+    @GetMapping("/username-check")
+    @PreAuthorize("hasAnyRole('CENTRE_ADMIN', 'TEACHER')")
+    public ResponseEntity<UsernameCheckDto> usernameCheck(@RequestParam String value) {
+        return ResponseEntity.ok(centreService.usernameCheck(CurrentPrincipal.require(), value));
+    }
+
+    @GetMapping("/students")
+    @PreAuthorize("hasAnyRole('CENTRE_ADMIN', 'TEACHER')")
+    public ResponseEntity<PageResponse<StudentLookupDto>> students(Pageable pageable) {
+        return ResponseEntity.ok(centreService.students(CurrentPrincipal.require(), pageable));
     }
 }

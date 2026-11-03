@@ -18,7 +18,12 @@ public interface BackgroundJobRepository extends JpaRepository<BackgroundJob, UU
     @Modifying
     @Query("update BackgroundJob j set j.status = com.learnium.model.content.BackgroundJobStatus.RUNNING, j.claimToken = :token, j.claimGeneration = j.claimGeneration + 1, j.leaseExpiresAt = :lease, j.attempts = j.attempts + 1, j.updatedAt = :now where j.id = :id and j.jobType = 'MARKING' and j.attempts < 2 and ((j.status = com.learnium.model.content.BackgroundJobStatus.PENDING and j.nextAttemptAt <= :now) or (j.status = com.learnium.model.content.BackgroundJobStatus.RUNNING and j.leaseExpiresAt < :now))")
     int claimMarking(UUID id, UUID token, Instant lease, Instant now);
-    Optional<BackgroundJob> findByQuestionAttemptId(UUID id);
+    @Query("select j from BackgroundJob j where j.jobType = 'MARKING' and j.questionAttemptId = :id and j.status in (com.learnium.model.content.BackgroundJobStatus.PENDING, com.learnium.model.content.BackgroundJobStatus.RUNNING) order by j.createdAt desc, j.id desc")
+    List<BackgroundJob> findLiveByQuestionAttemptId(UUID id, Pageable pageable);
+    @Query("select j from BackgroundJob j where j.jobType = 'MARKING' and j.questionAttemptId = :id order by j.createdAt desc, j.id desc")
+    List<BackgroundJob> findLatestByQuestionAttemptId(UUID id, Pageable pageable);
+    @Query("select j from BackgroundJob j where j.jobType = 'MARKING' and j.questionAttemptId in :ids order by j.createdAt desc, j.id desc")
+    List<BackgroundJob> markingHistory(List<UUID> ids);
     @Query("select j.id from BackgroundJob j where j.jobType = 'MARKING' and j.attempts < 2 and ((j.status = com.learnium.model.content.BackgroundJobStatus.PENDING and j.nextAttemptAt <= :now) or (j.status = com.learnium.model.content.BackgroundJobStatus.RUNNING and j.leaseExpiresAt < :now)) order by j.createdAt, j.id")
     List<UUID> markingCandidates(Instant now, Pageable pageable);
     @Modifying

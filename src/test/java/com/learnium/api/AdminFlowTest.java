@@ -31,6 +31,7 @@ import com.learnium.repository.user.BatchMembershipRepository;
 import com.learnium.repository.user.BatchRepository;
 import com.learnium.repository.user.CentreRepository;
 import com.learnium.repository.user.UserAccountRepository;
+import com.learnium.security.JwtService;
 import com.learnium.testsupport.AuthFixtures;
 import com.learnium.testsupport.CommittedDataCleanup;
 import java.util.UUID;
@@ -87,6 +88,7 @@ class AdminFlowTest {
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private EmailOutboxRepository emailOutboxRepository;
     @Autowired private PayloadCipher payloadCipher;
+    @Autowired private JwtService jwtService;
     @Autowired private JdbcTemplate jdbcTemplate;
 
     private Centre centreA;
@@ -674,7 +676,7 @@ class AdminFlowTest {
                                 post("/api/v1/batches/" + batchId + "/students")
                                         .header("Authorization", "Bearer " + admin)
                                         .contentType(MediaType.APPLICATION_JSON)
-                                        .content("{\"fullName\":\"Stu One\"}"))
+                                        .content("{\"displayName\":\"Stu One\"}"))
                         .andExpect(status().isCreated())
                         .andReturn()
                         .getResponse()
@@ -1014,35 +1016,14 @@ class AdminFlowTest {
     }
 
     private String studentToken() throws Exception {
-        String admin = tokenFor("admin@alpha.test");
-        JsonNode batch = createBatch(admin, "Topic Batch");
-        String batchId = batch.get("batchId").asString();
-        String addedBody =
-                mockMvc.perform(
-                                post("/api/v1/batches/" + batchId + "/students")
-                                        .header("Authorization", "Bearer " + admin)
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .content("{\"fullName\":\"Simran Kaur\"}"))
-                        .andExpect(status().isCreated())
-                        .andReturn()
-                        .getResponse()
-                        .getContentAsString();
-        String pin = objectMapper.readTree(addedBody).get("pin").asString();
-        String body =
-                mockMvc.perform(
-                                post("/api/v1/auth/student-session")
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .content(
-                                                "{\"batchId\":\""
-                                                        + batchId
-                                                        + "\",\"fullName\":\"Simran Kaur\",\"pin\":\""
-                                                        + pin
-                                                        + "\"}"))
-                        .andExpect(status().isOk())
-                        .andReturn()
-                        .getResponse()
-                        .getContentAsString();
-        return objectMapper.readTree(body).get("accessToken").asString();
+        UserAccount student = new UserAccount();
+        student.setCentre(centreA);
+        student.setRole(UserRole.STUDENT);
+        student.setUsername("simran");
+        student.setDisplayName("Simran Kaur");
+        student.setPasswordHash(passwordEncoder.encode(PASSWORD));
+        student.setStatus(UserStatus.ACTIVE);
+        return jwtService.issueAccessToken(userAccountRepository.saveAndFlush(student));
     }
 
     @Test

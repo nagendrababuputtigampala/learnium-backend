@@ -52,6 +52,7 @@ class DemoCentreSeederTest {
     @Test
     void seedsTheMockStory() {
         Centre centre = demoCentre();
+        assertThat(centre.getCode()).isEqualTo("dtc");
         List<UserAccount> users = userAccountRepository.findByCentreId(centre.getCentreId());
         assertThat(users).hasSize(7); // admin + teacher + 5 students
 
@@ -87,7 +88,6 @@ class DemoCentreSeederTest {
                         .findFirst()
                         .orElseThrow();
         assertThat(teacherMembership.getUser().getUserId()).isEqualTo(teacher.getUserId());
-        assertThat(teacherMembership.getPinHash()).isNull();
 
         List<BatchMembership> students =
                 roster.stream().filter(m -> m.getMemberRole() == MemberRole.STUDENT).toList();
@@ -96,10 +96,11 @@ class DemoCentreSeederTest {
                 .extracting(m -> m.getUser().getDisplayName())
                 .contains("Simran Kaur", "Arjun Singh", "Priya Sharma", "Rohan Mehta", "Ananya Iyer");
         for (BatchMembership student : students) {
-            assertThat(passwordEncoder.matches("1234", student.getPinHash())).isTrue();
             assertThat(student.getUser().getEmail()).isNull();
-            assertThat(student.getUser().getPasswordHash()).isNull();
+            assertThat(passwordEncoder.matches("Demo@123", student.getUser().getPasswordHash())).isTrue();
         }
+        assertThat(students).extracting(row -> row.getUser().getUsername())
+                .containsExactlyInAnyOrder("simran", "arjun", "priya", "rohan", "ananya");
         assertThat(studentProfileRepository.findAll()).hasSize(5);
         assertThat(studentProfileRepository.findAll())
                 .allSatisfy(p -> assertThat(p.getGrade().getCode()).isEqualTo("G8"));

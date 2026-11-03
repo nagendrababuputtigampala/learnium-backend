@@ -38,7 +38,7 @@ class MigrationTest {
                 .extracting(MigrationInfo::getVersion)
                 .extracting(Object::toString)
                 .containsExactly(
-                        "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14");
+                        "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17");
         assertThat(applied)
                 .extracting(MigrationInfo::getState)
                 .containsOnly(MigrationState.SUCCESS);
@@ -127,9 +127,9 @@ class MigrationTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(
                         () -> insertUserRow(centreA, "shared@example.test"))
                 .isInstanceOf(org.springframework.dao.DataAccessException.class);
-        // NULL emails (students) are unrestricted by the index.
-        insertUserRow(centreA, null);
-        insertUserRow(centreB, null);
+        // Student contact emails may repeat, including a staff email.
+        insertStudentRow(centreA, "shared@example.test", "student.one");
+        insertStudentRow(centreA, "shared@example.test", "student.two");
     }
 
     @Test
@@ -250,6 +250,43 @@ class MigrationTest {
                 .isInstanceOf(org.springframework.dao.DataAccessException.class);
     }
 
+    @Test
+    void markingJobHistoryAllowsTerminalRowsButOnlyOneLiveJobAfterV17() {
+        java.util.UUID questionAttemptId = java.util.UUID.randomUUID();
+        java.util.UUID centreId = java.util.UUID.randomUUID();
+        jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
+        try {
+            insertMarkingJobRow(centreId, questionAttemptId, "FAILED");
+            insertMarkingJobRow(centreId, questionAttemptId, "SUCCEEDED");
+            insertMarkingJobRow(centreId, questionAttemptId, "PENDING");
+            org.assertj.core.api.Assertions.assertThatThrownBy(
+                            () -> insertMarkingJobRow(centreId, questionAttemptId, "RUNNING"))
+                    .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        } finally {
+            jdbcTemplate.update(
+                    "DELETE FROM learnium.background_job WHERE question_attempt_id = ?",
+                    questionAttemptId);
+            jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
+        }
+    }
+
+    private void insertMarkingJobRow(
+            java.util.UUID centreId, java.util.UUID questionAttemptId, String status) {
+        jdbcTemplate.update(
+                "INSERT INTO learnium.background_job"
+                        + " (id, centre_id, job_type, question_attempt_id, marking_input,"
+                        + " provider, model, prompt_version, payload_schema_version, status,"
+                        + " next_attempt_at, created_at, updated_at)"
+                        + " VALUES (?, ?, 'MARKING', ?, CAST(? AS jsonb), 'ollama', 'test',"
+                        + " 'marking-prompt-v1', 'marking-v1', ?, CURRENT_TIMESTAMP,"
+                        + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                java.util.UUID.randomUUID(),
+                centreId,
+                questionAttemptId,
+                "{\"answer\":\"test\"}",
+                status);
+    }
+
     private void insertQuestionRow(
             java.util.UUID centreId,
             java.util.UUID topicId,
@@ -297,11 +334,20 @@ class MigrationTest {
         java.util.UUID centreId = java.util.UUID.randomUUID();
         jdbcTemplate.update(
                 "INSERT INTO learnium.centres"
-                        + " (centre_id, name, status, created_at, updated_at)"
-                        + " VALUES (?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                        + " (centre_id, code, name, status, created_at, updated_at)"
+                        + " VALUES (?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 centreId,
+                "t" + centreId.toString().substring(0, 8),
                 name);
         return centreId;
+    }
+
+    private void insertStudentRow(java.util.UUID centreId, String email, String username) {
+        jdbcTemplate.update(
+                "INSERT INTO learnium.user_account"
+                        + " (user_id, centre_id, role, email, username, display_name, status, created_at, updated_at)"
+                        + " VALUES (?, ?, 'STUDENT', ?, ?, 'Student Test', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                java.util.UUID.randomUUID(), centreId, email, username);
     }
 
     private void insertUserRow(java.util.UUID centreId, String email) {
@@ -320,6 +366,7 @@ class MigrationTest {
     void migratedSchemaAcceptsEntityWrites() {
         Centre centre = new Centre();
         centre.setName("Migration Smoke Centre");
+        centre.setCode("msc");
         Centre saved = centreRepository.save(centre);
         assertThat(saved.getCentreId()).isNotNull();
         assertThat(saved.getCreatedAt()).isNotNull();

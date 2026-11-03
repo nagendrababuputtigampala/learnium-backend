@@ -53,7 +53,7 @@ import org.hibernate.type.SqlTypes;
 public class BackgroundJob extends AuditableEntity {
     @Column(name = "job_type", nullable = false, length = 16)
     private String jobType = "GENERATION";
-    @Column(name = "question_attempt_id", unique = true)
+    @Column(name = "question_attempt_id")
     private UUID questionAttemptId;
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "marking_input", columnDefinition = "jsonb")

@@ -4,8 +4,8 @@ import com.learnium.admin.RosterService;
 import com.learnium.api.dto.BatchDtos.AddStudentRequest;
 import com.learnium.api.dto.BatchDtos.AddStudentResponse;
 import com.learnium.api.dto.BatchDtos.BulkAddStudentsRequest;
-import com.learnium.api.dto.BatchDtos.ResetPinResponse;
 import com.learnium.api.dto.BatchDtos.RosterStudentDto;
+import com.learnium.api.dto.BatchDtos.RenameUsernameRequest;
 import com.learnium.security.CurrentPrincipal;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -45,7 +46,7 @@ public class RosterController {
     public ResponseEntity<AddStudentResponse> addStudent(
             @PathVariable UUID batchId, @Valid @RequestBody AddStudentRequest request) {
         AddStudentResponse created =
-                rosterService.addStudent(CurrentPrincipal.require(), batchId, request.fullName());
+                rosterService.addStudent(CurrentPrincipal.require(), batchId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
@@ -57,11 +58,17 @@ public class RosterController {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    @PostMapping("/{membershipId}/reset-pin")
-    public ResponseEntity<ResetPinResponse> resetPin(
-            @PathVariable UUID batchId, @PathVariable UUID membershipId) {
-        return ResponseEntity.ok(
-                rosterService.resetPin(CurrentPrincipal.require(), batchId, membershipId));
+    @PutMapping("/{userId}/username")
+    public ResponseEntity<RosterStudentDto> rename(
+            @PathVariable UUID batchId, @PathVariable UUID userId,
+            @Valid @RequestBody RenameUsernameRequest request) {
+        return ResponseEntity.ok(rosterService.rename(CurrentPrincipal.require(), batchId, userId, request.username()));
+    }
+
+    @PostMapping("/{userId}/resend-invite")
+    public ResponseEntity<AddStudentResponse> resendInvite(
+            @PathVariable UUID batchId, @PathVariable UUID userId) {
+        return ResponseEntity.ok(rosterService.resendInvite(CurrentPrincipal.require(), batchId, userId));
     }
 
     @DeleteMapping("/{membershipId}")

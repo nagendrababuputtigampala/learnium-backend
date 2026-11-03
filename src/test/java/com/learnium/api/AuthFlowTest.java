@@ -82,6 +82,14 @@ class AuthFlowTest {
         AuthFixtures.createStaff(
                 userAccountRepository, passwordEncoder, centre, UserRole.TEACHER,
                 "nopassword@auth.test", "No Password", null, UserStatus.ACTIVE);
+        UserAccount student = AuthFixtures.createStaff(
+                userAccountRepository, passwordEncoder, centre, UserRole.STUDENT,
+                "family@auth.test", "Simran Kaur", PASSWORD, UserStatus.ACTIVE);
+        student.setUsername("simran"); userAccountRepository.save(student);
+        UserAccount inactiveStudent = AuthFixtures.createStaff(
+                userAccountRepository, passwordEncoder, centre, UserRole.STUDENT,
+                null, "Rohan Mehta", PASSWORD, UserStatus.DISABLED);
+        inactiveStudent.setUsername("rohan"); userAccountRepository.save(inactiveStudent);
     }
 
     private JsonNode login(String email, String password) throws Exception {
@@ -191,11 +199,46 @@ class AuthFlowTest {
         mockMvc.perform(
                         post("/api/v1/auth/login")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"email\":\"not-an-email\",\"password\":\"\"}"))
+                                .content("{\"email\":\"\",\"password\":\"\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("LRN-VAL-001"))
                 .andExpect(jsonPath("$.fieldErrors.email").exists())
                 .andExpect(jsonPath("$.fieldErrors.password").exists());
+    }
+
+    @Test void studentLogsInWithUsernameAndCentreCodeAndUsesRefresh() throws Exception {
+        JsonNode loggedIn = login("simran@" + centre.getCode(), PASSWORD);
+        assertThat(loggedIn.get("user").get("role").asString()).isEqualTo("STUDENT");
+        assertThat(loggedIn.get("user").get("username").asString()).isEqualTo("simran");
+        assertThat(refresh(loggedIn.get("refreshToken").asString(), 200).get("user").get("role").asString())
+                .isEqualTo("STUDENT");
+    }
+
+    @Test void studentWrongPasswordAndUnknownCentreStayIndistinguishable() throws Exception {
+        for (String identifier : java.util.List.of("simran@" + centre.getCode(), "simran@unknown")) {
+            mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"email\":\"" + identifier + "\",\"password\":\"wrong\"}"))
+                    .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("LRN-AUTH-002"));
+        }
+    }
+
+    @Test void malformedStudentIdentifiersUseTheSameInvalidCredentialsResponse() throws Exception {
+        for (String identifier : java.util.List.of("@" + centre.getCode(), "simran@")) {
+            mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"email\":\"" + identifier + "\",\"password\":\"" + PASSWORD + "\"}"))
+                    .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("LRN-AUTH-002"));
+        }
+    }
+
+    @Test void inactiveStudentWithCorrectPasswordIsForbidden() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"rohan@" + centre.getCode() + "\",\"password\":\"" + PASSWORD + "\"}"))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("LRN-AUTH-005"));
+    }
+
+    @Test void retiredStudentSessionRouteIsNotFound() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/student-session").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("LRN-SYS-404"));
     }
 
     @Test
@@ -350,6 +393,7 @@ class AuthFlowTest {
         Centre ghostCentre = new Centre();
         ghostCentre.setCentreId(java.util.UUID.randomUUID());
         ghostCentre.setName("Ghost Centre");
+        ghostCentre.setCode("ghost");
         UserAccount ghost = new UserAccount();
         ghost.setUserId(java.util.UUID.randomUUID());
         ghost.setCentre(ghostCentre);

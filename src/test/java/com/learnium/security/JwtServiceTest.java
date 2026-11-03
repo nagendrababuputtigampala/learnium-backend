@@ -38,6 +38,7 @@ class JwtServiceTest {
 
     private UserAccount staffUser(UserRole role) {
         Centre centre = new Centre();
+        centre.setCode("t" + UUID.randomUUID().toString().substring(0, 8));
         centre.setCentreId(UUID.randomUUID());
         centre.setName("JWT Centre");
         UserAccount user = new UserAccount();
@@ -60,16 +61,15 @@ class JwtServiceTest {
     }
 
     @Test
-    void studentTokenCarriesBatchAndMembershipScope() {
+    void studentAccountTokenRoundTripsToPrincipal() {
         UserAccount user = staffUser(UserRole.STUDENT);
-        UUID centreId = UUID.randomUUID();
-        UUID batchId = UUID.randomUUID();
-        UUID membershipId = UUID.randomUUID();
 
-        String token = jwtService.issueStudentToken(user, centreId, batchId, membershipId);
+        String token = jwtService.issueAccessToken(user);
 
         assertThat(jwtService.validate(token))
-                .contains(LearniumPrincipal.student(user.getUserId(), centreId, batchId, membershipId));
+                .contains(
+                        LearniumPrincipal.student(
+                                user.getUserId(), user.getCentre().getCentreId()));
     }
 
     @Test
@@ -196,7 +196,7 @@ class JwtServiceTest {
     }
 
     @Test
-    void studentTokenWithoutMembershipClaimIsRejected() throws Exception {
+    void legacyBatchClaimsDoNotChangeStudentAccountScope() throws Exception {
         UserAccount user = staffUser(UserRole.STUDENT);
         SecretKey key = keyFor(SECRET);
         String batchOnly =
@@ -211,7 +211,10 @@ class JwtServiceTest {
                         .signWith(key)
                         .compact();
 
-        assertThat(jwtService.validate(batchOnly)).isEmpty();
+        assertThat(jwtService.validate(batchOnly))
+                .contains(
+                        LearniumPrincipal.student(
+                                user.getUserId(), user.getCentre().getCentreId()));
     }
 
     @Test
@@ -227,7 +230,7 @@ class JwtServiceTest {
     }
 
     @Test
-    void studentTokenWithoutBatchScopeIsRejected() throws Exception {
+    void studentAccountTokenNeedsNoRosterClaims() throws Exception {
         UserAccount user = staffUser(UserRole.STUDENT);
         SecretKey key = keyFor(SECRET);
         String unscoped =
@@ -241,6 +244,9 @@ class JwtServiceTest {
                         .signWith(key)
                         .compact();
 
-        assertThat(jwtService.validate(unscoped)).isEmpty();
+        assertThat(jwtService.validate(unscoped))
+                .contains(
+                        LearniumPrincipal.student(
+                                user.getUserId(), user.getCentre().getCentreId()));
     }
 }

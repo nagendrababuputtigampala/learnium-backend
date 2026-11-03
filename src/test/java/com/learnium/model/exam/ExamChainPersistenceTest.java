@@ -45,6 +45,7 @@ import com.learnium.repository.user.CentreRepository;
 import com.learnium.repository.user.UserAccountRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -87,6 +88,7 @@ class ExamChainPersistenceTest {
     void fullChainFromTemplateToMarkedAnswers() throws Exception {
         Centre centre = new Centre();
         centre.setName("Alpha Tutoring");
+        centre.setCode("at1");
         centre = centreRepository.save(centre);
 
         UserAccount teacher = new UserAccount();
@@ -100,6 +102,7 @@ class ExamChainPersistenceTest {
         student.setCentre(centre);
         student.setRole(UserRole.STUDENT);
         student.setDisplayName("Simran");
+        student.setUsername("simran1");
         student = userAccountRepository.save(student);
 
         Grade grade = new Grade();
@@ -228,12 +231,13 @@ class ExamChainPersistenceTest {
         attempt.setTotalQuestions(2);
         attempt = examAttemptRepository.save(attempt);
         assertThat(attempt.getAttemptNo()).isEqualTo(1);
-        assertThat(attempt.getStatus()).isEqualTo(ExamAttemptStatus.STARTED);
+        assertThat(attempt.getStatus()).isEqualTo(ExamAttemptStatus.IN_PROGRESS);
         assertThat(attempt.getTotalScore()).isNull();
 
         QuestionAttempt objective = new QuestionAttempt();
         objective.setCentreId(centre.getCentreId());
         objective.setAttempt(attempt);
+        objective.setExamInstanceQuestion(iq1);
         objective.setQuestion(mcq);
         objective.setQuestionVersion(mcq.getVersion());
         objective.setAnswerPayload(objectMapper.readTree("{\"selected\":\"options[0]\"}"));
@@ -243,6 +247,7 @@ class ExamChainPersistenceTest {
         QuestionAttempt writtenAnswer = new QuestionAttempt();
         writtenAnswer.setCentreId(centre.getCentreId());
         writtenAnswer.setAttempt(attempt);
+        writtenAnswer.setExamInstanceQuestion(iq2);
         writtenAnswer.setQuestion(written);
         writtenAnswer.setQuestionVersion(written.getVersion());
         writtenAnswer.setAnswerPayload(objectMapper.readTree("{\"text\":\"Fractions with same value.\"}"));
@@ -321,6 +326,7 @@ class ExamChainPersistenceTest {
             throws Exception {
         Centre centre = new Centre();
         centre.setName(name);
+        centre.setCode("t" + UUID.randomUUID().toString().substring(0, 8));
         centre = centreRepository.save(centre);
 
         UserAccount teacher = new UserAccount();
@@ -332,6 +338,7 @@ class ExamChainPersistenceTest {
         UserAccount student = new UserAccount();
         student.setCentre(centre);
         student.setRole(UserRole.STUDENT);
+        student.setUsername("student" + UUID.randomUUID().toString().substring(0, 6));
         student = userAccountRepository.save(student);
 
         Question question = new Question();
@@ -367,6 +374,14 @@ class ExamChainPersistenceTest {
         instance.setJoinCode(joinCode);
         instance = examInstanceRepository.save(instance);
 
+        ExamInstanceQuestion instanceQuestion = new ExamInstanceQuestion();
+        instanceQuestion.setCentreId(centre.getCentreId());
+        instanceQuestion.setExamInstance(instance);
+        instanceQuestion.setQuestion(question);
+        instanceQuestion.setQuestionOrder(1);
+        instanceQuestion.setQuestionVersion(question.getVersion());
+        instanceQuestion = examInstanceQuestionRepository.save(instanceQuestion);
+
         ExamAttempt attempt = new ExamAttempt();
         attempt.setCentreId(centre.getCentreId());
         attempt.setExamInstance(instance);
@@ -377,6 +392,7 @@ class ExamChainPersistenceTest {
         QuestionAttempt answer = new QuestionAttempt();
         answer.setCentreId(centre.getCentreId());
         answer.setAttempt(attempt);
+        answer.setExamInstanceQuestion(instanceQuestion);
         answer.setQuestion(question);
         answer.setQuestionVersion(1);
         answer.setAnswerPayload(objectMapper.readTree("{\"selected\":\"options[0]\"}"));
@@ -442,12 +458,14 @@ class ExamChainPersistenceTest {
     void topicStatsBadgesAndXpRoundTrip() throws Exception {
         Centre centre = new Centre();
         centre.setName("Alpha Tutoring");
+        centre.setCode("at2");
         centre = centreRepository.save(centre);
 
         UserAccount student = new UserAccount();
         student.setCentre(centre);
         student.setRole(UserRole.STUDENT);
         student.setDisplayName("Simran");
+        student.setUsername("simran2");
         student = userAccountRepository.save(student);
 
         Grade grade = new Grade();

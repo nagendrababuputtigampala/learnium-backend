@@ -1,4 +1,71 @@
-# Progress — feature/publish (M4 branch 2)
+# Progress — feature/student-flow (M5)
+
+## Part 4 — student dashboard (2026-11-03)
+
+- Added a student-owned dashboard computed live from final attempt and marking facts;
+  invalidated attempts and pending written answers cannot affect scored denominators.
+- Topic summaries expose confirmed counts, earned/available marks, exact threshold bands,
+  strong/focus lists and the five most recent submitted results with pending indicators.
+- Batch/topic comparisons appear only from eight distinct students, expose aggregate
+  average and percentile data only, and never return another student's identity or score.
+- Repository aggregation uses three fixed queries for topic, recent-result and comparison
+  facts, avoiding per-topic, per-attempt and per-student query growth.
+- Clean verification: 620 tests run, 579 passed and 41 optional PostgreSQL tests skipped;
+  zero failures/errors. JaCoCo is 100% lines (3629/3629) and branches (1391/1391).
+- Part 4 is complete and committed before Part 5; no integrity/camera work has started.
+
+## Part 3 — marking queue and confirmation (2026-11-03)
+
+- Flyway V17 replaces the blanket one-job-per-answer constraint with one live marking
+  job per answer while retaining terminal history, and records confirmed criterion
+  breakdowns plus marker/time audit fields.
+- Added manageable-batch/admin marking queues and frozen-answer detail, with READY,
+  MARKING, FAILED and manual NONE states derived from persisted answer/job facts.
+- Added frozen-rubric confirmation with exact criterion/bounds validation, half-up
+  rescaling to published marks, double-confirm protection and an audited manual path.
+  Failed unconfirmed suggestions can be rerun without permitting duplicate live jobs.
+- Database-level tests prove terminal history and the one-live-job invariant; API tests
+  cover scoping, every state, validation, rounding, manual confirmation and rerun rules.
+- Clean verification: 617 tests run, 576 passed and 41 optional PostgreSQL tests skipped;
+  zero failures/errors. JaCoCo remains 100% lines (3581/3581) and branches (1365/1365).
+- Part 3 is complete and committed before Part 4; no dashboard work has started.
+
+## Checkpoint B — student player and practice (2026-11-03)
+
+- Flyway V16 completes the ported attempt model with server deadlines, the four-state
+  lifecycle and a tenant-safe frozen-item answer link unique within each attempt.
+- Added assignment-scoped start/resume, owned attempt retrieval, typed idempotent autosave,
+  first-writer submission, objective grading, written marking-job enqueueing and retakes.
+  Pre-release responses remove every answer key, model answer, rubric and worked solution.
+- Added the scheduled auto-submit path over the same grading transaction, including early
+  instance closure, and release-policy-aware results with pending/confirmed written states.
+- Flashcard practice returns frozen assigned cards in-window without creating attempts,
+  answers, scores or other server-side practice progress.
+- Final clean verification: 606 tests run, 565 passed and 41 optional PostgreSQL tests
+  skipped; zero failures/errors. The enforced JaCoCo gates are 100% lines (3461/3461)
+  and branches (1287/1287).
+- Checkpoint B is complete and committed before Part 3; no Part 3 work has started.
+
+## Checkpoint A — student accounts and Tests home (2026-11-03)
+
+- Flyway V15 replaces roster PIN sessions with centre-linked student accounts: centres
+  receive deterministic unique codes, students receive centre-scoped usernames, shared
+  optional contact emails remain legal, and the retired PIN columns are removed.
+- Staff and students now use the same login, JWT, refresh and account-status lifecycle.
+  Staff authenticate by email; students authenticate as `username@centrecode`. The old
+  student-session endpoint and batch-membership credential token have been removed.
+- Roster management creates real student accounts, profiles, memberships and optional
+  invites transactionally. It supports suggested/custom usernames, availability checks,
+  existing-centre students, bulk add, rename, resend and membership deactivation.
+- Added the centre-scoped student directory and student Tests-home API. The demo centre is
+  seeded with code `dtc`, five named student accounts and the shared demo password.
+- Clean verification: 592 tests run, 551 passed and 41 optional PostgreSQL tests skipped;
+  zero failures/errors. JaCoCo is 100% for instructions (17160/17160), branches
+  (1143/1143), lines (3272/3272), complexity (1269/1269) and methods (690/690).
+- Checkpoint A is complete. No V16 attempt/player work has started; Part 2 begins only
+  after this checkpoint is committed and reported.
+
+# Earlier progress — feature/publish (M4 branch 2)
 
 ## S1 — existing exam schema extensions (2026-11-02)
 

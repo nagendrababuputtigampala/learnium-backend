@@ -16,6 +16,7 @@ public final class AuthFixtures {
     public static Centre createCentre(CentreRepository centreRepository, String name) {
         Centre centre = new Centre();
         centre.setName(name);
+        centre.setCode("t" + java.util.UUID.randomUUID().toString().substring(0, 8));
         return centreRepository.save(centre);
     }
 
@@ -33,6 +34,10 @@ public final class AuthFixtures {
         user.setRole(role);
         user.setEmail(email);
         user.setDisplayName(displayName);
+        if (role == UserRole.STUDENT) {
+            user.setUsername(displayName.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]+", ".")
+                    .replaceAll("^\\.|\\.$", ""));
+        }
         user.setPasswordHash(rawPassword == null ? null : passwordEncoder.encode(rawPassword));
         user.setStatus(status);
         return userAccountRepository.save(user);

@@ -67,6 +67,7 @@ class PostgresMigrationTest {
     void centreJpaRoundTripOnRealPostgres() {
         Centre centre = new Centre();
         centre.setName("PG Smoke Centre");
+        centre.setCode("pgsc");
         Centre saved = centreRepository.save(centre);
         assertThat(saved.getCentreId()).isNotNull();
         assertThat(centreRepository.findById(saved.getCentreId()))
@@ -130,9 +131,10 @@ class PostgresMigrationTest {
     private UUID insertCentre(String name) {
         UUID id = UUID.randomUUID();
         jdbcTemplate.update(
-                "INSERT INTO learnium.centres (centre_id, name, created_at, updated_at)"
-                        + " VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                "INSERT INTO learnium.centres (centre_id, code, name, created_at, updated_at)"
+                        + " VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 id,
+                "p" + id.toString().substring(0, 8),
                 name);
         return id;
     }

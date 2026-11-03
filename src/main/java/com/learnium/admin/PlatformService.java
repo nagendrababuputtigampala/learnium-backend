@@ -32,16 +32,19 @@ public class PlatformService {
     private final CentreRepository centreRepository;
     private final UserAccountRepository userAccountRepository;
     private final AccountFlowService accountFlowService;
+    private final CentreCodeService centreCodes;
     private final String provisioningKey;
 
     public PlatformService(
             CentreRepository centreRepository,
             UserAccountRepository userAccountRepository,
             AccountFlowService accountFlowService,
+            CentreCodeService centreCodes,
             @Value("${learnium.platform.provisioning-key:}") String provisioningKey) {
         this.centreRepository = centreRepository;
         this.userAccountRepository = userAccountRepository;
         this.accountFlowService = accountFlowService;
+        this.centreCodes = centreCodes;
         this.provisioningKey = provisioningKey;
     }
 
@@ -54,6 +57,7 @@ public class PlatformService {
         }
         Centre centre = new Centre();
         centre.setName(request.name());
+        centre.setCode(centreCodes.issue(request.name()));
         centre.setStatus(CentreStatus.ACTIVE);
         centre = centreRepository.save(centre);
 
@@ -74,7 +78,7 @@ public class PlatformService {
         }
 
         accountFlowService.sendInvite(admin);
-        return new CreateCentreResponse(centre.getCentreId(), admin.getUserId());
+        return new CreateCentreResponse(centre.getCentreId(), centre.getCode(), admin.getUserId());
     }
 
     private void requireProvisioningKey(String providedKey) {

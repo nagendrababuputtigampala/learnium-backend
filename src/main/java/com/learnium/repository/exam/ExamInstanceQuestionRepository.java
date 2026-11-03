@@ -19,4 +19,9 @@ public interface ExamInstanceQuestionRepository extends JpaRepository<ExamInstan
                     + " order by iq.questionOrder asc")
     List<ExamInstanceQuestion> findByCentreIdAndExamInstanceIdOrderByQuestionOrderAsc(
             @Param("centreId") UUID centreId, @Param("examInstanceId") UUID examInstanceId);
+
+    @Query("select iq from ExamInstanceQuestion iq join fetch iq.question q join fetch q.questionType"
+            + " where iq.centreId = :centreId and iq.examInstance.examInstanceId = :instanceId"
+            + " and iq.examInstanceQuestionId = :itemId")
+    java.util.Optional<ExamInstanceQuestion> frozenItem(UUID centreId, UUID instanceId, UUID itemId);
 }

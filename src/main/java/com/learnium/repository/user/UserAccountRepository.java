@@ -48,8 +48,19 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
     @Query("select u from UserAccount u where u.email = :email")
     List<UserAccount> findByEmail(@Param("email") String email);
 
-    @Query(
-            "select case when count(u) > 0 then true else false end"
-                    + " from UserAccount u where u.email = :email")
+    @Query("select u from UserAccount u where u.email = :email and u.role <> com.learnium.model.user.UserRole.STUDENT")
+    List<UserAccount> findStaffByEmail(@Param("email") String email);
+
+    @Query("select u from UserAccount u join fetch u.centre c where c.code = :centreCode and u.username = :username and u.role = com.learnium.model.user.UserRole.STUDENT")
+    Optional<UserAccount> findStudentByCentreCodeAndUsername(
+            @Param("centreCode") String centreCode, @Param("username") String username);
+
+    @Query("select case when count(u) > 0 then true else false end from UserAccount u where u.centre.centreId = :centreId and u.username = :username")
+    boolean existsByCentreIdAndUsername(@Param("centreId") UUID centreId, @Param("username") String username);
+
+    @Query("select u from UserAccount u where u.centre.centreId = :centreId and u.role = com.learnium.model.user.UserRole.STUDENT order by u.displayName, u.userId")
+    Page<UserAccount> findStudents(@Param("centreId") UUID centreId, Pageable pageable);
+
+    @Query("select case when count(u) > 0 then true else false end from UserAccount u where u.email = :email and u.role <> com.learnium.model.user.UserRole.STUDENT")
     boolean existsByEmail(@Param("email") String email);
 }

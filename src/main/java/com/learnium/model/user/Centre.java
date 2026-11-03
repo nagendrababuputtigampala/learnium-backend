@@ -34,6 +34,9 @@ public class Centre extends AuditableEntity {
     @Column(name = "name", nullable = false, length = 150)
     private String name;
 
+    @Column(name = "code", nullable = false, length = 16, updatable = false, unique = true)
+    private String code;
+
     @Column(name = "logo_url", length = 500)
     private String logoUrl;
 

@@ -1,6 +1,7 @@
 package com.learnium.api.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
@@ -27,16 +28,25 @@ public final class BatchDtos {
             long studentCount) {}
 
     public record RosterStudentDto(
-            UUID membershipId, UUID userId, String fullName, String status, boolean pinLocked) {}
+            UUID membershipId, UUID userId, String displayName, String username,
+            String contactEmail, String status, String inviteStatus) {}
 
-    public record AddStudentRequest(@NotBlank(message = "must not be blank") String fullName) {}
+    public record AddStudentRequest(
+            @NotBlank(message = "must not be blank") String displayName,
+            @Email(message = "must be a valid email") String contactEmail,
+            String username,
+            UUID userId) {}
 
     public record BulkAddStudentsRequest(
             @NotEmpty(message = "must not be empty")
                     List<@NotBlank(message = "must not be blank") String> fullNames) {}
 
-    /** The raw PIN is returned exactly once, in this response only. */
-    public record AddStudentResponse(UUID membershipId, UUID userId, String fullName, String pin) {}
+    public record AddStudentResponse(
+            UUID membershipId, UUID userId, String displayName, String username, String inviteStatus) {}
 
-    public record ResetPinResponse(String pin) {}
+    public record RenameUsernameRequest(@NotBlank(message = "must not be blank") String username) {}
+
+    public record UsernameCheckDto(boolean available) {}
+
+    public record StudentLookupDto(UUID id, String displayName, String username) {}
 }

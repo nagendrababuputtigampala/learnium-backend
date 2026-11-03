@@ -57,6 +57,14 @@ public class AccountFlowService {
                 mailModel(user, raw, "invite", INVITE_TTL));
     }
 
+    /** Student contacts are optional; without one the account is created but no token is issued. */
+    @Transactional
+    public boolean sendStudentInvite(UserAccount user) {
+        if (user.getEmail() == null || user.getEmail().isBlank()) return false;
+        sendInvite(user);
+        return true;
+    }
+
     /**
      * Resend an invite for an account that has not set a password yet: every
      * outstanding invite token is invalidated and a fresh 48-hour token +
@@ -70,13 +78,14 @@ public class AccountFlowService {
 
     /**
      * Forgot-password: deliberately silent about whether the email exists
-     * (the endpoint always answers 202). Only active staff accounts get a
-     * reset link — students have no password to reset.
+     * (the endpoint always answers 202). Active accounts get a reset link.
+     * Student contact emails may repeat, so every matching active
+     * account receives its own opaque reset link without changing the response.
      */
     @Transactional
     public void forgotPassword(String email) {
         for (UserAccount user : userAccountRepository.findByEmail(EmailAddresses.normalize(email))) {
-            if (user.getStatus() == UserStatus.ACTIVE && user.getRole() != UserRole.STUDENT) {
+            if (user.getStatus() == UserStatus.ACTIVE) {
                 String raw = accountTokenService.create(user, AccountTokenPurpose.RESET, RESET_TTL);
                 emailOutboxService.enqueue(
                         user.getCentre().getCentreId(),
@@ -114,6 +123,8 @@ public class AccountFlowService {
         Map<String, Object> model = new HashMap<>();
         model.put("displayName", user.getDisplayName());
         model.put("centreName", user.getCentre().getName());
+        model.put("centreCode", user.getCentre().getCode());
+        if (user.getUsername() != null) model.put("username", user.getUsername() + "@" + user.getCentre().getCode());
         model.put("token", rawToken);
         model.put("purpose", purpose);
         model.put("expiresHours", Long.toString(ttl.toHours()));

@@ -43,6 +43,11 @@ class TenancyPersistenceTest {
     private Centre saveCentre(String name) {
         Centre centre = new Centre();
         centre.setName(name);
+        centre.setCode(
+                name.chars().filter(Character::isUpperCase)
+                                .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
+                                .toString().toLowerCase(java.util.Locale.ROOT)
+                        + java.util.UUID.randomUUID().toString().substring(0, 6));
         centre.setContactEmail("office@example.com");
         return centreRepository.save(centre);
     }
@@ -53,6 +58,7 @@ class TenancyPersistenceTest {
         user.setRole(role);
         user.setEmail(email);
         user.setDisplayName(displayName);
+        if (role == UserRole.STUDENT) user.setUsername("simran");
         return userAccountRepository.save(user);
     }
 
@@ -97,7 +103,6 @@ class TenancyPersistenceTest {
         studentMembership.setCentreId(centre.getCentreId());
         studentMembership.setUser(student);
         studentMembership.setMemberRole(MemberRole.STUDENT);
-        studentMembership.setPinHash("hashed-pin");
         membershipRepository.save(studentMembership);
 
         entityManager.flush();
@@ -110,13 +115,8 @@ class TenancyPersistenceTest {
         assertThat(roster)
                 .extracting(m -> m.getUser().getUserId())
                 .containsExactlyInAnyOrder(teacher.getUserId(), student.getUserId());
-        assertThat(
-                        roster.stream()
-                                .filter(m -> m.getMemberRole() == MemberRole.STUDENT)
-                                .findFirst()
-                                .orElseThrow()
-                                .getPinHash())
-                .isEqualTo("hashed-pin");
+        assertThat(roster.stream().filter(m -> m.getMemberRole() == MemberRole.STUDENT)
+                .findFirst().orElseThrow().getUser().getUsername()).isEqualTo("simran");
         assertThat(
                         membershipRepository.findByCentreIdAndBatchIdAndStatus(
                                 centre.getCentreId(), batch.getBatchId(), MembershipStatus.INACTIVE))

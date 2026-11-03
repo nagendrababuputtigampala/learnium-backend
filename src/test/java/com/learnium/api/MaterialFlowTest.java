@@ -23,6 +23,7 @@ import com.learnium.repository.master.SubjectRepository;
 import com.learnium.repository.user.CentreRepository;
 import com.learnium.repository.user.UserAccountRepository;
 import com.learnium.security.TokenHashing;
+import com.learnium.security.JwtService;
 import com.learnium.storage.StorageService;
 import com.learnium.testsupport.AuthFixtures;
 import com.learnium.testsupport.CommittedDataCleanup;
@@ -76,6 +77,7 @@ class MaterialFlowTest {
     @Autowired private StorageService storageService;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private JwtService jwtService;
 
     private UserAccount teacherA1;
     private GradeSubject gradeSubject;
@@ -490,47 +492,14 @@ class MaterialFlowTest {
     // --- helpers -------------------------------------------------------
 
     private String studentToken() throws Exception {
-        JsonNode batch =
-                readTree(
-                        mockMvc.perform(
-                                        post("/api/v1/admin/batches")
-                                                .header("Authorization", "Bearer " + adminToken)
-                                                .contentType(MediaType.APPLICATION_JSON)
-                                                .content(
-                                                        "{\"name\":\"Batch B\",\"gradeSubjectId\":\""
-                                                                + gradeSubject.getGradeSubjectId()
-                                                                + "\"}"))
-                                .andExpect(status().isCreated())
-                                .andReturn()
-                                .getResponse()
-                                .getContentAsString());
-        String batchId = batch.get("batchId").asString();
-        JsonNode student =
-                readTree(
-                        mockMvc.perform(
-                                        post("/api/v1/batches/" + batchId + "/students")
-                                                .header("Authorization", "Bearer " + adminToken)
-                                                .contentType(MediaType.APPLICATION_JSON)
-                                                .content("{\"fullName\":\"Simran Kaur\"}"))
-                                .andExpect(status().isCreated())
-                                .andReturn()
-                                .getResponse()
-                                .getContentAsString());
-        String body =
-                mockMvc.perform(
-                                post("/api/v1/auth/student-session")
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .content(
-                                                "{\"batchId\":\""
-                                                        + batchId
-                                                        + "\",\"fullName\":\"Simran Kaur\",\"pin\":\""
-                                                        + student.get("pin").asString()
-                                                        + "\"}"))
-                        .andExpect(status().isOk())
-                        .andReturn()
-                        .getResponse()
-                        .getContentAsString();
-        return readTree(body).get("accessToken").asString();
+        UserAccount student = new UserAccount();
+        student.setCentre(teacherA1.getCentre());
+        student.setRole(UserRole.STUDENT);
+        student.setUsername("simran");
+        student.setDisplayName("Simran Kaur");
+        student.setPasswordHash(passwordEncoder.encode(PASSWORD));
+        student.setStatus(UserStatus.ACTIVE);
+        return jwtService.issueAccessToken(userAccountRepository.saveAndFlush(student));
     }
 
     private ResultActions upload(String token, byte[] pdf, String filename, String title)
