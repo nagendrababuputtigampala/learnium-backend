@@ -13,7 +13,10 @@ import org.springframework.web.bind.annotation.*;
 public class MarkingQueueController {
     private final MarkingQueueService service;
     public MarkingQueueController(MarkingQueueService service) { this.service = service; }
-    @GetMapping public List<QueueGroupDto> queue() { return service.queue(CurrentPrincipal.require()); }
+    @GetMapping public List<QueueGroupDto> queue(@RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        return service.queue(CurrentPrincipal.require(), page, size);
+    }
     @GetMapping("/{id}") public MarkingDetailDto detail(@PathVariable UUID id) { return service.detail(CurrentPrincipal.require(), id); }
     @PostMapping("/{id}/confirm") public MarkingDetailDto confirm(@PathVariable UUID id, @RequestBody ConfirmRequest request) {
         return service.confirm(CurrentPrincipal.require(), id, request);

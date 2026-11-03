@@ -10,7 +10,32 @@
   instance+student, carries the hashed check token, and is linked to the
   attempt when the token is consumed at start. MigrationTest 9 green
   (V1–V18 in order, tenancy FK + CHECK rejection proven).
-- Next: S2 integrity event ingest. Failing tests: none.
+- S2 done: POST /student/attempts/{id}/integrity-events — own attempt only,
+  batch ≤ 20 validated up front, recorded only when the instance has signals
+  ON and the attempt is not invalidated (otherwise accepted + dropped);
+  maintains exam_attempts.integrity_flag_count. IntegrityFlowTest 4 green.
+- S3 done: teacher attempt oversight (AttemptAdminService) —
+  GET /instances/{id}/attempts with live score state + grouped flag counts,
+  GET /attempts/{id}/integrity-events timeline, POST /attempts/{id}/invalidate
+  (idempotent; managing staff + admins only, 404 otherwise). Marking queue and
+  detail now exclude INVALIDATED attempts; a student result for an invalidated
+  attempt reads LRN-ATT-001. AttemptAdminFlowTest 3 green.
+- S4 done: camera check — POST /student/tests/{id}/camera-check stores the
+  PRE_TEST frame via StorageService and returns a 10-minute single-use token
+  (SHA-256 hash only on the snapshot row); camera-ON starts require a live
+  check (new LRN-ATT-004), resume does not, consumption links the snapshot to
+  the attempt. Frames are magic-byte validated (JPEG/PNG/WebP) and capped at
+  2 MB. CameraCheckFlowTest 3 green.
+- S5 done: POST /student/attempts/{id}/snapshots (PERIODIC/EVENT, own
+  in-progress attempt, camera-ON only); teacher GET snapshot list + image
+  stream under /attempts/{id}/snapshots with an audit log line per view;
+  ProctorRetentionJob nightly-purges snapshots older than 30 days (object +
+  row). SnapshotFlowTest 2 green.
+- S6 done (tracker 86): confirm() now requires PENDING/MARKING_PENDING
+  (CONFIRMED keeps LRN-MRK-002, anything else LRN-MRK-001); the marking
+  queue accepts optional page/size params (paging applied to pending answers
+  before grouping; no params = whole queue). MarkingQueueFlowTest 11 green.
+- Next: frontend F1–F3, then full gates. Failing tests: none.
 
 ## Part 4 — student dashboard (2026-11-03)
 
