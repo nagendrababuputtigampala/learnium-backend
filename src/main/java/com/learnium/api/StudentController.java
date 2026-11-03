@@ -1,6 +1,8 @@
 package com.learnium.api;
 
+import com.learnium.api.dto.IntegrityDtos.*;
 import com.learnium.api.dto.StudentDtos.*;
+import com.learnium.exam.IntegrityService;
 import com.learnium.exam.StudentAttemptService;
 import com.learnium.exam.StudentTestService;
 import com.learnium.exam.StudentDashboardService;
@@ -20,8 +22,10 @@ public class StudentController {
     private final StudentTestService tests;
     private final StudentAttemptService attempts;
     private final StudentDashboardService dashboard;
-    public StudentController(StudentTestService tests, StudentAttemptService attempts, StudentDashboardService dashboard) {
-        this.tests = tests; this.attempts = attempts; this.dashboard = dashboard;
+    private final IntegrityService integrity;
+    public StudentController(StudentTestService tests, StudentAttemptService attempts, StudentDashboardService dashboard,
+            IntegrityService integrity) {
+        this.tests = tests; this.attempts = attempts; this.dashboard = dashboard; this.integrity = integrity;
     }
     @GetMapping("/tests")
     public ResponseEntity<List<StudentTestDto>> tests() {
@@ -62,5 +66,12 @@ public class StudentController {
     @GetMapping("/tests/{instanceId}/practice")
     public ResponseEntity<PracticeDto> practice(@PathVariable UUID instanceId) {
         return ResponseEntity.ok(attempts.practice(CurrentPrincipal.require(), instanceId));
+    }
+
+    @PostMapping("/attempts/{attemptId}/integrity-events")
+    public ResponseEntity<IntegrityEventsResponse> integrityEvents(@PathVariable UUID attemptId,
+            @RequestBody IntegrityEventsRequest request) {
+        return ResponseEntity.ok(new IntegrityEventsResponse(
+                integrity.record(CurrentPrincipal.require(), attemptId, request == null ? null : request.events())));
     }
 }
