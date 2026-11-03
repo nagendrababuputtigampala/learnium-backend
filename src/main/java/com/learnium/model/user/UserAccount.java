@@ -21,10 +21,9 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * One login/person inside a centre. Admins and teachers authenticate with
- * email + password hash; students have neither — their credential is the roster
- * PIN on {@link BatchMembership}. (The legacy Firebase auth_provider/auth_uid
- * columns are dropped: v0.1.0 uses its own JWT.)
+ * One login/person inside a centre. Staff authenticate with globally unique
+ * email addresses; students authenticate with a centre-scoped username and
+ * may share an optional contact email.
  */
 @Entity
 @Table(
@@ -58,6 +57,9 @@ public class UserAccount extends AuditableEntity {
 
     @Column(name = "email", length = 255)
     private String email;
+
+    @Column(name = "username", length = 64)
+    private String username;
 
     @Column(name = "display_name", length = 150)
     private String displayName;

@@ -74,9 +74,10 @@ abstract class PublishingFixtures {
         mcq = question("MCQ"); numeric = question("NUMERIC"); flashcard = question("FLASHCARD"); written = question("WRITTEN");
         questions.flush(); memberships.flush();
     }
-    Centre centre(String name) { var c = new Centre(); c.setName(name); return centres.save(c); }
+    Centre centre(String name) { var c = new Centre(); c.setName(name); c.setCode("t" + UUID.randomUUID().toString().substring(0, 8)); return centres.save(c); }
     UserAccount user(Centre c, UserRole role) {
         var u = new UserAccount(); u.setCentre(c); u.setRole(role); u.setDisplayName(role + " " + UUID.randomUUID());
+        if (role == UserRole.STUDENT) u.setUsername("s" + UUID.randomUUID().toString().substring(0, 8));
         return users.save(u);
     }
     BatchMembership member(Batch batch, UserAccount user) {
@@ -99,7 +100,7 @@ abstract class PublishingFixtures {
     }
     RequestPostProcessor as(UserAccount user) {
         LearniumPrincipal principal = user.getRole() == UserRole.STUDENT
-                ? LearniumPrincipal.student(user.getUserId(), user.getCentre().getCentreId(), batch.getBatchId(), UUID.randomUUID())
+                ? LearniumPrincipal.student(user.getUserId(), user.getCentre().getCentreId())
                 : LearniumPrincipal.staff(user.getUserId(), user.getCentre().getCentreId(), user.getRole());
         return authentication(new UsernamePasswordAuthenticationToken(principal, null,
                 List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole()))));

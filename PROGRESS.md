@@ -1,4 +1,25 @@
-# Progress — feature/publish (M4 branch 2)
+# Progress — feature/student-flow (M5)
+
+## Checkpoint A — student accounts and Tests home (2026-11-03)
+
+- Flyway V15 replaces roster PIN sessions with centre-linked student accounts: centres
+  receive deterministic unique codes, students receive centre-scoped usernames, shared
+  optional contact emails remain legal, and the retired PIN columns are removed.
+- Staff and students now use the same login, JWT, refresh and account-status lifecycle.
+  Staff authenticate by email; students authenticate as `username@centrecode`. The old
+  student-session endpoint and batch-membership credential token have been removed.
+- Roster management creates real student accounts, profiles, memberships and optional
+  invites transactionally. It supports suggested/custom usernames, availability checks,
+  existing-centre students, bulk add, rename, resend and membership deactivation.
+- Added the centre-scoped student directory and student Tests-home API. The demo centre is
+  seeded with code `dtc`, five named student accounts and the shared demo password.
+- Clean verification: 592 tests run, 551 passed and 41 optional PostgreSQL tests skipped;
+  zero failures/errors. JaCoCo is 100% for instructions (17160/17160), branches
+  (1143/1143), lines (3272/3272), complexity (1269/1269) and methods (690/690).
+- Checkpoint A is complete. No V16 attempt/player work has started; Part 2 begins only
+  after this checkpoint is committed and reported.
+
+# Earlier progress — feature/publish (M4 branch 2)
 
 ## S1 — existing exam schema extensions (2026-11-02)
 

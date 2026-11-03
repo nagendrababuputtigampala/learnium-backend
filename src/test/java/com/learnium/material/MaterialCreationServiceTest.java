@@ -70,6 +70,7 @@ class MaterialCreationServiceTest {
                 .thenReturn(Optional.of(gradeSubject));
 
         Centre centre = new Centre();
+        centre.setCode("t" + UUID.randomUUID().toString().substring(0, 8));
         centre.setCentreId(centreId);
         UserAccount uploader = new UserAccount();
         uploader.setUserId(userId);

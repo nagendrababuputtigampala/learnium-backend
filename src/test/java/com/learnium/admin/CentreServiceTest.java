@@ -9,6 +9,7 @@ import com.learnium.common.error.BusinessException;
 import com.learnium.common.error.ErrorCode;
 import com.learnium.model.user.UserRole;
 import com.learnium.repository.user.CentreRepository;
+import com.learnium.repository.user.UserAccountRepository;
 import com.learnium.security.LearniumPrincipal;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,7 +23,7 @@ class CentreServiceTest {
         CentreRepository centreRepository = mock(CentreRepository.class);
         UUID centreId = UUID.randomUUID();
         when(centreRepository.findById(centreId)).thenReturn(Optional.empty());
-        CentreService service = new CentreService(centreRepository);
+        CentreService service = new CentreService(centreRepository, mock(UserAccountRepository.class), mock(StudentUsernameService.class));
         LearniumPrincipal principal =
                 LearniumPrincipal.staff(UUID.randomUUID(), centreId, UserRole.CENTRE_ADMIN);
 

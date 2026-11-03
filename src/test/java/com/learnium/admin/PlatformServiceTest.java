@@ -27,6 +27,7 @@ class PlatformServiceTest {
                         mock(CentreRepository.class),
                         mock(UserAccountRepository.class),
                         mock(AccountFlowService.class),
+                        mock(CentreCodeService.class),
                         null);
 
         assertThatThrownBy(
@@ -62,6 +63,7 @@ class PlatformServiceTest {
                         centreRepository,
                         userAccountRepository,
                         mock(AccountFlowService.class),
+                        codeService(),
                         "provisioning-key");
 
         assertThatThrownBy(
@@ -72,5 +74,11 @@ class PlatformServiceTest {
                 .isInstanceOfSatisfying(
                         BusinessException.class,
                         ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.USR_EMAIL_TAKEN));
+    }
+
+    private CentreCodeService codeService() {
+        CentreCodeService service = mock(CentreCodeService.class);
+        when(service.issue(any())).thenReturn("nc");
+        return service;
     }
 }

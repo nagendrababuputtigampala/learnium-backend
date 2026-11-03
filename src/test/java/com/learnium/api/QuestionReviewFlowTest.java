@@ -280,7 +280,7 @@ class QuestionReviewFlowTest {
     @Test void rejectsStudentRolesAndMissingReviewFields() throws Exception {
         Question q = draft(GeneratedQuestionType.MCQ);
         var student = authentication(new UsernamePasswordAuthenticationToken(
-                LearniumPrincipal.student(UUID.randomUUID(), centre.getCentreId(), UUID.randomUUID(), UUID.randomUUID()),
+                LearniumPrincipal.student(UUID.randomUUID(), centre.getCentreId()),
                 null, List.of(new SimpleGrantedAuthority("ROLE_STUDENT"))));
         mvc.perform(get("/api/v1/questions").with(student)).andExpect(status().isForbidden());
         mvc.perform(post("/api/v1/questions/"+q.getQuestionId()+"/approve").with(as(owner))
@@ -343,7 +343,7 @@ class QuestionReviewFlowTest {
     }
     @Test void authorizationMatrixCoversEveryEndpointAndReviewState() throws Exception {
         var student = authentication(new UsernamePasswordAuthenticationToken(
-                LearniumPrincipal.student(UUID.randomUUID(), centre.getCentreId(), UUID.randomUUID(), UUID.randomUUID()),
+                LearniumPrincipal.student(UUID.randomUUID(), centre.getCentreId()),
                 null, List.of(new SimpleGrantedAuthority("ROLE_STUDENT"))));
         var actors = List.of(as(owner), admin(), as(colleague), as(foreign), student);
         for (QuestionStatus state : QuestionStatus.values()) {

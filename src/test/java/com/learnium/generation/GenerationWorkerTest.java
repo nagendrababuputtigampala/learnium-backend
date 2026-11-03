@@ -198,6 +198,7 @@ class GenerationWorkerTest {
         generator.reset();
         clock.set(T0);
         Centre centre = new Centre();
+        centre.setCode("t" + UUID.randomUUID().toString().substring(0, 8));
         centre.setName("Worker Centre");
         centre = centreRepository.save(centre);
         teacher = new UserAccount();

@@ -159,10 +159,16 @@ class AccountFlowTest {
     }
 
     @Test
-    void forgotPasswordForStudentAccountStaysSilent() throws Exception {
+    void forgotPasswordUsesAStudentsContactEmail() throws Exception {
         forgot("student@flow.test");
 
-        assertThat(outboxRows()).isEmpty();
+        assertThat(outboxRows()).singleElement()
+                .satisfies(row -> {
+                    assertThat(row.getRecipient()).isEqualTo("student@flow.test");
+                    assertThat(row.getTemplate()).isEqualTo("reset");
+                    assertThat(decryptedModel(row).get("username").asText())
+                            .isEqualTo("stu.student@" + centre.getCode());
+                });
     }
 
     @Test

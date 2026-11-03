@@ -91,22 +91,6 @@ class ErrorCodeTest {
     }
 
     @Test
-    void authPinLockedHasRegisteredValues() {
-        assertThat(ErrorCode.AUTH_PIN_LOCKED.getCode()).isEqualTo("LRN-AUTH-006");
-        assertThat(ErrorCode.AUTH_PIN_LOCKED.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(ErrorCode.AUTH_PIN_LOCKED.getDefaultMessage())
-                .isEqualTo("This PIN is locked; ask your teacher to reset it");
-    }
-
-    @Test
-    void authStudentRejectedHasRegisteredValues() {
-        assertThat(ErrorCode.AUTH_STUDENT_REJECTED.getCode()).isEqualTo("LRN-AUTH-007");
-        assertThat(ErrorCode.AUTH_STUDENT_REJECTED.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED);
-        assertThat(ErrorCode.AUTH_STUDENT_REJECTED.getDefaultMessage())
-                .isEqualTo("Name or PIN not recognised for this batch");
-    }
-
-    @Test
     void usrEmailTakenHasRegisteredValues() {
         assertThat(ErrorCode.USR_EMAIL_TAKEN.getCode()).isEqualTo("LRN-USR-001");
         assertThat(ErrorCode.USR_EMAIL_TAKEN.getStatus()).isEqualTo(HttpStatus.CONFLICT);
@@ -119,6 +103,14 @@ class ErrorCodeTest {
         assertThat(ErrorCode.USR_NOT_FOUND.getCode()).isEqualTo("LRN-USR-002");
         assertThat(ErrorCode.USR_NOT_FOUND.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(ErrorCode.USR_NOT_FOUND.getDefaultMessage()).isEqualTo("User not found");
+    }
+
+    @Test
+    void usrUsernameInvalidHasRegisteredValues() {
+        assertThat(ErrorCode.USR_USERNAME_INVALID.getCode()).isEqualTo("LRN-USR-003");
+        assertThat(ErrorCode.USR_USERNAME_INVALID.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.USR_USERNAME_INVALID.getDefaultMessage())
+                .isEqualTo("Username is unavailable or invalid");
     }
 
     @Test

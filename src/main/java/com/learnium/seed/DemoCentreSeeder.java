@@ -47,7 +47,7 @@ public class DemoCentreSeeder implements ApplicationRunner {
     static final String ADMIN_EMAIL = "admin@demo.learnium.local";
     static final String TEACHER_EMAIL = "patel@demo.learnium.local";
     static final String STAFF_PASSWORD = "Demo@123";
-    static final String STUDENT_PIN = "1234";
+    static final String STUDENT_PASSWORD = "Demo@123";
     static final String BATCH_NAME = "Grade 8 Math — Batch B";
     static final List<String> STUDENT_NAMES =
             List.of("Simran Kaur", "Arjun Singh", "Priya Sharma", "Rohan Mehta", "Ananya Iyer");
@@ -96,6 +96,7 @@ public class DemoCentreSeeder implements ApplicationRunner {
 
         Centre centre = new Centre();
         centre.setName(CENTRE_NAME);
+        centre.setCode("dtc");
         centre.setContactEmail(ADMIN_EMAIL);
         centre = centreRepository.save(centre);
 
@@ -124,13 +125,16 @@ public class DemoCentreSeeder implements ApplicationRunner {
         batch.setName(BATCH_NAME);
         batch = batchRepository.save(batch);
 
-        saveMembership(batch, teacher, MemberRole.TEACHER, null);
-        String pinHash = passwordEncoder.encode(STUDENT_PIN);
-        for (String studentName : STUDENT_NAMES) {
+        saveMembership(batch, teacher, MemberRole.TEACHER);
+        String studentPasswordHash = passwordEncoder.encode(STUDENT_PASSWORD);
+        for (int index = 0; index < STUDENT_NAMES.size(); index++) {
+            String studentName = STUDENT_NAMES.get(index);
             UserAccount student = new UserAccount();
             student.setCentre(centre);
             student.setRole(UserRole.STUDENT);
             student.setDisplayName(studentName);
+            student.setUsername(studentName.split(" ")[0].toLowerCase(java.util.Locale.ROOT));
+            student.setPasswordHash(studentPasswordHash);
             student = userAccountRepository.save(student);
 
             StudentProfile profile = new StudentProfile();
@@ -140,7 +144,7 @@ public class DemoCentreSeeder implements ApplicationRunner {
             profile.setFullName(studentName);
             studentProfileRepository.save(profile);
 
-            saveMembership(batch, student, MemberRole.STUDENT, pinHash);
+            saveMembership(batch, student, MemberRole.STUDENT);
         }
         log.info("Seeded batch '{}' with {} students", BATCH_NAME, STUDENT_NAMES.size());
     }
@@ -156,13 +160,12 @@ public class DemoCentreSeeder implements ApplicationRunner {
         return userAccountRepository.save(user);
     }
 
-    private void saveMembership(Batch batch, UserAccount user, MemberRole role, String pinHash) {
+    private void saveMembership(Batch batch, UserAccount user, MemberRole role) {
         BatchMembership membership = new BatchMembership();
         membership.setBatch(batch);
         membership.setCentreId(batch.getCentre().getCentreId());
         membership.setUser(user);
         membership.setMemberRole(role);
-        membership.setPinHash(pinHash);
         membershipRepository.save(membership);
     }
 }

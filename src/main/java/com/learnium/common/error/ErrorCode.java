@@ -27,14 +27,9 @@ public enum ErrorCode {
     AUTH_ACCOUNT_TOKEN_INVALID(
             "LRN-AUTH-004", HttpStatus.BAD_REQUEST, "This link is invalid or has expired"),
     AUTH_ACCOUNT_INACTIVE("LRN-AUTH-005", HttpStatus.FORBIDDEN, "This account is inactive"),
-    AUTH_PIN_LOCKED(
-            "LRN-AUTH-006",
-            HttpStatus.FORBIDDEN,
-            "This PIN is locked; ask your teacher to reset it"),
-    AUTH_STUDENT_REJECTED(
-            "LRN-AUTH-007", HttpStatus.UNAUTHORIZED, "Name or PIN not recognised for this batch"),
     USR_EMAIL_TAKEN("LRN-USR-001", HttpStatus.CONFLICT, "Email is already registered"),
     USR_NOT_FOUND("LRN-USR-002", HttpStatus.NOT_FOUND, "User not found"),
+    USR_USERNAME_INVALID("LRN-USR-003", HttpStatus.BAD_REQUEST, "Username is unavailable or invalid"),
     CTR_BATCH_NOT_FOUND("LRN-CTR-001", HttpStatus.NOT_FOUND, "Batch not found"),
     CTR_ROSTER_NOT_FOUND("LRN-CTR-002", HttpStatus.NOT_FOUND, "Roster entry not found"),
     MAT_INVALID_FILE(

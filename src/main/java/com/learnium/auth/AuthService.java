@@ -12,8 +12,8 @@ import com.learnium.repository.user.UserAccountRepository;
 import com.learnium.security.JwtService;
 import com.learnium.security.LearniumPrincipal;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,19 +48,21 @@ public class AuthService {
      * DOES match gets the distinct 403 (the caller proved the credential).
      */
     @Transactional
-    public AuthResponse login(String email, String password) {
-        List<UserAccount> passwordMatches = new ArrayList<>();
-        for (UserAccount candidate :
-                userAccountRepository.findByEmail(EmailAddresses.normalize(email))) {
-            if (candidate.getPasswordHash() != null
-                    && passwordEncoder.matches(password, candidate.getPasswordHash())) {
-                passwordMatches.add(candidate);
-            }
+    public AuthResponse login(String identifier, String password) {
+        String normalized = EmailAddresses.normalize(identifier);
+        List<UserAccount> staff = userAccountRepository.findStaffByEmail(normalized);
+        UserAccount user;
+        if (!staff.isEmpty()) {
+            user = staff.size() == 1 ? staff.get(0) : null;
+        } else {
+            int split = normalized.lastIndexOf('@');
+            if (split < 1 || split == normalized.length() - 1) throw invalid();
+            String username = normalized.substring(0, split).toLowerCase(Locale.ROOT);
+            String centreCode = normalized.substring(split + 1).toLowerCase(Locale.ROOT);
+            user = userAccountRepository.findStudentByCentreCodeAndUsername(centreCode, username).orElse(null);
         }
-        if (passwordMatches.size() != 1) {
-            throw new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS);
-        }
-        UserAccount user = passwordMatches.get(0);
+        if (user == null || user.getPasswordHash() == null
+                || !passwordEncoder.matches(password, user.getPasswordHash())) throw invalid();
         if (user.getStatus() != UserStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.AUTH_ACCOUNT_INACTIVE);
         }
@@ -101,14 +103,16 @@ public class AuthService {
                 user.getUserId(),
                 user.getDisplayName(),
                 user.getEmail(),
+                user.getUsername(),
                 user.getRole().name(),
                 user.getCentre().getCentreId(),
+                user.getCentre().getCode(),
                 user.getCentre().getName());
     }
 
     private AuthResponse buildResponse(UserAccount user, String rawRefreshToken) {
         return new AuthResponse(
-                jwtService.issueStaffToken(user),
+                jwtService.issueAccessToken(user),
                 rawRefreshToken,
                 "Bearer",
                 JwtService.STAFF_TOKEN_TTL.toSeconds(),
@@ -116,8 +120,12 @@ public class AuthService {
                         user.getUserId(),
                         user.getDisplayName(),
                         user.getEmail(),
+                        user.getUsername(),
                         user.getRole().name(),
                         user.getCentre().getCentreId(),
+                        user.getCentre().getCode(),
                         user.getCentre().getName()));
     }
+
+    private BusinessException invalid() { return new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS); }
 }

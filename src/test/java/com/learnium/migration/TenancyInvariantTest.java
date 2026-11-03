@@ -93,6 +93,9 @@ class TenancyInvariantTest {
         user.setCentre(centre);
         user.setRole(role);
         user.setDisplayName(displayName);
+        if (role == UserRole.STUDENT) {
+            user.setUsername(displayName.toLowerCase(java.util.Locale.ROOT).replace(' ', '.'));
+        }
         return userAccountRepository.save(user);
     }
 
@@ -107,9 +110,11 @@ class TenancyInvariantTest {
     private Fixture fixture() {
         Centre centreA = new Centre();
         centreA.setName("Invariant Alpha");
+        centreA.setCode("ia");
         centreA = centreRepository.save(centreA);
         Centre centreB = new Centre();
         centreB.setName("Invariant Beta");
+        centreB.setCode("ib");
         centreB = centreRepository.save(centreB);
 
         GradeSubject gradeSubject =

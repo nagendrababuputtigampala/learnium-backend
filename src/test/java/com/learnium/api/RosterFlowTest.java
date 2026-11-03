@@ -1,380 +1,152 @@
 package com.learnium.api;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.assertj.core.api.Assertions.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.learnium.auth.*;
+import com.learnium.common.error.*;
+import com.learnium.model.auth.AccountTokenPurpose;
 import com.learnium.model.common.UserStatus;
-import com.learnium.model.master.Grade;
-import com.learnium.model.master.GradeSubject;
-import com.learnium.model.master.Subject;
-import com.learnium.model.user.BatchMembership;
-import com.learnium.model.user.Centre;
-import com.learnium.model.user.MembershipStatus;
-import com.learnium.model.user.UserAccount;
-import com.learnium.model.user.UserRole;
-import com.learnium.repository.master.GradeRepository;
-import com.learnium.repository.master.GradeSubjectRepository;
-import com.learnium.repository.master.SubjectRepository;
-import com.learnium.repository.user.BatchMembershipRepository;
-import com.learnium.repository.user.CentreRepository;
-import com.learnium.repository.user.UserAccountRepository;
+import com.learnium.model.master.*;
+import com.learnium.model.user.*;
+import com.learnium.repository.auth.*;
+import com.learnium.repository.master.*;
+import com.learnium.repository.user.*;
+import com.learnium.security.LearniumPrincipal;
 import com.learnium.testsupport.AuthFixtures;
-import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import java.time.Duration;
+import java.util.*;
+import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.*;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.*;
 
-/** Roster management over HTTP: add/bulk/reset/deactivate + access guards. */
-@SpringBootTest
-@AutoConfigureMockMvc
-@ActiveProfiles("test")
-@Transactional
+@SpringBootTest @AutoConfigureMockMvc @ActiveProfiles("test") @Transactional
 class RosterFlowTest {
+    @Autowired MockMvc mvc; @Autowired ObjectMapper json; @Autowired CentreRepository centres;
+    @Autowired UserAccountRepository users; @Autowired BatchRepository batches;
+    @Autowired BatchMembershipRepository memberships; @Autowired GradeRepository grades;
+    @Autowired SubjectRepository subjects; @Autowired GradeSubjectRepository pairings;
+    @Autowired EmailOutboxRepository outbox; @Autowired AccountTokenRepository tokens;
+    @Autowired AccountTokenService accountTokens; @Autowired AccountFlowService accountFlows;
+    @Autowired PasswordEncoder passwords;
+    Centre centre, foreignCentre; UserAccount teacher, admin, foreignTeacher; Batch batch;
 
-    private static final String PASSWORD = "Passw0rd1";
-
-    @Autowired private MockMvc mockMvc;
-    @Autowired private ObjectMapper objectMapper;
-    @Autowired private CentreRepository centreRepository;
-    @Autowired private UserAccountRepository userAccountRepository;
-    @Autowired private BatchMembershipRepository batchMembershipRepository;
-    @Autowired private GradeRepository gradeRepository;
-    @Autowired private SubjectRepository subjectRepository;
-    @Autowired private GradeSubjectRepository gradeSubjectRepository;
-    @Autowired private PasswordEncoder passwordEncoder;
-
-    private Centre centreA;
-    private UserAccount teacherA2;
-    private UUID batchId;
-    private String adminToken;
-    private String teacherToken;
-
-    @BeforeEach
-    void setUp() throws Exception {
-        centreA = AuthFixtures.createCentre(centreRepository, "Alpha Centre");
-        Centre centreB = AuthFixtures.createCentre(centreRepository, "Beta Centre");
-        AuthFixtures.createStaff(
-                userAccountRepository, passwordEncoder, centreA, UserRole.CENTRE_ADMIN,
-                "admin@alpha.test", "Ann Admin", PASSWORD, UserStatus.ACTIVE);
-        UserAccount teacherA1 =
-                AuthFixtures.createStaff(
-                        userAccountRepository, passwordEncoder, centreA, UserRole.TEACHER,
-                        "tess@alpha.test", "Tess Teacher", PASSWORD, UserStatus.ACTIVE);
-        teacherA2 =
-                AuthFixtures.createStaff(
-                        userAccountRepository, passwordEncoder, centreA, UserRole.TEACHER,
-                        "tim@alpha.test", "Tim Teacher", PASSWORD, UserStatus.ACTIVE);
-        AuthFixtures.createStaff(
-                userAccountRepository, passwordEncoder, centreB, UserRole.CENTRE_ADMIN,
-                "admin@beta.test", "Bob Beta", PASSWORD, UserStatus.ACTIVE);
-
-        Grade grade = new Grade();
-        grade.setCode("G8");
-        grade.setName("Grade 8");
-        grade = gradeRepository.save(grade);
-        Subject subject = new Subject();
-        subject.setSubjectName("Mathematics");
-        subject = subjectRepository.save(subject);
-        GradeSubject gs = new GradeSubject();
-        gs.setGrade(grade);
-        gs.setSubject(subject);
-        GradeSubject gradeSubject = gradeSubjectRepository.save(gs);
-
-        adminToken = tokenFor("admin@alpha.test");
-        String created =
-                mockMvc.perform(
-                                post("/api/v1/admin/batches")
-                                        .header("Authorization", "Bearer " + adminToken)
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .content(
-                                                "{\"name\":\"Batch B\",\"gradeSubjectId\":\""
-                                                        + gradeSubject.getGradeSubjectId()
-                                                        + "\"}"))
-                        .andExpect(status().isCreated())
-                        .andReturn()
-                        .getResponse()
-                        .getContentAsString();
-        batchId = UUID.fromString(objectMapper.readTree(created).get("batchId").asString());
-        mockMvc.perform(
-                        put("/api/v1/admin/batches/" + batchId + "/teacher")
-                                .header("Authorization", "Bearer " + adminToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"userId\":\"" + teacherA1.getUserId() + "\"}"))
-                .andExpect(status().isOk());
-        teacherToken = tokenFor("tess@alpha.test");
+    @BeforeEach void setup() {
+        centre = AuthFixtures.createCentre(centres, "Roster Centre"); centre.setCode("rc"); centres.save(centre);
+        foreignCentre = AuthFixtures.createCentre(centres, "Foreign Centre"); foreignCentre.setCode("fc"); centres.save(foreignCentre);
+        teacher = AuthFixtures.createStaff(users, passwords, centre, UserRole.TEACHER, "teacher@roster.test", "Teacher", "Passw0rd1", UserStatus.ACTIVE);
+        admin = AuthFixtures.createStaff(users, passwords, centre, UserRole.CENTRE_ADMIN, "admin@roster.test", "Admin", "Passw0rd1", UserStatus.ACTIVE);
+        foreignTeacher = AuthFixtures.createStaff(users, passwords, foreignCentre, UserRole.TEACHER, "foreign@roster.test", "Foreign", "Passw0rd1", UserStatus.ACTIVE);
+        Grade grade = new Grade(); grade.setCode("RG8"); grade.setName("Roster Grade"); grades.save(grade);
+        Subject subject = new Subject(); subject.setSubjectName("Roster Maths"); subjects.save(subject);
+        GradeSubject pairing = new GradeSubject(); pairing.setGrade(grade); pairing.setSubject(subject); pairings.save(pairing);
+        batch = new Batch(); batch.setCentre(centre); batch.setGradeSubject(pairing); batch.setName("Batch A"); batches.save(batch);
+        BatchMembership assignment = new BatchMembership(); assignment.setCentreId(centre.getCentreId()); assignment.setBatch(batch);
+        assignment.setUser(teacher); assignment.setMemberRole(MemberRole.TEACHER); memberships.save(assignment);
     }
 
-    private String tokenFor(String email) throws Exception {
-        String body =
-                mockMvc.perform(
-                                post("/api/v1/auth/login")
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .content(
-                                                "{\"email\":\""
-                                                        + email
-                                                        + "\",\"password\":\""
-                                                        + PASSWORD
-                                                        + "\"}"))
-                        .andExpect(status().isOk())
-                        .andReturn()
-                        .getResponse()
-                        .getContentAsString();
-        return objectMapper.readTree(body).get("accessToken").asString();
+    @Test void createsUsernameStudentProfileMembershipAndTransactionalInvite() throws Exception {
+        JsonNode created = body(mvc.perform(post("/api/v1/batches/" + batch.getBatchId() + "/students").with(as(teacher))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"displayName\":\"Simran Kaur\",\"contactEmail\":\"Parent@Example.test\"}"))
+                .andExpect(status().isCreated()).andReturn());
+        assertThat(created.get("username").asString()).isEqualTo("simran.k");
+        assertThat(created.get("inviteStatus").asString()).isEqualTo("SENT");
+        assertThat(created.toString().toLowerCase()).doesNotContain("pin");
+        var student = users.findByCentreIdAndUserId(centre.getCentreId(), UUID.fromString(created.get("userId").asString())).orElseThrow();
+        assertThat(student.getEmail()).isEqualTo("parent@example.test");
+        assertThat(outbox.findByCentreId(centre.getCentreId())).singleElement().satisfies(row -> assertThat(row.getTemplate()).isEqualTo("invite"));
+        assertThat(tokens.findAll()).singleElement().satisfies(token -> assertThat(token.getPurpose()).isEqualTo(AccountTokenPurpose.INVITE));
     }
 
-    private JsonNode addStudent(String token, String fullName) throws Exception {
-        String body =
-                mockMvc.perform(
-                                post("/api/v1/batches/" + batchId + "/students")
-                                        .header("Authorization", "Bearer " + token)
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .content("{\"fullName\":\"" + fullName + "\"}"))
-                        .andExpect(status().isCreated())
-                        .andReturn()
-                        .getResponse()
-                        .getContentAsString();
-        return objectMapper.readTree(body);
+    @Test void supportsCustomChecksDuplicatesRenamesAndSharedContactEmails() throws Exception {
+        assertAvailable("custom.name", true); assertAvailable("Bad Name", false);
+        JsonNode first = create("Ananya Rao", "family@example.test", "custom.name");
+        assertThat(first.get("username").asString()).isEqualTo("custom.name");
+        assertAvailable("custom.name", false);
+        mvc.perform(post("/api/v1/batches/" + batch.getBatchId() + "/students").with(as(teacher))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"displayName\":\"Other\",\"contactEmail\":\"family@example.test\",\"username\":\"custom.name\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("LRN-USR-003"));
+        JsonNode second = create("Other Student", "family@example.test", "other.student");
+        mvc.perform(put("/api/v1/batches/" + batch.getBatchId() + "/students/" + second.get("userId").asString() + "/username")
+                .with(as(teacher)).contentType(MediaType.APPLICATION_JSON).content("{\"username\":\"other.renamed\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.username").value("other.renamed"));
     }
 
-    @Test
-    void addStudentReturnsPinOnceAndListsOnRoster() throws Exception {
-        JsonNode added = addStudent(adminToken, "  Aisha Khan  ");
-        assertThat(added.get("fullName").asString()).isEqualTo("Aisha Khan");
-        assertThat(added.get("pin").asString()).matches("\\d{4}");
-        assertThat(added.get("membershipId").asString()).isNotBlank();
-        assertThat(added.get("userId").asString()).isNotBlank();
-
-        mockMvc.perform(
-                        get("/api/v1/batches/" + batchId + "/students")
-                                .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].fullName").value("Aisha Khan"))
-                .andExpect(jsonPath("$[0].status").value("ACTIVE"))
-                .andExpect(jsonPath("$[0].pinLocked").value(false));
-
-        // The batch DTO counts the new ACTIVE student.
-        mockMvc.perform(get("/api/v1/batches").header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].studentCount").value(1));
+    @Test void optionalContactSkipsInviteAndExistingStudentCanJoinAnotherRoster() throws Exception {
+        JsonNode created = create("No Email", null, null);
+        assertThat(created.get("inviteStatus").asString()).isEqualTo("NOT_SENT");
+        assertThat(outbox.findByCentreId(centre.getCentreId())).isEmpty();
+        mvc.perform(get("/api/v1/centre/students").with(as(teacher))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].username").value(created.get("username").asString()));
+        mvc.perform(post("/api/v1/batches/" + batch.getBatchId() + "/students").with(as(teacher))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"displayName\":\"ignored\",\"userId\":\"" + created.get("userId").asString() + "\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.userId").value(created.get("userId").asString()));
     }
 
-    @Test
-    void assignedTeacherCanManageRosterUnassignedTeacherCannot() throws Exception {
-        addStudent(teacherToken, "Ravi Rao");
-
-        String timToken = tokenFor("tim@alpha.test");
-        mockMvc.perform(
-                        get("/api/v1/batches/" + batchId + "/students")
-                                .header("Authorization", "Bearer " + timToken))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("LRN-AUTH-003"));
-        mockMvc.perform(
-                        post("/api/v1/batches/" + batchId + "/students")
-                                .header("Authorization", "Bearer " + timToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"fullName\":\"Sneaky\"}"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("LRN-AUTH-003"));
+    @Test void resendIsCentreScopedSingleUseAndRequiresPendingContact() throws Exception {
+        JsonNode created = create("Invite Student", "invite@example.test", null);
+        UUID userId = UUID.fromString(created.get("userId").asString());
+        mvc.perform(post("/api/v1/batches/" + batch.getBatchId() + "/students/" + userId + "/resend-invite").with(as(teacher)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.inviteStatus").value("SENT"));
+        assertThat(outbox.findByCentreId(centre.getCentreId())).hasSize(2);
+        mvc.perform(post("/api/v1/batches/" + batch.getBatchId() + "/students/" + userId + "/resend-invite").with(as(foreignTeacher)))
+                .andExpect(status().isNotFound());
+        UserAccount student = users.findByCentreIdAndUserId(centre.getCentreId(), userId).orElseThrow();
+        String raw = accountTokens.create(student, AccountTokenPurpose.INVITE, Duration.ofHours(1));
+        accountFlows.acceptInvite(raw, "NewPass1");
+        assertThatThrownBy(() -> accountFlows.acceptInvite(raw, "OtherPass1"))
+                .isInstanceOfSatisfying(BusinessException.class, ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.AUTH_ACCOUNT_TOKEN_INVALID));
     }
 
-    @Test
-    void studentRoleCannotTouchRoster() throws Exception {
-        mockMvc.perform(
-                        get("/api/v1/batches/" + batchId + "/students")
-                                .with(user("someone").roles("STUDENT")))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("LRN-AUTH-003"));
+    @Test void rosterResponseHasUsernameInviteStateAndNoPinFields() throws Exception {
+        create("Roster Student", "roster@example.test", null);
+        String response = mvc.perform(get("/api/v1/batches/" + batch.getBatchId() + "/students").with(as(admin)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].username").exists())
+                .andExpect(jsonPath("$[0].inviteStatus").value("PENDING")).andReturn().getResponse().getContentAsString();
+        assertThat(response.toLowerCase()).doesNotContain("pin");
     }
 
-    @Test
-    void foreignBatchIsInvisible() throws Exception {
-        UUID foreignBatch = UUID.randomUUID();
-        mockMvc.perform(
-                        get("/api/v1/batches/" + foreignBatch + "/students")
-                                .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("LRN-CTR-001"));
-    }
-
-    @Test
-    void bulkAddCreatesInRequestOrderAndRejectsBlanks() throws Exception {
-        String body =
-                mockMvc.perform(
-                                post("/api/v1/batches/" + batchId + "/students/bulk")
-                                        .header("Authorization", "Bearer " + adminToken)
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .content(
-                                                "{\"fullNames\":[\" Zara Ahmed \",\"Ben Osei\",\"Cleo Park\"]}"))
-                        .andExpect(status().isCreated())
-                        .andReturn()
-                        .getResponse()
-                        .getContentAsString();
-        JsonNode added = objectMapper.readTree(body);
-        assertThat(added.size()).isEqualTo(3);
-        assertThat(added.get(0).get("fullName").asString()).isEqualTo("Zara Ahmed");
-        assertThat(added.get(1).get("fullName").asString()).isEqualTo("Ben Osei");
-        assertThat(added.get(2).get("fullName").asString()).isEqualTo("Cleo Park");
-
-        mockMvc.perform(
-                        post("/api/v1/batches/" + batchId + "/students/bulk")
-                                .header("Authorization", "Bearer " + adminToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"fullNames\":[\"Fine Name\",\"  \"]}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("LRN-VAL-001"));
-        mockMvc.perform(
-                        post("/api/v1/batches/" + batchId + "/students/bulk")
-                                .header("Authorization", "Bearer " + adminToken)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"fullNames\":[]}"))
-                .andExpect(status().isBadRequest());
-        // The rejected bulk call added nobody (single transaction).
-        mockMvc.perform(
-                        get("/api/v1/batches/" + batchId + "/students")
-                                .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(3));
-    }
-
-    @Test
-    void resetPinClearsLockAndAttempts() throws Exception {
-        JsonNode added = addStudent(adminToken, "Locky Singh");
-        UUID membershipId = UUID.fromString(added.get("membershipId").asString());
-        BatchMembership membership =
-                batchMembershipRepository
-                        .findByCentreIdAndMembershipId(centreA.getCentreId(), membershipId)
-                        .orElseThrow();
-        membership.setPinFailedAttempts(4);
-        membership.setPinLocked(true);
-        batchMembershipRepository.save(membership);
-
-        String body =
-                mockMvc.perform(
-                                post(
-                                                "/api/v1/batches/"
-                                                        + batchId
-                                                        + "/students/"
-                                                        + membershipId
-                                                        + "/reset-pin")
-                                        .header("Authorization", "Bearer " + teacherToken))
-                        .andExpect(status().isOk())
-                        .andReturn()
-                        .getResponse()
-                        .getContentAsString();
-        assertThat(objectMapper.readTree(body).get("pin").asString()).matches("\\d{4}");
-
-        BatchMembership reloaded =
-                batchMembershipRepository
-                        .findByCentreIdAndMembershipId(centreA.getCentreId(), membershipId)
-                        .orElseThrow();
-        assertThat(reloaded.isPinLocked()).isFalse();
-        assertThat(reloaded.getPinFailedAttempts()).isZero();
-    }
-
-    @Test
-    void resetPinForUnknownOrForeignMembershipReturns404() throws Exception {
-        mockMvc.perform(
-                        post(
-                                        "/api/v1/batches/"
-                                                + batchId
-                                                + "/students/"
-                                                + UUID.randomUUID()
-                                                + "/reset-pin")
-                                .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("LRN-CTR-002"));
-    }
-
-    @Test
-    void resetPinForMembershipOfAnotherBatchReturns404() throws Exception {
-        JsonNode added = addStudent(adminToken, "Other Batch Otto");
-        UUID membershipId = UUID.fromString(added.get("membershipId").asString());
-        // A second batch in the same centre: the membership does not belong to it.
-        String created =
-                mockMvc.perform(
-                                post("/api/v1/admin/batches")
-                                        .header("Authorization", "Bearer " + adminToken)
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .content(
-                                                "{\"name\":\"Batch C\",\"gradeSubjectId\":\""
-                                                        + batchRepositoryGradeSubjectId()
-                                                        + "\"}"))
-                        .andExpect(status().isCreated())
-                        .andReturn()
-                        .getResponse()
-                        .getContentAsString();
-        String otherBatchId = objectMapper.readTree(created).get("batchId").asString();
-
-        mockMvc.perform(
-                        post("/api/v1/batches/" + otherBatchId + "/students/" + membershipId + "/reset-pin")
-                                .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("LRN-CTR-002"));
-    }
-
-    @Test
-    void resetPinForTeacherMembershipReturns404() throws Exception {
-        UUID teacherMembershipId =
-                batchMembershipRepository
-                        .findByCentreIdAndBatchIdAndMemberRole(
-                                centreA.getCentreId(), batchId, com.learnium.model.user.MemberRole.TEACHER)
-                        .get(0)
-                        .getMembershipId();
-
-        mockMvc.perform(
-                        post("/api/v1/batches/" + batchId + "/students/" + teacherMembershipId + "/reset-pin")
-                                .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("LRN-CTR-002"));
-    }
-
-    private String batchRepositoryGradeSubjectId() {
-        return batchMembershipRepository
-                .findByCentreIdAndBatchIdAndMemberRole(
-                        centreA.getCentreId(), batchId, com.learnium.model.user.MemberRole.TEACHER)
-                .get(0)
-                .getBatch()
-                .getGradeSubject()
-                .getGradeSubjectId()
-                .toString();
-    }
-
-    @Test
-    void deactivateStudentMarksMembershipInactive() throws Exception {
-        JsonNode added = addStudent(adminToken, "Leaving Lisa");
-        UUID membershipId = UUID.fromString(added.get("membershipId").asString());
-
-        mockMvc.perform(
-                        delete("/api/v1/batches/" + batchId + "/students/" + membershipId)
-                                .header("Authorization", "Bearer " + adminToken))
+    @Test void bulkAddAndDeactivateUseTheStaffRosterBoundary() throws Exception {
+        mvc.perform(post("/api/v1/batches/" + batch.getBatchId() + "/students/bulk").with(as(teacher))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"fullNames\":[\"Asha Rao\",\"Bala Singh\"]}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$[0].username").value("asha.r"))
+                .andExpect(jsonPath("$[1].username").value("bala.s"));
+        UUID membershipId = memberships.findByCentreIdAndBatchIdAndMemberRole(
+                centre.getCentreId(), batch.getBatchId(), MemberRole.STUDENT).get(0).getMembershipId();
+        mvc.perform(delete("/api/v1/batches/" + batch.getBatchId() + "/students/" + membershipId).with(as(teacher)))
                 .andExpect(status().isNoContent());
+        assertThat(memberships.findById(membershipId)).get().extracting(BatchMembership::getStatus)
+                .isEqualTo(MembershipStatus.INACTIVE);
+    }
 
-        mockMvc.perform(
-                        get("/api/v1/batches/" + batchId + "/students")
-                                .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].status").value("INACTIVE"));
-
-        BatchMembership membership =
-                batchMembershipRepository
-                        .findByCentreIdAndMembershipId(centreA.getCentreId(), membershipId)
-                        .orElseThrow();
-        assertThat(membership.getStatus()).isEqualTo(MembershipStatus.INACTIVE);
+    private JsonNode create(String name, String email, String username) throws Exception {
+        var map = new LinkedHashMap<String,Object>(); map.put("displayName", name);
+        if (email != null) map.put("contactEmail", email); if (username != null) map.put("username", username);
+        return body(mvc.perform(post("/api/v1/batches/" + batch.getBatchId() + "/students").with(as(teacher))
+                .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(map)))
+                .andExpect(status().isCreated()).andReturn());
+    }
+    private void assertAvailable(String value, boolean available) throws Exception {
+        mvc.perform(get("/api/v1/centre/username-check").param("value", value).with(as(teacher)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.available").value(available));
+    }
+    private JsonNode body(MvcResult result) throws Exception { return json.readTree(result.getResponse().getContentAsString()); }
+    private org.springframework.test.web.servlet.request.RequestPostProcessor as(UserAccount user) {
+        var principal = LearniumPrincipal.staff(user.getUserId(), user.getCentre().getCentreId(), user.getRole());
+        return authentication(new UsernamePasswordAuthenticationToken(principal, null,
+                List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))));
     }
 }

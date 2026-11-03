@@ -3,8 +3,6 @@ package com.learnium.security;
 import com.learnium.common.error.ErrorCode;
 import com.learnium.config.SecurityErrorResponseWriter;
 import com.learnium.model.common.UserStatus;
-import com.learnium.model.user.MembershipStatus;
-import com.learnium.repository.user.BatchMembershipRepository;
 import com.learnium.repository.user.UserAccountRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -28,8 +26,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
  *
  * <p>A cryptographically valid token is not enough: the subject's CURRENT
  * status is checked on every request (one indexed projection query). A
- * deactivated staff account — or a student whose roster membership was
- * deactivated — is rejected with 403 {@code LRN-AUTH-005} immediately, not
+ * deactivated staff or student account is rejected with 403
+ * {@code LRN-AUTH-005} immediately, not
  * when the token happens to expire; a token whose subject no longer exists
  * is treated as unauthenticated.
  */
@@ -40,17 +38,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserAccountRepository userAccountRepository;
-    private final BatchMembershipRepository batchMembershipRepository;
     private final SecurityErrorResponseWriter errorResponseWriter;
 
     public JwtAuthenticationFilter(
             JwtService jwtService,
             UserAccountRepository userAccountRepository,
-            BatchMembershipRepository batchMembershipRepository,
             SecurityErrorResponseWriter errorResponseWriter) {
         this.jwtService = jwtService;
         this.userAccountRepository = userAccountRepository;
-        this.batchMembershipRepository = batchMembershipRepository;
         this.errorResponseWriter = errorResponseWriter;
     }
 
@@ -90,17 +85,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private StatusVerdict checkCurrentStatus(LearniumPrincipal principal) {
-        if (principal.isStudent()) {
-            Optional<MembershipStatus> status =
-                    batchMembershipRepository.findStatusByCentreIdAndMembershipId(
-                            principal.centreId(), principal.membershipId());
-            if (status.isEmpty()) {
-                return StatusVerdict.SUBJECT_GONE;
-            }
-            return status.get() == MembershipStatus.ACTIVE
-                    ? StatusVerdict.AUTHENTICATE
-                    : StatusVerdict.SUBJECT_INACTIVE;
-        }
         Optional<UserStatus> status = userAccountRepository.findStatusByUserId(principal.userId());
         if (status.isEmpty()) {
             return StatusVerdict.SUBJECT_GONE;

@@ -7,11 +7,8 @@ import com.learnium.api.dto.AuthDtos.LoginRequest;
 import com.learnium.api.dto.AuthDtos.LogoutRequest;
 import com.learnium.api.dto.AuthDtos.RefreshRequest;
 import com.learnium.api.dto.AuthDtos.ResetPasswordRequest;
-import com.learnium.api.dto.AuthDtos.StudentSessionRequest;
-import com.learnium.api.dto.AuthDtos.StudentSessionResponse;
 import com.learnium.auth.AccountFlowService;
 import com.learnium.auth.AuthService;
-import com.learnium.auth.StudentSessionService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,15 +24,12 @@ public class AuthController {
 
     private final AuthService authService;
     private final AccountFlowService accountFlowService;
-    private final StudentSessionService studentSessionService;
 
     public AuthController(
             AuthService authService,
-            AccountFlowService accountFlowService,
-            StudentSessionService studentSessionService) {
+            AccountFlowService accountFlowService) {
         this.authService = authService;
         this.accountFlowService = accountFlowService;
-        this.studentSessionService = studentSessionService;
     }
 
     @PostMapping("/login")
@@ -71,13 +65,5 @@ public class AuthController {
     public ResponseEntity<Void> acceptInvite(@Valid @RequestBody AcceptInviteRequest request) {
         accountFlowService.acceptInvite(request.token(), request.newPassword());
         return ResponseEntity.noContent().build();
-    }
-
-    /** The student door: batch + roster name + PIN, no staff account involved. */
-    @PostMapping("/student-session")
-    public ResponseEntity<StudentSessionResponse> studentSession(
-            @Valid @RequestBody StudentSessionRequest request) {
-        return ResponseEntity.ok(
-                studentSessionService.openSession(request.batchId(), request.fullName(), request.pin()));
     }
 }

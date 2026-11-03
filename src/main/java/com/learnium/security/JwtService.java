@@ -22,10 +22,9 @@ import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Service;
 
 /**
- * Issues and validates Learnium access tokens (HS256). Staff tokens live 15
- * minutes; a student session token lives 12 hours and is additionally scoped
- * to one batch + roster membership. The signing secret comes from
- * {@code JWT_SECRET}.
+ * Issues and validates Learnium account access tokens (HS256). Every role uses
+ * the same 15-minute token shape and refresh-token lifecycle. The signing
+ * secret comes from {@code JWT_SECRET}.
  *
  * <p>The development fallback secret is public knowledge (it is printed in
  * this file), so it must never silently sign production tokens: it is used
@@ -39,13 +38,10 @@ import org.springframework.stereotype.Service;
 public class JwtService {
 
     public static final Duration STAFF_TOKEN_TTL = Duration.ofMinutes(15);
-    public static final Duration STUDENT_TOKEN_TTL = Duration.ofHours(12);
 
     private static final String CLAIM_CENTRE_ID = "centreId";
     private static final String CLAIM_ROLE = "role";
     private static final String CLAIM_TYPE = "typ";
-    private static final String CLAIM_BATCH_ID = "batchId";
-    private static final String CLAIM_MEMBERSHIP_ID = "membershipId";
     private static final String TYPE_ACCESS = "access";
 
     /**
@@ -101,8 +97,8 @@ public class JwtService {
         }
     }
 
-    /** Staff access token for an admin/teacher (15 min). */
-    public String issueStaffToken(UserAccount user) {
+    /** Account access token for an admin, teacher or student (15 min). */
+    public String issueAccessToken(UserAccount user) {
         Instant now = Instant.now();
         return Jwts.builder()
                 .subject(user.getUserId().toString())
@@ -116,23 +112,8 @@ public class JwtService {
                 .compact();
     }
 
-    /** Student session token (12 h), scoped to one batch roster membership. */
-    public String issueStudentToken(
-            UserAccount user, UUID centreId, UUID batchId, UUID membershipId) {
-        Instant now = Instant.now();
-        return Jwts.builder()
-                .subject(user.getUserId().toString())
-                .id(UUID.randomUUID().toString())
-                .claim(CLAIM_CENTRE_ID, centreId.toString())
-                .claim(CLAIM_ROLE, UserRole.STUDENT.name())
-                .claim(CLAIM_TYPE, TYPE_ACCESS)
-                .claim(CLAIM_BATCH_ID, batchId.toString())
-                .claim(CLAIM_MEMBERSHIP_ID, membershipId.toString())
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plus(STUDENT_TOKEN_TTL)))
-                .signWith(signingKey)
-                .compact();
-    }
+    /** Compatibility name retained for callers that issue staff tokens explicitly. */
+    public String issueStaffToken(UserAccount user) { return issueAccessToken(user); }
 
     /**
      * Validates signature, expiry and token type. Any failure yields empty —
@@ -153,16 +134,7 @@ public class JwtService {
             UUID userId = UUID.fromString(claims.getSubject());
             UUID centreId = UUID.fromString(claims.get(CLAIM_CENTRE_ID, String.class));
             UserRole role = UserRole.valueOf(claims.get(CLAIM_ROLE, String.class));
-            String batchId = claims.get(CLAIM_BATCH_ID, String.class);
-            String membershipId = claims.get(CLAIM_MEMBERSHIP_ID, String.class);
-            if (role == UserRole.STUDENT) {
-                if (batchId == null || membershipId == null) {
-                    return Optional.empty();
-                }
-                return Optional.of(
-                        LearniumPrincipal.student(
-                                userId, centreId, UUID.fromString(batchId), UUID.fromString(membershipId)));
-            }
+            if (role == UserRole.STUDENT) return Optional.of(LearniumPrincipal.student(userId, centreId));
             return Optional.of(LearniumPrincipal.staff(userId, centreId, role));
         } catch (JwtException | IllegalArgumentException e) {
             return Optional.empty();

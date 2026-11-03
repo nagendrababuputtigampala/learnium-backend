@@ -43,6 +43,7 @@ class RefreshTokenRaceTest {
         UUID centreId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         Centre centre = new Centre();
+        centre.setCode("t" + UUID.randomUUID().toString().substring(0, 8));
         centre.setCentreId(centreId);
         UserAccount user = new UserAccount();
         ReflectionTestUtils.setField(user, "userId", userId);

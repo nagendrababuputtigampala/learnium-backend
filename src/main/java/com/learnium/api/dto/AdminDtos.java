@@ -11,7 +11,7 @@ public final class AdminDtos {
 
     private AdminDtos() {}
 
-    public record CentreDto(UUID centreId, String name, String logoUrl, String contactEmail) {}
+    public record CentreDto(UUID centreId, String code, String name, String logoUrl, String contactEmail) {}
 
     public record UpdateCentreRequest(
             @NotBlank(message = "must not be blank") String name,
@@ -24,7 +24,7 @@ public final class AdminDtos {
                     String adminEmail,
             @NotBlank(message = "must not be blank") String adminDisplayName) {}
 
-    public record CreateCentreResponse(UUID centreId, UUID adminUserId) {}
+    public record CreateCentreResponse(UUID centreId, String code, UUID adminUserId) {}
 
     public record GradeSubjectDto(
             UUID gradeSubjectId,

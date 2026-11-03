@@ -45,6 +45,7 @@ import com.learnium.repository.user.CentreRepository;
 import com.learnium.repository.user.UserAccountRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -87,6 +88,7 @@ class ExamChainPersistenceTest {
     void fullChainFromTemplateToMarkedAnswers() throws Exception {
         Centre centre = new Centre();
         centre.setName("Alpha Tutoring");
+        centre.setCode("at1");
         centre = centreRepository.save(centre);
 
         UserAccount teacher = new UserAccount();
@@ -100,6 +102,7 @@ class ExamChainPersistenceTest {
         student.setCentre(centre);
         student.setRole(UserRole.STUDENT);
         student.setDisplayName("Simran");
+        student.setUsername("simran1");
         student = userAccountRepository.save(student);
 
         Grade grade = new Grade();
@@ -321,6 +324,7 @@ class ExamChainPersistenceTest {
             throws Exception {
         Centre centre = new Centre();
         centre.setName(name);
+        centre.setCode("t" + UUID.randomUUID().toString().substring(0, 8));
         centre = centreRepository.save(centre);
 
         UserAccount teacher = new UserAccount();
@@ -332,6 +336,7 @@ class ExamChainPersistenceTest {
         UserAccount student = new UserAccount();
         student.setCentre(centre);
         student.setRole(UserRole.STUDENT);
+        student.setUsername("student" + UUID.randomUUID().toString().substring(0, 6));
         student = userAccountRepository.save(student);
 
         Question question = new Question();
@@ -442,12 +447,14 @@ class ExamChainPersistenceTest {
     void topicStatsBadgesAndXpRoundTrip() throws Exception {
         Centre centre = new Centre();
         centre.setName("Alpha Tutoring");
+        centre.setCode("at2");
         centre = centreRepository.save(centre);
 
         UserAccount student = new UserAccount();
         student.setCentre(centre);
         student.setRole(UserRole.STUDENT);
         student.setDisplayName("Simran");
+        student.setUsername("simran2");
         student = userAccountRepository.save(student);
 
         Grade grade = new Grade();

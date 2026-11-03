@@ -220,6 +220,7 @@ class GenerationClaimServiceTest {
     private static BackgroundJob claimedJob(UUID jobId, UUID centreId, UUID creatorId)
             throws Exception {
         Centre centre = new Centre();
+        centre.setCode("t" + UUID.randomUUID().toString().substring(0, 8));
         centre.setCentreId(centreId);
         Grade grade = new Grade();
         grade.setName("Grade 8");

@@ -11,9 +11,7 @@ import static org.mockito.Mockito.when;
 import com.learnium.common.error.ErrorCode;
 import com.learnium.config.SecurityErrorResponseWriter;
 import com.learnium.model.common.UserStatus;
-import com.learnium.model.user.MembershipStatus;
 import com.learnium.model.user.UserRole;
-import com.learnium.repository.user.BatchMembershipRepository;
 import com.learnium.repository.user.UserAccountRepository;
 import jakarta.servlet.FilterChain;
 import java.util.Optional;
@@ -33,15 +31,12 @@ class JwtAuthenticationFilterTest {
 
     private final JwtService jwtService = mock(JwtService.class);
     private final UserAccountRepository userAccountRepository = mock(UserAccountRepository.class);
-    private final BatchMembershipRepository batchMembershipRepository =
-            mock(BatchMembershipRepository.class);
     private final SecurityErrorResponseWriter errorWriter =
             mock(SecurityErrorResponseWriter.class);
     private final FilterChain chain = mock(FilterChain.class);
 
     private final JwtAuthenticationFilter filter =
-            new JwtAuthenticationFilter(
-                    jwtService, userAccountRepository, batchMembershipRepository, errorWriter);
+            new JwtAuthenticationFilter(jwtService, userAccountRepository, errorWriter);
 
     private final UUID userId = UUID.randomUUID();
     private final UUID centreId = UUID.randomUUID();
@@ -143,14 +138,9 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void activeStudentTokenAuthenticates() throws Exception {
-        UUID batchId = UUID.randomUUID();
-        UUID membershipId = UUID.randomUUID();
         when(jwtService.validate("student"))
-                .thenReturn(
-                        Optional.of(
-                                LearniumPrincipal.student(userId, centreId, batchId, membershipId)));
-        when(batchMembershipRepository.findStatusByCentreIdAndMembershipId(centreId, membershipId))
-                .thenReturn(Optional.of(MembershipStatus.ACTIVE));
+                .thenReturn(Optional.of(LearniumPrincipal.student(userId, centreId)));
+        when(userAccountRepository.findStatusByUserId(userId)).thenReturn(Optional.of(UserStatus.ACTIVE));
 
         runFilter(requestWithToken("Bearer student"));
 
@@ -159,15 +149,10 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void deactivatedMembershipTokenIsRejectedWith403() throws Exception {
-        UUID batchId = UUID.randomUUID();
-        UUID membershipId = UUID.randomUUID();
+    void deactivatedStudentAccountTokenIsRejectedWith403() throws Exception {
         when(jwtService.validate("student"))
-                .thenReturn(
-                        Optional.of(
-                                LearniumPrincipal.student(userId, centreId, batchId, membershipId)));
-        when(batchMembershipRepository.findStatusByCentreIdAndMembershipId(centreId, membershipId))
-                .thenReturn(Optional.of(MembershipStatus.INACTIVE));
+                .thenReturn(Optional.of(LearniumPrincipal.student(userId, centreId)));
+        when(userAccountRepository.findStatusByUserId(userId)).thenReturn(Optional.of(UserStatus.DISABLED));
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilter(requestWithToken("Bearer student"), response, chain);
@@ -176,20 +161,4 @@ class JwtAuthenticationFilterTest {
         verify(chain, never()).doFilter(any(), any());
     }
 
-    @Test
-    void tokenForAMissingMembershipIsTreatedAsUnauthenticated() throws Exception {
-        UUID batchId = UUID.randomUUID();
-        UUID membershipId = UUID.randomUUID();
-        when(jwtService.validate("student"))
-                .thenReturn(
-                        Optional.of(
-                                LearniumPrincipal.student(userId, centreId, batchId, membershipId)));
-        when(batchMembershipRepository.findStatusByCentreIdAndMembershipId(centreId, membershipId))
-                .thenReturn(Optional.empty());
-
-        runFilter(requestWithToken("Bearer student"));
-
-        verify(chain).doFilter(any(), any());
-        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
-    }
 }

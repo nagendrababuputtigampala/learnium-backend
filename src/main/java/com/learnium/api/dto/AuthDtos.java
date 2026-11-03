@@ -2,7 +2,6 @@ package com.learnium.api.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import java.time.Instant;
 import java.util.UUID;
@@ -19,7 +18,7 @@ public final class AuthDtos {
             "must be at least 8 characters and contain a letter and a digit";
 
     public record LoginRequest(
-            @NotBlank(message = "must not be blank") @Email(message = "must be a valid email") String email,
+            @NotBlank(message = "must not be blank") String email,
             @NotBlank(message = "must not be blank") String password) {}
 
     public record RefreshRequest(@NotBlank(message = "must not be blank") String refreshToken) {}
@@ -42,7 +41,8 @@ public final class AuthDtos {
                     String newPassword) {}
 
     public record UserSummary(
-            UUID userId, String displayName, String email, String role, UUID centreId, String centreName) {}
+            UUID userId, String displayName, String email, String username, String role,
+            UUID centreId, String centreCode, String centreName) {}
 
     public record AuthResponse(
             String accessToken,
@@ -52,7 +52,8 @@ public final class AuthDtos {
             UserSummary user) {}
 
     public record MeResponse(
-            UUID userId, String displayName, String email, String role, UUID centreId, String centreName) {}
+            UUID userId, String displayName, String email, String username, String role,
+            UUID centreId, String centreCode, String centreName) {}
 
     public record CreateTeacherRequest(
             @NotBlank(message = "must not be blank") @Email(message = "must be a valid email") String email,
@@ -69,19 +70,4 @@ public final class AuthDtos {
     /** Acknowledgement of a resent invite: who it went to (a fresh 48-hour link). */
     public record ResendInviteDto(UUID userId, String email) {}
 
-    public record StudentSessionRequest(
-            @NotNull(message = "must not be null") UUID batchId,
-            @NotBlank(message = "must not be blank") String fullName,
-            @NotBlank(message = "must not be blank") String pin) {}
-
-    public record StudentSummary(
-            UUID userId,
-            String displayName,
-            UUID membershipId,
-            UUID batchId,
-            String batchName,
-            UUID centreId) {}
-
-    public record StudentSessionResponse(
-            String accessToken, String tokenType, long expiresInSeconds, StudentSummary student) {}
 }
