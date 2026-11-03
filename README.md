@@ -1,5 +1,7 @@
 # Learnium Backend
 
+M4 definitions, publishing and marking: [API contract](docs/m4-publishing-api.md).
+
 M4 review and bank: [API contract](docs/m4-review-api.md) ·
 [settled milestone policies](docs/m4-requirements.md).
 

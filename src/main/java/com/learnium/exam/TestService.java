@@ -134,7 +134,7 @@ public class TestService {
             ItemRequest entry = input.get(i);
             Question q = entry == null ? null : available.get(entry.questionId());
             if (q == null || !seen.add(q.getQuestionId()) || !q.getTopic().getGradeSubject().getGradeSubjectId().equals(pairingId)
-                    || ("FLASHCARD_PRACTICE".equals(kind) != "FLASHCARD".equals(q.getQuestionType().getCode())))
+                    || !("FLASHCARD_PRACTICE".equals(kind) ? "FLASHCARD".equals(q.getQuestionType().getCode()) : Set.of("MCQ", "FILL_BLANK", "NUMERIC", "WRITTEN").contains(q.getQuestionType().getCode())))
                 throw invalid(ErrorCode.TST_INVALID, "items[" + i + "].questionId", "Choose a distinct approved question of this grade, subject and kind");
             selected.add(new Selection(q, marks(entry.marks(), kind, "items[" + i + "].marks")));
         }
@@ -236,7 +236,7 @@ public class TestService {
 
     private List<BatchMembership> activeRoster(UUID centreId, UUID batchId) {
         return memberships.findByCentreIdAndBatchIdAndMemberRoleAndStatus(centreId, batchId, MemberRole.STUDENT, MembershipStatus.ACTIVE)
-                .stream().filter(m -> m.getUser().getStatus() == UserStatus.ACTIVE).toList();
+                .stream().filter(m -> m.getUser().getStatus() == UserStatus.ACTIVE && m.getUser().getRole() == UserRole.STUDENT).toList();
     }
     private void addAssigned(ExamInstance instance, UserAccount user, UUID actor) {
         var student = new ExamInstanceStudent(); student.setCentreId(instance.getCentreId()); student.setExamInstance(instance);

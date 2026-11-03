@@ -140,6 +140,8 @@ class TenancyInvariantTest {
     }
 
     private ExamMode saveQuizMode() {
+        var existing = examModeRepository.findByTestType(ExamModeType.quiz);
+        if (existing.isPresent()) return existing.get();
         ExamMode mode = new ExamMode();
         mode.setTestType(ExamModeType.quiz);
         mode.setTitle("Quiz");

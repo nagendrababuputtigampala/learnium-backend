@@ -1,7 +1,7 @@
 # Learnium — as-built entity relationships
 
 Source: PostgreSQL catalogue metadata from the migrated `learnium` schema.
-Flyway versions: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13.
+Flyway versions: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14.
 
 Regenerate with `python3 scripts/export_er_diagram.py --container CONTAINER`.
 
@@ -52,6 +52,9 @@ erDiagram
         timestamp_with_time_zone created_at
         uuid updated_by
         timestamp_with_time_zone updated_at
+        character_varying_16_ job_type
+        uuid question_attempt_id FK
+        jsonb marking_input
     }
     badges {
         uuid badge_id PK
@@ -149,6 +152,17 @@ erDiagram
         uuid updated_by
         timestamp_with_time_zone updated_at
         uuid centre_id FK
+        jsonb payload_snapshot
+        character_varying_50_ correct_ref_snapshot
+        numeric_6_2_ marks
+    }
+    exam_instance_student {
+        uuid id PK
+        uuid centre_id FK
+        uuid exam_instance_id FK
+        uuid user_id FK
+        uuid added_by FK
+        timestamp_with_time_zone added_at
     }
     exam_instances {
         uuid exam_instance_id PK
@@ -167,6 +181,12 @@ erDiagram
         uuid updated_by
         timestamp_with_time_zone updated_at
         uuid centre_id FK
+        character_varying_120_ definition_name
+        character_varying_24_ definition_kind
+        integer time_limit_seconds
+        integer max_attempts
+        character_varying_16_ answer_release_policy
+        timestamp_with_time_zone closed_at
     }
     exam_modes {
         uuid exam_mode_id PK
@@ -201,6 +221,7 @@ erDiagram
         uuid updated_by
         timestamp_with_time_zone updated_at
         uuid centre_id FK
+        numeric_6_2_ marks
     }
     exam_templates {
         uuid exam_template_id PK
@@ -218,6 +239,8 @@ erDiagram
         timestamp_with_time_zone created_at
         uuid updated_by
         timestamp_with_time_zone updated_at
+        character_varying_24_ kind
+        uuid grade_subject_id FK
     }
     grade_subjects {
         uuid grade_subject_id PK
@@ -278,6 +301,7 @@ erDiagram
         uuid updated_by
         timestamp_with_time_zone updated_at
         uuid centre_id FK
+        jsonb ai_breakdown
     }
     question_types {
         uuid question_type_id PK
@@ -429,8 +453,9 @@ erDiagram
     user_account ||--o{ account_token : account_token_user_id_fkey
     user_account ||--o{ account_token : fk_account_token_centre_user
     centres ||--o{ background_job : background_job_centre_id_fkey
-    topics ||--o{ background_job : background_job_topic_id_fkey
-    materials ||--o{ background_job : fk_background_job_material
+    topics |o--o{ background_job : background_job_topic_id_fkey
+    materials |o--o{ background_job : fk_background_job_material
+    question_attempts |o--o| background_job : fk_marking_attempt
     batches ||--o{ batch_memberships : batch_memberships_batch_id_fkey
     user_account ||--o{ batch_memberships : batch_memberships_user_id_fkey
     batches ||--o{ batch_memberships : fk_batch_memberships_centre_batch
@@ -446,6 +471,10 @@ erDiagram
     questions ||--o{ exam_instance_questions : exam_instance_questions_question_id_fkey
     exam_instances ||--o{ exam_instance_questions : fk_eiq_centre_instance
     questions ||--o{ exam_instance_questions : fk_eiq_centre_question
+    centres ||--o{ exam_instance_student : exam_instance_student_centre_id_fkey
+    user_account ||--o{ exam_instance_student : fk_instance_student_actor
+    exam_instances ||--o{ exam_instance_student : fk_instance_student_instance
+    user_account ||--o{ exam_instance_student : fk_instance_student_user
     batches ||--o{ exam_instances : exam_instances_batch_id_fkey
     exam_templates ||--o{ exam_instances : exam_instances_exam_template_id_fkey
     user_account ||--o{ exam_instances : exam_instances_published_by_fkey
@@ -459,6 +488,7 @@ erDiagram
     centres ||--o{ exam_templates : exam_templates_centre_id_fkey
     exam_modes ||--o{ exam_templates : exam_templates_exam_mode_id_fkey
     grades ||--o{ exam_templates : exam_templates_grade_id_fkey
+    grade_subjects ||--o{ exam_templates : exam_templates_grade_subject_id_fkey
     subjects ||--o{ exam_templates : exam_templates_subject_id_fkey
     topics |o--o{ exam_templates : exam_templates_topic_id_fkey
     grades ||--o{ grade_subjects : grade_subjects_grade_id_fkey
@@ -508,6 +538,7 @@ erDiagram
 | background_job | centre_id | centres | centre_id |
 | background_job | topic_id | topics | topic_id |
 | background_job | centre_id, material_id | materials | centre_id, material_id |
+| background_job | centre_id, question_attempt_id | question_attempts | centre_id, question_attempt_id |
 | batch_memberships | batch_id | batches | batch_id |
 | batch_memberships | user_id | user_account | user_id |
 | batch_memberships | centre_id, batch_id | batches | centre_id, batch_id |
@@ -523,6 +554,10 @@ erDiagram
 | exam_instance_questions | question_id | questions | question_id |
 | exam_instance_questions | centre_id, exam_instance_id | exam_instances | centre_id, exam_instance_id |
 | exam_instance_questions | centre_id, question_id | questions | centre_id, question_id |
+| exam_instance_student | centre_id | centres | centre_id |
+| exam_instance_student | centre_id, added_by | user_account | centre_id, user_id |
+| exam_instance_student | centre_id, exam_instance_id | exam_instances | centre_id, exam_instance_id |
+| exam_instance_student | centre_id, user_id | user_account | centre_id, user_id |
 | exam_instances | batch_id | batches | batch_id |
 | exam_instances | exam_template_id | exam_templates | exam_template_id |
 | exam_instances | published_by | user_account | user_id |
@@ -536,6 +571,7 @@ erDiagram
 | exam_templates | centre_id | centres | centre_id |
 | exam_templates | exam_mode_id | exam_modes | exam_mode_id |
 | exam_templates | grade_id | grades | grade_id |
+| exam_templates | grade_subject_id | grade_subjects | grade_subject_id |
 | exam_templates | subject_id | subjects | subject_id |
 | exam_templates | topic_id | topics | topic_id |
 | grade_subjects | grade_id | grades | grade_id |

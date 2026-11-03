@@ -1,12 +1,20 @@
 -- M4 branch 2: extend the ported exam chain without duplicating its existing
 -- creator/order/integrity/camera columns. Preserve all published migrations.
+INSERT INTO exam_modes (exam_mode_id, test_type, title, created_at, updated_at)
+    SELECT '50000000-0000-4000-8000-000000000001', 'quiz', 'Scored test', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    WHERE NOT EXISTS (SELECT 1 FROM exam_modes WHERE test_type = 'quiz');
+INSERT INTO exam_modes (exam_mode_id, test_type, title, created_at, updated_at)
+    SELECT '50000000-0000-4000-8000-000000000002', 'flashcards', 'Flashcard practice', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    WHERE NOT EXISTS (SELECT 1 FROM exam_modes WHERE test_type = 'flashcards');
 ALTER TABLE exam_templates ADD COLUMN kind varchar(24) NOT NULL DEFAULT 'SCORED_TEST';
+UPDATE exam_templates t SET kind = 'FLASHCARD_PRACTICE' WHERE EXISTS (SELECT 1 FROM exam_modes m WHERE m.exam_mode_id = t.exam_mode_id AND m.test_type = 'flashcards');
 ALTER TABLE exam_templates ADD COLUMN grade_subject_id uuid REFERENCES grade_subjects (grade_subject_id);
 UPDATE exam_templates t SET grade_subject_id =
     (SELECT gs.grade_subject_id FROM grade_subjects gs WHERE gs.grade_id = t.grade_id AND gs.subject_id = t.subject_id);
 ALTER TABLE exam_templates ALTER COLUMN grade_subject_id SET NOT NULL;
 ALTER TABLE exam_template_questions ADD COLUMN marks numeric(6,2) NOT NULL DEFAULT 1;
 UPDATE exam_template_questions SET marks = points;
+UPDATE exam_template_questions tq SET marks = 0 WHERE EXISTS (SELECT 1 FROM exam_templates t WHERE t.exam_template_id = tq.exam_template_id AND t.kind = 'FLASHCARD_PRACTICE');
 -- Freeze definition identity too: later definition name/kind edits cannot relabel a sitting.
 ALTER TABLE exam_instances ADD COLUMN definition_name varchar(120) NOT NULL DEFAULT '';
 ALTER TABLE exam_instances ADD COLUMN definition_kind varchar(24) NOT NULL DEFAULT 'SCORED_TEST';
@@ -17,6 +25,9 @@ ALTER TABLE exam_instances ADD COLUMN max_attempts integer NOT NULL DEFAULT 1;
 UPDATE exam_instances SET max_attempts = 2 WHERE retakes_allowed = true;
 ALTER TABLE exam_instances ADD COLUMN answer_release_policy varchar(16) NOT NULL DEFAULT 'AFTER_CLOSE';
 ALTER TABLE exam_instances ADD COLUMN closed_at timestamp with time zone;
+-- Legacy rows without a complete window are historical closed sittings.
+UPDATE exam_instances SET opens_at = created_at WHERE opens_at IS NULL;
+UPDATE exam_instances SET closes_at = created_at WHERE closes_at IS NULL;
 -- integrity_signals_on and camera_mode already exist; question_order is display_order.
 UPDATE exam_instances SET camera_mode = 'ON' WHERE camera_mode = 'VERIFY_SNAPSHOTS';
 ALTER TABLE exam_instance_questions ADD COLUMN payload_snapshot jsonb;
@@ -24,6 +35,7 @@ ALTER TABLE exam_instance_questions ADD COLUMN correct_ref_snapshot varchar(50);
 ALTER TABLE exam_instance_questions ADD COLUMN marks numeric(6,2) NOT NULL DEFAULT 1;
 UPDATE exam_instance_questions iq SET payload_snapshot = (SELECT q.payload FROM questions q WHERE q.question_id = iq.question_id),
     correct_ref_snapshot = (SELECT q.correct_ref FROM questions q WHERE q.question_id = iq.question_id), marks = points;
+UPDATE exam_instance_questions iq SET marks = 0 WHERE EXISTS (SELECT 1 FROM exam_instances i WHERE i.exam_instance_id = iq.exam_instance_id AND i.definition_kind = 'FLASHCARD_PRACTICE');
 ALTER TABLE exam_instance_questions ALTER COLUMN payload_snapshot SET NOT NULL;
 ALTER TABLE exam_instance_questions ALTER COLUMN correct_ref_snapshot SET NOT NULL;
 CREATE TABLE exam_instance_student (

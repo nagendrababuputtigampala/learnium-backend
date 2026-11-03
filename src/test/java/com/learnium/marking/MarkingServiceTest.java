@@ -55,7 +55,7 @@ class MarkingServiceTest {
             doThrow(new ModelTransportException(code)).when(transport).send(any());
             assertThat(run("ollama").retryable()).isEqualTo(code == -1 || code == 408 || code == 429 || code >= 500);
         }
-        for (String bad : List.of("broken", "null", "{}", "{\"message\":{\"content\":4}}", ollamaEnvelope("broken"))) {
+        for (String bad : List.of("", "broken", "null", "{}", "{\"message\":{\"content\":4}}", ollamaEnvelope("broken"))) {
             doReturn(new ModelTransport.ModelResponse(200, bad)).when(transport).send(any());
             assertThat(run("ollama").failure()).isEqualTo(GenerationFailureKind.MALFORMED_RESPONSE);
         }

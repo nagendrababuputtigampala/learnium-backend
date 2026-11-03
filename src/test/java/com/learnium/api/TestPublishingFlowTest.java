@@ -57,6 +57,7 @@ class TestPublishingFlowTest extends PublishingFixtures {
 
     @Test void publishingFreezesContentOrderMarksMetadataAndActiveRoster() throws Exception {
         UserAccount inactive = user(centre, UserRole.STUDENT); inactive.setStatus(UserStatus.DISABLED); users.save(inactive); member(batch, inactive);
+        var wrongRole = member(batch, colleague); wrongRole.setMemberRole(MemberRole.STUDENT); memberships.saveAndFlush(wrongRole);
         var created = create(); String id = created.path("id").asText();
         var overrides = publishBody(); overrides.put("itemMarks", Map.of(mcq.getQuestionId(), 4.25));
         overrides.put("timeLimitSeconds", 1200); overrides.put("maxAttempts", 3); overrides.put("answerReleasePolicy", "ON_SUBMIT"); overrides.put("cameraMode", "ON"); overrides.put("integrityEnabled", true);
@@ -134,6 +135,7 @@ class TestPublishingFlowTest extends PublishingFixtures {
         var tooMany = definition(); tooMany.put("items", Collections.nCopies(201, item(mcq, 1))); invalid.add(tooMany);
         var missing = definition(); missing.put("items", List.of(Map.of("marks", 1))); invalid.add(missing);
         var practice = definition(); practice.put("kind", "FLASHCARD_PRACTICE"); practice.put("items", List.of(item(flashcard, 1))); invalid.add(practice);
+        var mixedPractice = definition(); mixedPractice.put("kind", "FLASHCARD_PRACTICE"); mixedPractice.put("items", List.of(item(mcq, 0))); invalid.add(mixedPractice);
         for (var d : invalid) mvc.perform(post("/api/v1/tests").with(as(owner)).contentType("application/json").content(body(d)))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("LRN-TST-001")).andExpect(jsonPath("$.fieldErrors").isNotEmpty());
         mcq.setStatus(QuestionStatus.DRAFT); questions.saveAndFlush(mcq);
@@ -166,4 +168,46 @@ class TestPublishingFlowTest extends PublishingFixtures {
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.fieldErrors.batchId").isNotEmpty());
         assertThat(instances.count()).isEqualTo(before);
     }
+    @Test void allRoutesRequireStaffAndAdminsCanPublishOtherTeachersDefinitions() throws Exception {
+        String id = create().path("id").asText();
+        var requests = List.of(get("/api/v1/tests"), post("/api/v1/tests"), get("/api/v1/tests/" + id), put("/api/v1/tests/" + id), delete("/api/v1/tests/" + id), post("/api/v1/tests/" + id + "/publish"),
+                get("/api/v1/instances"), get("/api/v1/instances/" + id), post("/api/v1/instances/" + id + "/close"), post("/api/v1/instances/" + id + "/regenerate-code"), post("/api/v1/instances/" + id + "/students"));
+        for (var request : requests) {
+            mvc.perform(request.contentType("application/json").content("{}")).andExpect(status().isUnauthorized());
+            mvc.perform(request.with(as(student)).contentType("application/json").content("{}")).andExpect(status().isForbidden());
+        }
+        mvc.perform(post("/api/v1/tests/" + id + "/publish").with(as(admin)).contentType("application/json").content(body(publishBody())))
+                .andExpect(status().isCreated());
+        create(definition(), colleague); create(definition(), admin);
+        mvc.perform(get("/api/v1/tests").with(as(colleague))).andExpect(jsonPath("$.length()").value(1));
+        mvc.perform(get("/api/v1/tests").with(as(foreign))).andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(get("/api/v1/tests").with(as(admin))).andExpect(jsonPath("$.length()").value(3));
+    }
+
+    @Test void rejectsOtherPairingsAndSupportsZeroMarkPracticeAndExpiredWindows() throws Exception {
+        var grade = new Grade(); grade.setCode("P9"); grade.setName("Publish Grade 9"); grades.save(grade);
+        var otherPairing = new GradeSubject(); otherPairing.setGrade(grade); otherPairing.setSubject(pairing.getSubject()); pairings.save(otherPairing);
+        var otherTopic = new Topic(); otherTopic.setGradeSubject(otherPairing); otherTopic.setTopicName("Other topic"); topics.save(otherTopic);
+        mcq.setTopic(otherTopic); questions.saveAndFlush(mcq);
+        mvc.perform(post("/api/v1/tests").with(as(owner)).contentType("application/json").content(body(definition()))).andExpect(status().isBadRequest());
+        mcq.setTopic(topic); questions.saveAndFlush(mcq);
+        var unknown = new QuestionType(); unknown.setCode("UNKNOWN"); unknown.setName("Unknown"); types.save(unknown);
+        var originalType = mcq.getQuestionType(); mcq.setQuestionType(unknown); questions.saveAndFlush(mcq);
+        mvc.perform(post("/api/v1/tests").with(as(owner)).contentType("application/json").content(body(definition()))).andExpect(status().isBadRequest());
+        mcq.setQuestionType(originalType); questions.saveAndFlush(mcq);
+        var practice = definition(); practice.put("kind", "FLASHCARD_PRACTICE"); practice.put("items", List.of(item(flashcard, 0)));
+        var saved = create(practice, owner);
+        var window = publishBody(); window.put("opensAt", Instant.now().minusSeconds(7200).toString()); window.put("closesAt", Instant.now().minusSeconds(3600).toString());
+        var expired = publish(saved.path("id").asText(), window);
+        assertThat(expired.path("status").asText()).isEqualTo("CLOSED");
+        mvc.perform(post("/api/v1/instances/" + expired.path("id").asText() + "/students").with(as(owner)).contentType("application/json").content(body(Map.of("userId", student.getUserId())))).andExpect(status().isBadRequest());
+        var expiredRow = instances.findById(UUID.fromString(expired.path("id").asText())).orElseThrow();
+        expiredRow.setStatus(ExamInstanceStatus.OPEN); instances.saveAndFlush(expiredRow);
+        mvc.perform(get("/api/v1/instances/" + expired.path("id").asText()).with(as(owner))).andExpect(jsonPath("$.status").value("CLOSED"));
+        var nullItem = publishBody(); nullItem.put("items", Collections.singletonList(null));
+        mvc.perform(post("/api/v1/tests/" + saved.path("id").asText() + "/publish").with(as(owner)).contentType("application/json").content(body(nullItem))).andExpect(status().isBadRequest());
+        batch.setGradeSubject(otherPairing); batches.saveAndFlush(batch);
+        mvc.perform(post("/api/v1/tests/" + saved.path("id").asText() + "/publish").with(as(owner)).contentType("application/json").content(body(publishBody()))).andExpect(status().isBadRequest());
+    }
+
 }

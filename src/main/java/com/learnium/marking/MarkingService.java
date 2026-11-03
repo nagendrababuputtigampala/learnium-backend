@@ -50,7 +50,6 @@ public class MarkingService {
         }
         try {
             JsonNode root = JSON.readTree(transport.send(new ModelRequest(url, headers, body.toString(), timeout)).body());
-            if (root == null) return fail(GenerationFailureKind.MALFORMED_RESPONSE, false);
             String content;
             if (ollama) {
                 if ("length".equals(root.path("done_reason").asText())) return fail(GenerationFailureKind.TRUNCATED, true);

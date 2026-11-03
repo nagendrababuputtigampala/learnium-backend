@@ -22,7 +22,15 @@
 - Marking jobs freeze provider/model/prompt/rubric/answer, isolate generation quotas and
   claim scans, retry transient failures only, reject stale completions and exhaust at two
   claims. A late result cannot overwrite a teacher confirmation. No answer text is logged.
-- Next: full backend coverage/real PostgreSQL verification, then frontend.
+- S4 green: 40 targeted/upgrade tests plus the full execution report pass the unchanged
+  100% line/branch gates. Added authorization coverage, legacy V13→V14 backfill evidence,
+  practice/kind boundaries, code-collision handling and current-roster account/role checks.
+- Real PostgreSQL 16: 52 migration/review/publishing/marking tests passed, including new
+  composite tenant FKs. Fresh databases now receive the required exam-mode catalogue rows.
+- Added the API/marking contract, updated settled scope, CI PostgreSQL suites, as-built ER
+  metadata and full-stack publishing acceptance. Final clean-target evidence is collected
+  after both repos are complete.
+- Next: frontend definitions/builder, final publish dialog and instance management.
 
 # Progress — feature/review-and-bank (backend)
 

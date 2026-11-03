@@ -40,10 +40,12 @@ SELECT json_build_object(
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--container", default="learnium-backend-postgres-1")
+    parser.add_argument("--db-user", default="learnium")
+    parser.add_argument("--database", default="learnium")
     parser.add_argument("--output", type=Path, default=Path("ER-Diagram.md"))
     args = parser.parse_args()
-    result = subprocess.run(["docker", "exec", args.container, "psql", "-X", "-U", "learnium",
-                             "-d", "learnium", "-At", "-c", SQL],
+    result = subprocess.run(["docker", "exec", args.container, "psql", "-X", "-U", args.db_user,
+                             "-d", args.database, "-At", "-c", SQL],
                             check=True, text=True, stdout=subprocess.PIPE)
     schema = json.loads(result.stdout)
     lines = ["# Learnium — as-built entity relationships", "",
