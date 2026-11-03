@@ -9,8 +9,33 @@ import org.springframework.data.repository.query.Param;
 import java.time.Instant;
 import java.util.Optional;
 import com.learnium.model.exam.ExamAttemptStatus;
+import java.math.BigDecimal;
+import org.springframework.data.domain.Pageable;
 
 public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, UUID> {
+
+    interface DashboardRecentFact {
+        UUID getAttemptId();
+        String getTestName();
+        String getBatchName();
+        Instant getSubmittedAt();
+        BigDecimal getEarnedMarks();
+        BigDecimal getAvailableMarks();
+        Long getPendingItemCount();
+    }
+
+    @Query("select a.attemptId as attemptId, a.examInstance.definitionName as testName,"
+            + " a.examInstance.batch.name as batchName, a.submittedAt as submittedAt,"
+            + " sum(case when q.markingStatus = com.learnium.model.exam.MarkingStatus.AUTO and q.correct = true then iq.marks"
+            + " when q.markingStatus = com.learnium.model.exam.MarkingStatus.CONFIRMED then coalesce(q.confirmedScore, 0) else 0 end) as earnedMarks,"
+            + " sum(iq.marks) as availableMarks,"
+            + " sum(case when q.markingStatus not in (com.learnium.model.exam.MarkingStatus.AUTO, com.learnium.model.exam.MarkingStatus.CONFIRMED) then 1 else 0 end) as pendingItemCount"
+            + " from QuestionAttempt q join q.attempt a join q.examInstanceQuestion iq"
+            + " where a.centreId = :centreId and a.user.userId = :studentId"
+            + " and a.status in (com.learnium.model.exam.ExamAttemptStatus.SUBMITTED, com.learnium.model.exam.ExamAttemptStatus.AUTO_SUBMITTED)"
+            + " group by a.attemptId, a.examInstance.definitionName, a.examInstance.batch.name, a.submittedAt"
+            + " order by a.submittedAt desc, a.attemptId desc")
+    List<DashboardRecentFact> dashboardRecent(UUID centreId, UUID studentId, Pageable pageable);
 
     @Query(
             "select a from ExamAttempt a"

@@ -3,6 +3,8 @@ package com.learnium.api;
 import com.learnium.api.dto.StudentDtos.*;
 import com.learnium.exam.StudentAttemptService;
 import com.learnium.exam.StudentTestService;
+import com.learnium.exam.StudentDashboardService;
+import com.learnium.api.dto.StudentDashboardDtos.DashboardDto;
 import com.learnium.security.CurrentPrincipal;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
@@ -17,12 +19,18 @@ import java.util.UUID;
 public class StudentController {
     private final StudentTestService tests;
     private final StudentAttemptService attempts;
-    public StudentController(StudentTestService tests, StudentAttemptService attempts) {
-        this.tests = tests; this.attempts = attempts;
+    private final StudentDashboardService dashboard;
+    public StudentController(StudentTestService tests, StudentAttemptService attempts, StudentDashboardService dashboard) {
+        this.tests = tests; this.attempts = attempts; this.dashboard = dashboard;
     }
     @GetMapping("/tests")
     public ResponseEntity<List<StudentTestDto>> tests() {
         return ResponseEntity.ok(tests.tests(CurrentPrincipal.require()));
+    }
+
+    @GetMapping("/dashboard")
+    public ResponseEntity<DashboardDto> dashboard() {
+        return ResponseEntity.ok(dashboard.dashboard(CurrentPrincipal.require()));
     }
 
     @PostMapping("/tests/{instanceId}/attempts")

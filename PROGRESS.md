@@ -1,5 +1,19 @@
 # Progress — feature/student-flow (M5)
 
+## Part 4 — student dashboard (2026-11-03)
+
+- Added a student-owned dashboard computed live from final attempt and marking facts;
+  invalidated attempts and pending written answers cannot affect scored denominators.
+- Topic summaries expose confirmed counts, earned/available marks, exact threshold bands,
+  strong/focus lists and the five most recent submitted results with pending indicators.
+- Batch/topic comparisons appear only from eight distinct students, expose aggregate
+  average and percentile data only, and never return another student's identity or score.
+- Repository aggregation uses three fixed queries for topic, recent-result and comparison
+  facts, avoiding per-topic, per-attempt and per-student query growth.
+- Clean verification: 620 tests run, 579 passed and 41 optional PostgreSQL tests skipped;
+  zero failures/errors. JaCoCo is 100% lines (3629/3629) and branches (1391/1391).
+- Part 4 is complete and committed before Part 5; no integrity/camera work has started.
+
 ## Part 3 — marking queue and confirmation (2026-11-03)
 
 - Flyway V17 replaces the blanket one-job-per-answer constraint with one live marking
