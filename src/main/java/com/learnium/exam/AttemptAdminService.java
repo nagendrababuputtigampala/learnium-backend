@@ -3,20 +3,24 @@ package com.learnium.exam;
 import com.learnium.admin.BatchAccessGuard;
 import com.learnium.api.dto.AttemptAdminDtos.InstanceAttemptDto;
 import com.learnium.api.dto.IntegrityDtos.IntegrityEventDto;
+import com.learnium.api.dto.ProctorDtos.SnapshotDto;
 import com.learnium.common.error.BusinessException;
 import com.learnium.common.error.ErrorCode;
 import com.learnium.model.exam.ExamAttempt;
 import com.learnium.model.exam.ExamAttemptStatus;
 import com.learnium.model.exam.ExamInstance;
 import com.learnium.model.exam.MarkingStatus;
+import com.learnium.model.exam.ProctorSnapshot;
 import com.learnium.model.exam.QuestionAttempt;
 import com.learnium.model.user.UserRole;
 import com.learnium.repository.exam.ExamAttemptRepository;
 import com.learnium.repository.exam.ExamInstanceQuestionRepository;
 import com.learnium.repository.exam.ExamInstanceRepository;
 import com.learnium.repository.exam.IntegrityEventRepository;
+import com.learnium.repository.exam.ProctorSnapshotRepository;
 import com.learnium.repository.exam.QuestionAttemptRepository;
 import com.learnium.security.LearniumPrincipal;
+import com.learnium.storage.StorageService;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,11 +39,15 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class AttemptAdminService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AttemptAdminService.class);
+
     private final ExamInstanceRepository instances;
     private final ExamAttemptRepository attempts;
     private final QuestionAttemptRepository answers;
     private final ExamInstanceQuestionRepository items;
     private final IntegrityEventRepository events;
+    private final ProctorSnapshotRepository snapshots;
+    private final StorageService storage;
     private final BatchAccessGuard batchAccess;
 
     public AttemptAdminService(
@@ -48,12 +56,16 @@ public class AttemptAdminService {
             QuestionAttemptRepository answers,
             ExamInstanceQuestionRepository items,
             IntegrityEventRepository events,
+            ProctorSnapshotRepository snapshots,
+            StorageService storage,
             BatchAccessGuard batchAccess) {
         this.instances = instances;
         this.attempts = attempts;
         this.answers = answers;
         this.items = items;
         this.events = events;
+        this.snapshots = snapshots;
+        this.storage = storage;
         this.batchAccess = batchAccess;
     }
 
@@ -109,6 +121,43 @@ public class AttemptAdminService {
                 answers.findByCentreIdAndAttemptId(caller.centreId(), attemptId),
                 maxScore,
                 flagCounts(caller.centreId(), List.of(attempt)).getOrDefault(attemptId, Map.of()));
+    }
+
+    @Transactional(readOnly = true)
+    public List<SnapshotDto> snapshots(LearniumPrincipal caller, UUID attemptId) {
+        manageableAttempt(caller, attemptId);
+        return snapshots.findByCentreIdAndAttemptAttemptIdOrderByCapturedAtAsc(caller.centreId(), attemptId).stream()
+                .map(snapshot -> new SnapshotDto(
+                        snapshot.getSnapshotId(), snapshot.getReason().name(), snapshot.getCapturedAt()))
+                .toList();
+    }
+
+    /**
+     * Streams one snapshot image to managing staff. EVERY view is audit-logged
+     * (viewer, attempt, snapshot ids — never image bytes or content).
+     */
+    @Transactional(readOnly = true)
+    public SnapshotImage snapshotImage(LearniumPrincipal caller, UUID attemptId, UUID snapshotId) {
+        manageableAttempt(caller, attemptId);
+        ProctorSnapshot snapshot =
+                snapshots
+                        .findByCentreIdAndSnapshotId(caller.centreId(), snapshotId)
+                        .filter(row -> row.getAttempt() != null && row.getAttempt().getAttemptId().equals(attemptId))
+                        .orElseThrow(() -> new BusinessException(ErrorCode.TST_NOT_FOUND));
+        log.info(
+                "proctor snapshot viewed viewerId={} attemptId={} snapshotId={}",
+                caller.userId(),
+                attemptId,
+                snapshotId);
+        return new SnapshotImage(storage.read(snapshot.getStorageKey()), contentType(snapshot.getStorageKey()));
+    }
+
+    public record SnapshotImage(byte[] content, String contentType) {}
+
+    private String contentType(String storageKey) {
+        if (storageKey.endsWith(".png")) return "image/png";
+        if (storageKey.endsWith(".webp")) return "image/webp";
+        return "image/jpeg";
     }
 
     private Map<UUID, Map<String, Long>> flagCounts(UUID centreId, List<ExamAttempt> rows) {

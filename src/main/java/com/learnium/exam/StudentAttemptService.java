@@ -26,19 +26,26 @@ public class StudentAttemptService {
     private final ExamInstanceQuestionRepository items;
     private final QuestionAttemptRepository answers;
     private final MarkingJobService markingJobs;
+    private final ProctorService proctor;
     private final Clock clock;
     private final tools.jackson.databind.ObjectMapper webJson;
 
     public StudentAttemptService(ExamInstanceStudentRepository assignments, ExamInstanceRepository instances,
             ExamAttemptRepository attempts, ExamInstanceQuestionRepository items,
-            QuestionAttemptRepository answers, MarkingJobService markingJobs, Clock clock,
+            QuestionAttemptRepository answers, MarkingJobService markingJobs, ProctorService proctor, Clock clock,
             tools.jackson.databind.ObjectMapper webJson) {
         this.assignments = assignments; this.instances = instances; this.attempts = attempts; this.items = items;
-        this.answers = answers; this.markingJobs = markingJobs; this.clock = clock; this.webJson = webJson;
+        this.answers = answers; this.markingJobs = markingJobs; this.proctor = proctor; this.clock = clock;
+        this.webJson = webJson;
     }
 
     @Transactional
     public AttemptDto start(LearniumPrincipal caller, UUID instanceId) {
+        return start(caller, instanceId, null);
+    }
+
+    @Transactional
+    public AttemptDto start(LearniumPrincipal caller, UUID instanceId, String cameraCheckToken) {
         var assignment = assignments.findAssigned(caller.centreId(), instanceId, caller.userId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.ATT_NOT_ASSIGNED));
         ExamInstance instance = instances.lockInCentre(caller.centreId(), instanceId)
@@ -50,6 +57,10 @@ public class StudentAttemptService {
         if (!available(instance, now) || !"SCORED_TEST".equals(instance.getDefinitionKind()))
             throw new BusinessException(ErrorCode.ATT_NOT_AVAILABLE);
         if (owned.size() >= instance.getMaxAttempts()) throw new BusinessException(ErrorCode.ATT_EXHAUSTED);
+        // Camera-ON instances start only with a live camera check; resuming an
+        // in-progress attempt (handled above) never needs a new one.
+        ProctorSnapshot cameraCheck =
+                ProctorService.cameraOn(instance) ? proctor.requireCheck(caller, instance, cameraCheckToken) : null;
         ExamAttempt attempt = new ExamAttempt(); attempt.setCentreId(caller.centreId());
         attempt.setExamInstance(instance); attempt.setUser(assignment.getUser()); attempt.setAttemptNo(owned.size() + 1);
         attempt.setStatus(ExamAttemptStatus.IN_PROGRESS); attempt.setStartedAt(now);
@@ -58,7 +69,9 @@ public class StudentAttemptService {
             deadline = min(deadline, now.plusSeconds(instance.getTimeLimitSeconds()));
         attempt.setDeadlineAt(deadline);
         attempt.setTotalQuestions(items.frozen(caller.centreId(), instanceId).size());
-        return dto(attempts.saveAndFlush(attempt));
+        ExamAttempt saved = attempts.saveAndFlush(attempt);
+        if (cameraCheck != null) proctor.consumeCheck(cameraCheck, saved);
+        return dto(saved);
     }
 
     @Transactional(readOnly = true)

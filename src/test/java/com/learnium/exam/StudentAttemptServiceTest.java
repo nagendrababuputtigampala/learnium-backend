@@ -34,7 +34,8 @@ class StudentAttemptServiceTest {
 
     @BeforeEach void setup() {
         service = new StudentAttemptService(assignments, instances, attempts, items, answers,
-                mock(MarkingJobService.class), Clock.fixed(now, ZoneOffset.UTC), new tools.jackson.databind.ObjectMapper());
+                mock(MarkingJobService.class), mock(com.learnium.exam.ProctorService.class),
+                Clock.fixed(now, ZoneOffset.UTC), new tools.jackson.databind.ObjectMapper());
     }
 
     @Test void canonicalAnswersAcceptScalarAndObjectFormsAndRejectEveryMalformedShape() {

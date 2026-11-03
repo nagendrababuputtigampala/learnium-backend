@@ -18,6 +18,7 @@ public final class StudentDtos {
             String status, Instant startedAt, Instant deadlineAt, long remainingSeconds,
             List<AttemptItemDto> items, List<SavedAnswerDto> answers) {}
     public record SaveAnswerRequest(@NotNull JsonNode answer) {}
+    public record StartAttemptRequest(String cameraCheckToken) {}
     public record SavedAnswerResponse(UUID itemId, JsonNode answer, Instant savedAt) {}
     public record ResultItemDto(UUID itemId, int order, String type, BigDecimal marks, JsonNode payload,
             JsonNode answer, String state, BigDecimal score, JsonNode solution, String feedback) {}
