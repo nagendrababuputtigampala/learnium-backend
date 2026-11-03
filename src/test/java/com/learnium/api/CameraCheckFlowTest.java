@@ -66,6 +66,8 @@ class CameraCheckFlowTest extends PublishingFixtures {
                         .content("{\"cameraCheckToken\":\"" + token + "\"}"))
                 .andExpect(status().isOk()).andReturn());
         UUID attemptId = UUID.fromString(started.path("attemptId").asText());
+        assertThat(started.path("cameraMode").asText()).isEqualTo("ON");
+        assertThat(started.path("integritySignalsOn").asBoolean()).isFalse();
         ProctorSnapshot consumed = snapshots.findById(check.getSnapshotId()).orElseThrow();
         assertThat(consumed.getCheckUsedAt()).isNotNull();
         assertThat(consumed.getAttempt().getAttemptId()).isEqualTo(attemptId);

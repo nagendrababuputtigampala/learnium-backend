@@ -166,7 +166,8 @@ public class StudentAttemptService {
         long remaining = Math.max(0, Duration.between(clock.instant(), attempt.getDeadlineAt()).toSeconds());
         return new AttemptDto(attempt.getAttemptId(), instanceId, attempt.getExamInstance().getDefinitionName(),
                 attempt.getAttemptNo(), attempt.getStatus().name(), attempt.getStartedAt(), attempt.getDeadlineAt(),
-                remaining, questions, saved);
+                remaining, questions, saved,
+                attempt.getExamInstance().isIntegritySignalsOn(), attempt.getExamInstance().getCameraMode().name());
     }
 
     private AttemptResultDto resultDto(ExamAttempt attempt) {

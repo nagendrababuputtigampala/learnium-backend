@@ -1,6 +1,7 @@
 package com.learnium.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -49,6 +50,10 @@ class IntegrityFlowTest extends PublishingFixtures {
     @Test
     void recordsEventsWhenSignalsOn() throws Exception {
         UUID attemptId = startAttempt(true);
+        JsonNode tests = json(mvc.perform(get("/api/v1/student/tests").with(as(student)))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(tests.get(0).path("integritySignalsOn").asBoolean()).isTrue();
+        assertThat(tests.get(0).path("cameraMode").asText()).isEqualTo("OFF");
         String response = mvc.perform(post("/api/v1/student/attempts/" + attemptId + "/integrity-events").with(as(student))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(batch(
