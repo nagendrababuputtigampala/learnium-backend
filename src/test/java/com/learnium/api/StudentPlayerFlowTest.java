@@ -70,6 +70,21 @@ class StudentPlayerFlowTest extends PublishingFixtures {
         assertThat(loaded.path("answers")).hasSize(1);
     }
 
+    @Test void saveAndSubmitRejectAttemptsOwnedByAnotherStudent() throws Exception {
+        JsonNode instance = scored("AFTER_CLOSE", 600, now.minusSeconds(60), now.plusSeconds(3600));
+        UUID instanceId = UUID.fromString(instance.path("id").asText());
+        JsonNode started = start(instanceId, student);
+        UUID attemptId = UUID.fromString(started.path("attemptId").asText());
+        UUID mcqItem = itemIds(started).get("MCQ");
+        UserAccount other = user(centre, UserRole.STUDENT);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .put("/api/v1/student/attempts/" + attemptId + "/answers/" + mcqItem).with(as(other))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"answer\":{\"optionId\":\"x\"}}"))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("LRN-ATT-001"));
+        mvc.perform(post("/api/v1/student/attempts/" + attemptId + "/submit").with(as(other)))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("LRN-ATT-001"));
+    }
+
     @Test void startRejectsWindowAndComputesCloseOnlyDeadline() throws Exception {
         JsonNode future = scored("NEVER", null, now.plusSeconds(60), now.plusSeconds(3600));
         mvc.perform(post("/api/v1/student/tests/" + future.path("id").asText() + "/attempts").with(as(student)))

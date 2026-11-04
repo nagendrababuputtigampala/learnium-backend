@@ -84,7 +84,7 @@ public class StudentController {
     public ResponseEntity<IntegrityEventsResponse> integrityEvents(@PathVariable UUID attemptId,
             @RequestBody IntegrityEventsRequest request) {
         return ResponseEntity.ok(new IntegrityEventsResponse(
-                integrity.record(CurrentPrincipal.require(), attemptId, request == null ? null : request.events())));
+                integrity.record(CurrentPrincipal.require(), attemptId, request.events())));
     }
 
     @PostMapping("/attempts/{attemptId}/snapshots")

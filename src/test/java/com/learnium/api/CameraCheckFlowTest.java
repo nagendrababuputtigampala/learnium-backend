@@ -31,6 +31,7 @@ class CameraCheckFlowTest extends PublishingFixtures {
         UUID instanceId = UUID.fromString(published.path("id").asText());
         instances.findById(instanceId).ifPresent(instance -> {
             instance.setCameraMode(mode);
+            instance.setMaxAttempts(2);
             instances.saveAndFlush(instance);
         });
         return instanceId;
@@ -121,5 +122,12 @@ class CameraCheckFlowTest extends PublishingFixtures {
         // Camera-OFF instances start with no token at all:
         mvc.perform(post("/api/v1/student/tests/" + offInstance + "/attempts").with(as(student)))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void startWithoutAnyBodyWorksWhenCameraIsOff() throws Exception {
+        UUID instanceId = publishWithCamera(CameraMode.OFF);
+        mvc.perform(post("/api/v1/student/tests/" + instanceId + "/attempts").with(as(student)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.cameraMode").value("OFF"));
     }
 }

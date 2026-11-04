@@ -35,11 +35,6 @@ public class MarkingQueueService {
         this.answers = answers; this.jobs = jobs; this.markingJobs = markingJobs; this.clock = clock; this.webJson = webJson;
     }
 
-    @Transactional(readOnly = true)
-    public List<QueueGroupDto> queue(LearniumPrincipal caller) {
-        return queue(caller, null, null);
-    }
-
     /** Optional paging over the pending answers (applied before grouping); no params returns the whole queue. */
     @Transactional(readOnly = true)
     public List<QueueGroupDto> queue(LearniumPrincipal caller, Integer page, Integer size) {

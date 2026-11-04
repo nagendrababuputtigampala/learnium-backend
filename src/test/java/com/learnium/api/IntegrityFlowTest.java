@@ -124,4 +124,28 @@ class IntegrityFlowTest extends PublishingFixtures {
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("LRN-VAL-001"));
         assertThat(events.findAll()).isEmpty();
     }
+
+    @Test
+    void rejectsForeignAttemptsAndStructurallyMalformedBatches() throws Exception {
+        UUID attemptId = startAttempt(true);
+        UserAccount other = user(centre, UserRole.STUDENT);
+        mvc.perform(post("/api/v1/student/attempts/" + attemptId + "/integrity-events").with(as(other))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(batch(event("TAB_HIDDEN", "2026-11-03T18:01:00Z"))))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("LRN-ATT-001"));
+        mvc.perform(post("/api/v1/student/attempts/" + attemptId + "/integrity-events").with(as(student))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"events\":null}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("LRN-VAL-001"));
+        mvc.perform(post("/api/v1/student/attempts/" + attemptId + "/integrity-events").with(as(student))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"events\":[null]}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/v1/student/attempts/" + attemptId + "/integrity-events").with(as(student))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"events\":[{\"occurredAt\":\"2026-11-03T18:01:00Z\"}]}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/v1/student/attempts/" + attemptId + "/integrity-events").with(as(student))
+                        .contentType(MediaType.APPLICATION_JSON).content("null"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("LRN-VAL-002"));
+        assertThat(events.findAll()).isEmpty();
+    }
 }

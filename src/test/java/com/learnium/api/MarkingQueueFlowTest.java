@@ -220,6 +220,20 @@ class MarkingQueueFlowTest extends PublishingFixtures {
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("LRN-MRK-001"));
     }
 
+    @Test void confirmAcceptsAnAnswerWhoseAiJobIsStillRunning() throws Exception {
+        answer.setMarkingStatus(MarkingStatus.MARKING_PENDING);
+        answers.saveAndFlush(answer);
+        String request = body(Map.of("criteria", List.of(
+                Map.of("criterionId", "reasoning", "score", 5),
+                Map.of("criterionId", "clarity", "score", 2),
+                Map.of("criterionId", "evidence", "score", 2)), "feedback", "Confirmed while AI ran"));
+        mvc.perform(post("/api/v1/marking-queue/" + answer.getQuestionAttemptId() + "/confirm").with(as(owner))
+                        .contentType("application/json").content(request))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.confirmedScore").value(4.5));
+        assertThat(answers.findById(answer.getQuestionAttemptId()).orElseThrow().getMarkingStatus())
+                .isEqualTo(MarkingStatus.CONFIRMED);
+    }
+
     @Test void queuePagesPendingAnswersBeforeGrouping() throws Exception {
         ExamAttempt secondAttempt = new ExamAttempt(); secondAttempt.setCentreId(centre.getCentreId());
         secondAttempt.setExamInstance(answer.getAttempt().getExamInstance()); secondAttempt.setUser(student);
@@ -249,6 +263,8 @@ class MarkingQueueFlowTest extends PublishingFixtures {
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("LRN-VAL-001"));
         mvc.perform(get("/api/v1/marking-queue?page=-1").with(as(owner)))
                 .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/v1/marking-queue?size=101").with(as(owner)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("LRN-VAL-001"));
     }
 
     private void assertState(String state) throws Exception {

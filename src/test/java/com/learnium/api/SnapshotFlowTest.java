@@ -115,4 +115,54 @@ class SnapshotFlowTest extends PublishingFixtures {
         assertThat(snapshots.findByCentreIdAndAttemptAttemptIdOrderByCapturedAtAsc(centre.getCentreId(), attemptId))
                 .hasSize(1);
     }
+
+    @Test
+    void snapshotImageContentTypesAndUnlinkedPreTest() throws Exception {
+        UUID attemptId = cameraAttempt();
+        byte[] png = {(byte) 0x89, 0x50, 0x4E, 0x47, 1, 2, 3};
+        byte[] webp = {0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50, 9};
+        mvc.perform(upload(attemptId, "PERIODIC", png).with(as(student))).andExpect(status().isOk());
+        mvc.perform(upload(attemptId, "EVENT", webp).with(as(student))).andExpect(status().isOk());
+        JsonNode list = json(mvc.perform(get("/api/v1/attempts/" + attemptId + "/snapshots").with(as(owner)))
+                .andExpect(status().isOk()).andReturn());
+        UUID pngId = null;
+        UUID webpId = null;
+        for (JsonNode row : list) {
+            if ("PERIODIC".equals(row.path("reason").asText())) pngId = UUID.fromString(row.path("snapshotId").asText());
+            if ("EVENT".equals(row.path("reason").asText())) webpId = UUID.fromString(row.path("snapshotId").asText());
+        }
+        mvc.perform(get("/api/v1/attempts/" + attemptId + "/snapshots/" + pngId).with(as(owner)))
+                .andExpect(status().isOk()).andExpect(content().contentType("image/png"));
+        mvc.perform(get("/api/v1/attempts/" + attemptId + "/snapshots/" + webpId).with(as(owner)))
+                .andExpect(status().isOk()).andExpect(content().contentType("image/webp"));
+
+        // A fresh, unconsumed camera check is not linked to any attempt yet:
+        var attempt = snapshots.findAll().get(0).getAttempt();
+        UUID instanceId = attempt.getExamInstance().getExamInstanceId();
+        mvc.perform(multipart("/api/v1/student/tests/" + instanceId + "/camera-check")
+                        .file(new MockMultipartFile("file", "frame.jpg", "image/jpeg", JPEG)).with(as(student)))
+                .andExpect(status().isOk());
+        UUID unlinkedId = snapshots.findAll().stream()
+                .filter(row -> row.getAttempt() == null)
+                .findFirst().orElseThrow().getSnapshotId();
+        mvc.perform(get("/api/v1/attempts/" + attemptId + "/snapshots/" + unlinkedId).with(as(owner)))
+                .andExpect(status().isNotFound());
+
+        // A snapshot linked to a different attempt of the same student is equally hidden:
+        instances.findById(instanceId).ifPresent(instance -> {
+            instance.setMaxAttempts(2);
+            instances.saveAndFlush(instance);
+        });
+        mvc.perform(post("/api/v1/student/attempts/" + attemptId + "/submit").with(as(student)))
+                .andExpect(status().isOk());
+        JsonNode secondCheck = json(mvc.perform(multipart("/api/v1/student/tests/" + instanceId + "/camera-check")
+                        .file(new MockMultipartFile("file", "frame.jpg", "image/jpeg", JPEG)).with(as(student)))
+                .andExpect(status().isOk()).andReturn());
+        JsonNode second = json(mvc.perform(post("/api/v1/student/tests/" + instanceId + "/attempts").with(as(student))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cameraCheckToken\":\"" + secondCheck.path("checkToken").asText() + "\"}"))
+                .andExpect(status().isOk()).andReturn());
+        mvc.perform(get("/api/v1/attempts/" + second.path("attemptId").asText() + "/snapshots/" + pngId).with(as(owner)))
+                .andExpect(status().isNotFound());
+    }
 }

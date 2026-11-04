@@ -139,6 +139,26 @@ class StudentAttemptServiceTest {
         assertThatThrownBy(() -> service.start(caller, instance.getExamInstanceId())).isInstanceOf(BusinessException.class);
     }
 
+    @Test void startAndPracticeRejectUnassignedAndMissingInstances() {
+        UUID instanceId = UUID.randomUUID();
+        when(assignments.findAssigned(centreId, instanceId, userId)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.practice(caller, instanceId))
+                .isInstanceOf(BusinessException.class)
+                .extracting(error -> ((BusinessException) error).getErrorCode())
+                .isEqualTo(com.learnium.common.error.ErrorCode.ATT_NOT_ASSIGNED);
+        var row = mock(com.learnium.model.exam.ExamInstanceStudent.class);
+        when(assignments.findAssigned(centreId, instanceId, userId)).thenReturn(Optional.of(row));
+        when(instances.findById(instanceId)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.start(caller, instanceId))
+                .isInstanceOf(BusinessException.class)
+                .extracting(error -> ((BusinessException) error).getErrorCode())
+                .isEqualTo(com.learnium.common.error.ErrorCode.ATT_NOT_ASSIGNED);
+        assertThatThrownBy(() -> service.practice(caller, instanceId))
+                .isInstanceOf(BusinessException.class)
+                .extracting(error -> ((BusinessException) error).getErrorCode())
+                .isEqualTo(com.learnium.common.error.ErrorCode.ATT_NOT_ASSIGNED);
+    }
+
     @Test void invalidWebJsonIsConvertedToTheStandardAnswerValidationError() {
         tools.jackson.databind.JsonNode invalid = mock(tools.jackson.databind.JsonNode.class);
         when(invalid.toString()).thenReturn("{");

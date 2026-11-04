@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.learnium.model.exam.ExamAttempt;
 import com.learnium.model.exam.ExamAttemptStatus;
 import com.learnium.repository.exam.ExamAttemptRepository;
 import java.util.List;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class AttemptAdminFlowTest extends PublishingFixtures {
     @Autowired ExamAttemptRepository examAttempts;
+    @Autowired com.learnium.repository.exam.QuestionAttemptRepository questionAttempts;
 
     private record Scenario(UUID instanceId, UUID attemptId, UUID writtenAnswerId) {}
 
@@ -94,6 +96,85 @@ class AttemptAdminFlowTest extends PublishingFixtures {
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/instances/" + UUID.randomUUID() + "/attempts").with(as(owner)))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void emptyInstanceHasAnEmptyAttemptList() throws Exception {
+        JsonNode created = create();
+        JsonNode published = publish(created.path("id").asText(), publishBody());
+        UUID instanceId = UUID.fromString(published.path("id").asText());
+        JsonNode rows = json(mvc.perform(get("/api/v1/instances/" + instanceId + "/attempts").with(as(owner)))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(rows).hasSize(0);
+    }
+
+    @Test
+    void stagedMarkingStatesDriveScoreAndPendingFlag() throws Exception {
+        Scenario s = submittedWithFlags();
+        JsonNode before = json(mvc.perform(get("/api/v1/instances/" + s.instanceId() + "/attempts").with(as(owner)))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(before.get(0).path("markingPending").asBoolean()).isTrue();
+        String objectiveScore = before.get(0).path("score").asText();
+
+        var written = questionAttempts.findById(s.writtenAnswerId()).orElseThrow();
+        written.setMarkingStatus(com.learnium.model.exam.MarkingStatus.CONFIRMED);
+        written.setConfirmedScore(null);
+        questionAttempts.saveAndFlush(written);
+        JsonNode rows = json(mvc.perform(get("/api/v1/instances/" + s.instanceId() + "/attempts").with(as(owner)))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(rows.get(0).path("markingPending").asBoolean()).isFalse();
+        assertThat(rows.get(0).path("score").asText()).isEqualTo(objectiveScore);
+
+        written.setMarkingStatus(com.learnium.model.exam.MarkingStatus.MARKING_PENDING);
+        questionAttempts.saveAndFlush(written);
+        rows = json(mvc.perform(get("/api/v1/instances/" + s.instanceId() + "/attempts").with(as(owner)))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(rows.get(0).path("markingPending").asBoolean()).isTrue();
+
+        written.setMarkingStatus(com.learnium.model.exam.MarkingStatus.CONFIRMED);
+        written.setConfirmedScore(new java.math.BigDecimal("3.5"));
+        questionAttempts.saveAndFlush(written);
+        rows = json(mvc.perform(get("/api/v1/instances/" + s.instanceId() + "/attempts").with(as(owner)))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(rows.get(0).path("markingPending").asBoolean()).isFalse();
+        assertThat(rows.get(0).path("score").decimalValue())
+                .isEqualByComparingTo(new java.math.BigDecimal(objectiveScore).add(new java.math.BigDecimal("3.5")));
+    }
+
+    @Test
+    void adminViewsTheListAndStagedStatesRenderFaithfully() throws Exception {
+        Scenario s = submittedWithFlags();
+        JsonNode asAdmin = json(mvc.perform(get("/api/v1/instances/" + s.instanceId() + "/attempts").with(as(admin)))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(asAdmin).hasSize(1);
+        mvc.perform(get("/api/v1/attempts/" + s.attemptId() + "/integrity-events").with(as(admin)))
+                .andExpect(status().isOk());
+
+        var attempt = examAttempts.findById(s.attemptId()).orElseThrow();
+        attempt.setStatus(ExamAttemptStatus.AUTO_SUBMITTED);
+        examAttempts.saveAndFlush(attempt);
+        var mcqAnswer = questionAttempts.findByCentreIdAndInstanceId(centre.getCentreId(), s.instanceId()).stream()
+                .filter(row -> row.getMarkingStatus() == com.learnium.model.exam.MarkingStatus.AUTO)
+                .findFirst().orElseThrow();
+        mcqAnswer.setCorrect(false);
+        questionAttempts.saveAndFlush(mcqAnswer);
+        JsonNode rows = json(mvc.perform(get("/api/v1/instances/" + s.instanceId() + "/attempts").with(as(owner)))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(rows.get(0).path("status").asText()).isEqualTo("AUTO_SUBMITTED");
+        assertThat(rows.get(0).path("score").decimalValue()).isEqualByComparingTo("0");
+
+        ExamAttempt twin = new ExamAttempt();
+        twin.setCentreId(centre.getCentreId());
+        twin.setExamInstance(attempt.getExamInstance());
+        twin.setUser(student);
+        twin.setAttemptNo(2);
+        twin.setStartedAt(attempt.getStartedAt());
+        twin.setDeadlineAt(attempt.getDeadlineAt());
+        twin.setStatus(ExamAttemptStatus.SUBMITTED);
+        examAttempts.saveAndFlush(twin);
+        JsonNode two = json(mvc.perform(get("/api/v1/instances/" + s.instanceId() + "/attempts").with(as(owner)))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(two).hasSize(2);
     }
 
     @Test
