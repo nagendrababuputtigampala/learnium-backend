@@ -16,6 +16,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.jupiter.api.Test;
 
@@ -129,6 +131,37 @@ class ReportPdfRendererTest {
                     throw new IOException("disk gone");
                 }))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void metaLineHasNoSeparatorWhenOnlyTheBatchIsKnown() throws Exception {
+        var report = report(
+                "Simran Kaur", null, "Batch 8", null, List.of(), List.of(), overall(0, 0, "0", "0", "0"));
+
+        String text = textOf(renderer.render(report, "Centre", "UTC"));
+
+        assertThat(text).contains("Batch 8").doesNotContain("· Batch 8");
+    }
+
+    @Test
+    void blankCommentIsOmitted() throws Exception {
+        var report = report(
+                "Simran Kaur", "simran.k", null, "   ", List.of(), List.of(), overall(0, 0, "0", "0", "0"));
+
+        String text = textOf(renderer.render(report, "Centre", "UTC"));
+
+        assertThat(text).doesNotContain("Teacher comment");
+    }
+
+    @Test
+    void fitKeepsShortTextTrimsLongTextAndDrainsAtTinyWidths() throws Exception {
+        var bold = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
+        assertThat(ReportPdfRenderer.fit("Fractions", bold, 11, 250)).isEqualTo("Fractions");
+        assertThat(ReportPdfRenderer.fit(
+                        "A very long topic name that will not fit the column width at all", bold, 11, 250))
+                .endsWith("…")
+                .hasSizeLessThan(60);
+        assertThat(ReportPdfRenderer.fit("Hello", bold, 11, 1)).isEqualTo("…");
     }
 
     @Test

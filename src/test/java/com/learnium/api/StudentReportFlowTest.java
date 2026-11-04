@@ -15,6 +15,7 @@ import com.learnium.model.exam.ExamInstance;
 import com.learnium.model.exam.ExamInstanceQuestion;
 import com.learnium.model.exam.MarkingStatus;
 import com.learnium.model.exam.QuestionAttempt;
+import com.learnium.model.user.Batch;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
@@ -119,6 +120,35 @@ class StudentReportFlowTest extends PublishingFixtures {
         mvc.perform(get("/api/v1/students/" + owner.getUserId() + "/report").with(as(admin)))
                 .andExpect(status().isNotFound());
         mvc.perform(get(url()).with(as(admin))).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void adminCanGenerateInBatchScope() throws Exception {
+        mvc.perform(post(url()).with(as(admin)).contentType("application/json")
+                        .content(body(Map.of("batchId", batch.getBatchId().toString()))))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void batchScopeDenialsAreHidden() throws Exception {
+        // A batch id that does not exist in the caller's centre.
+        mvc.perform(post(url()).with(as(owner)).contentType("application/json")
+                        .content(body(Map.of("batchId", UUID.randomUUID().toString()))))
+                .andExpect(status().isNotFound());
+        // The real batch, but the colleague does not teach it.
+        mvc.perform(post(url()).with(as(colleague)).contentType("application/json")
+                        .content(body(Map.of("batchId", batch.getBatchId().toString()))))
+                .andExpect(status().isNotFound());
+        // A real batch the caller teaches, but the student is not a member of it.
+        Batch other = new Batch();
+        other.setCentre(centre);
+        other.setName("Batch 9");
+        other.setGradeSubject(pairing);
+        other = batches.saveAndFlush(other);
+        member(other, owner);
+        mvc.perform(post(url()).with(as(owner)).contentType("application/json")
+                        .content(body(Map.of("batchId", other.getBatchId().toString()))))
+                .andExpect(status().isNotFound());
     }
 
     @Test

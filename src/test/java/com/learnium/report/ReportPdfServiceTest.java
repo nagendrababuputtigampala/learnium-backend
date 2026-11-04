@@ -83,6 +83,19 @@ class ReportPdfServiceTest {
     }
 
     @Test
+    void studentPdfFallsBackToTheStudentIdWithABlankUsername() {
+        LearniumPrincipal student = LearniumPrincipal.student(studentId, centreId);
+        var report = reportWithUsername("  ");
+        when(reports.latestForStudent(student)).thenReturn(report);
+        when(centres.findById(centreId)).thenReturn(Optional.of(centre()));
+        when(renderer.render(report, "Demo Centre", "America/Vancouver")).thenReturn(new byte[] {7});
+
+        var file = service.studentPdf(student);
+
+        assertThat(file.filename()).isEqualTo("report-" + studentId + ".pdf");
+    }
+
+    @Test
     void missingCentreIsNotFound() {
         LearniumPrincipal student = LearniumPrincipal.student(studentId, centreId);
         when(reports.latestForStudent(student)).thenReturn(reportWithUsername("simran.k"));

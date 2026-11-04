@@ -203,7 +203,7 @@ public class ReportPdfRenderer {
     }
 
     /** Trims a string to a measured width, ellipsizing the tail. */
-    private static String fit(String text, PDFont font, float size, float maxWidth) throws IOException {
+    static String fit(String text, PDFont font, float size, float maxWidth) throws IOException {
         String value = safe(text);
         if (width(font, size, value) <= maxWidth) {
             return value;
