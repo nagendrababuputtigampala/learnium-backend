@@ -1,6 +1,10 @@
 package com.learnium.api;
 
+import com.learnium.api.dto.IntegrityDtos.*;
+import com.learnium.api.dto.ProctorDtos.*;
 import com.learnium.api.dto.StudentDtos.*;
+import com.learnium.exam.IntegrityService;
+import com.learnium.exam.ProctorService;
 import com.learnium.exam.StudentAttemptService;
 import com.learnium.exam.StudentTestService;
 import com.learnium.exam.StudentDashboardService;
@@ -20,8 +24,12 @@ public class StudentController {
     private final StudentTestService tests;
     private final StudentAttemptService attempts;
     private final StudentDashboardService dashboard;
-    public StudentController(StudentTestService tests, StudentAttemptService attempts, StudentDashboardService dashboard) {
-        this.tests = tests; this.attempts = attempts; this.dashboard = dashboard;
+    private final IntegrityService integrity;
+    private final ProctorService proctor;
+    public StudentController(StudentTestService tests, StudentAttemptService attempts, StudentDashboardService dashboard,
+            IntegrityService integrity, ProctorService proctor) {
+        this.tests = tests; this.attempts = attempts; this.dashboard = dashboard; this.integrity = integrity;
+        this.proctor = proctor;
     }
     @GetMapping("/tests")
     public ResponseEntity<List<StudentTestDto>> tests() {
@@ -34,8 +42,16 @@ public class StudentController {
     }
 
     @PostMapping("/tests/{instanceId}/attempts")
-    public ResponseEntity<AttemptDto> start(@PathVariable UUID instanceId) {
-        return ResponseEntity.ok(attempts.start(CurrentPrincipal.require(), instanceId));
+    public ResponseEntity<AttemptDto> start(@PathVariable UUID instanceId,
+            @RequestBody(required = false) StartAttemptRequest request) {
+        return ResponseEntity.ok(attempts.start(CurrentPrincipal.require(), instanceId,
+                request == null ? null : request.cameraCheckToken()));
+    }
+
+    @PostMapping("/tests/{instanceId}/camera-check")
+    public ResponseEntity<CameraCheckDto> cameraCheck(@PathVariable UUID instanceId,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        return ResponseEntity.ok(proctor.cameraCheck(CurrentPrincipal.require(), instanceId, file));
     }
 
     @GetMapping("/attempts/{attemptId}")
@@ -62,5 +78,19 @@ public class StudentController {
     @GetMapping("/tests/{instanceId}/practice")
     public ResponseEntity<PracticeDto> practice(@PathVariable UUID instanceId) {
         return ResponseEntity.ok(attempts.practice(CurrentPrincipal.require(), instanceId));
+    }
+
+    @PostMapping("/attempts/{attemptId}/integrity-events")
+    public ResponseEntity<IntegrityEventsResponse> integrityEvents(@PathVariable UUID attemptId,
+            @RequestBody IntegrityEventsRequest request) {
+        return ResponseEntity.ok(new IntegrityEventsResponse(
+                integrity.record(CurrentPrincipal.require(), attemptId, request.events())));
+    }
+
+    @PostMapping("/attempts/{attemptId}/snapshots")
+    public ResponseEntity<SnapshotDto> snapshot(@PathVariable UUID attemptId,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            @RequestParam("reason") String reason) {
+        return ResponseEntity.ok(proctor.uploadSnapshot(CurrentPrincipal.require(), attemptId, file, reason));
     }
 }

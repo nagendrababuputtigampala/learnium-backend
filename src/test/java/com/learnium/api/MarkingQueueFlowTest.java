@@ -208,6 +208,65 @@ class MarkingQueueFlowTest extends PublishingFixtures {
                 .isInstanceOf(BusinessException.class);
     }
 
+    @Test void confirmRejectsAnAnswerThatIsNotAwaitingMarking() throws Exception {
+        answer.setMarkingStatus(MarkingStatus.AUTO);
+        answers.saveAndFlush(answer);
+        String request = body(Map.of("criteria", List.of(
+                Map.of("criterionId", "reasoning", "score", 5),
+                Map.of("criterionId", "clarity", "score", 2),
+                Map.of("criterionId", "evidence", "score", 2)), "feedback", "Nope"));
+        mvc.perform(post("/api/v1/marking-queue/" + answer.getQuestionAttemptId() + "/confirm").with(as(owner))
+                        .contentType("application/json").content(request))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("LRN-MRK-001"));
+    }
+
+    @Test void confirmAcceptsAnAnswerWhoseAiJobIsStillRunning() throws Exception {
+        answer.setMarkingStatus(MarkingStatus.MARKING_PENDING);
+        answers.saveAndFlush(answer);
+        String request = body(Map.of("criteria", List.of(
+                Map.of("criterionId", "reasoning", "score", 5),
+                Map.of("criterionId", "clarity", "score", 2),
+                Map.of("criterionId", "evidence", "score", 2)), "feedback", "Confirmed while AI ran"));
+        mvc.perform(post("/api/v1/marking-queue/" + answer.getQuestionAttemptId() + "/confirm").with(as(owner))
+                        .contentType("application/json").content(request))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.confirmedScore").value(4.5));
+        assertThat(answers.findById(answer.getQuestionAttemptId()).orElseThrow().getMarkingStatus())
+                .isEqualTo(MarkingStatus.CONFIRMED);
+    }
+
+    @Test void queuePagesPendingAnswersBeforeGrouping() throws Exception {
+        ExamAttempt secondAttempt = new ExamAttempt(); secondAttempt.setCentreId(centre.getCentreId());
+        secondAttempt.setExamInstance(answer.getAttempt().getExamInstance()); secondAttempt.setUser(student);
+        secondAttempt.setAttemptNo(2); secondAttempt.setStartedAt(now.minusSeconds(200));
+        secondAttempt.setDeadlineAt(now.plusSeconds(300)); secondAttempt.setSubmittedAt(now.minusSeconds(30));
+        secondAttempt.setStatus(ExamAttemptStatus.SUBMITTED);
+        secondAttempt = examAttempts.saveAndFlush(secondAttempt);
+        QuestionAttempt second = new QuestionAttempt(); second.setCentreId(centre.getCentreId());
+        second.setAttempt(secondAttempt); second.setExamInstanceQuestion(answer.getExamInstanceQuestion());
+        second.setQuestion(written); second.setQuestionVersion(written.getVersion());
+        second.setCreatedBy(student.getUserId());
+        second.setAnswerPayload(JSON.createObjectNode().put("text", "Another explanation"));
+        second.setMarkingStatus(MarkingStatus.PENDING); answers.saveAndFlush(second);
+
+        JsonNode all = json(mvc.perform(get("/api/v1/marking-queue").with(as(owner)))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(all.get(0).path("items")).hasSize(2);
+        JsonNode page0 = json(mvc.perform(get("/api/v1/marking-queue?page=0&size=1").with(as(owner)))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(page0.get(0).path("items")).hasSize(1);
+        JsonNode page1 = json(mvc.perform(get("/api/v1/marking-queue?page=1&size=1").with(as(owner)))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(page1.get(0).path("items")).hasSize(1);
+        assertThat(page0.get(0).path("items").get(0).path("questionAttemptId").asText())
+                .isNotEqualTo(page1.get(0).path("items").get(0).path("questionAttemptId").asText());
+        mvc.perform(get("/api/v1/marking-queue?size=0").with(as(owner)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("LRN-VAL-001"));
+        mvc.perform(get("/api/v1/marking-queue?page=-1").with(as(owner)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/v1/marking-queue?size=101").with(as(owner)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("LRN-VAL-001"));
+    }
+
     private void assertState(String state) throws Exception {
         mvc.perform(get("/api/v1/marking-queue").with(as(owner))).andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].items[0].suggestionState").value(state));

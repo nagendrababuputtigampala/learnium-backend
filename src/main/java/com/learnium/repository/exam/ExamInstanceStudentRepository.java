@@ -20,11 +20,13 @@ public interface ExamInstanceStudentRepository extends JpaRepository<ExamInstanc
         Instant getOpensAt(); Instant getClosesAt(); Instant getClosedAt(); int getMaxAttempts();
         UUID getAttemptId(); Integer getAttemptNo(); ExamAttemptStatus getAttemptStatus(); Instant getSubmittedAt();
         BigDecimal getTotalScore(); boolean getMarkingPending();
+        boolean getIntegritySignalsOn(); com.learnium.model.exam.CameraMode getCameraMode();
     }
 
     @Query("select i.examInstanceId as instanceId, i.definitionName as definitionName, i.definitionKind as definitionKind,"
             + " i.batch.name as batchName, i.opensAt as opensAt, i.closesAt as closesAt, i.closedAt as closedAt,"
-            + " i.maxAttempts as maxAttempts, a.attemptId as attemptId, a.attemptNo as attemptNo, a.status as attemptStatus,"
+            + " i.maxAttempts as maxAttempts, i.integritySignalsOn as integritySignalsOn, i.cameraMode as cameraMode,"
+            + " a.attemptId as attemptId, a.attemptNo as attemptNo, a.status as attemptStatus,"
             + " a.submittedAt as submittedAt, a.totalScore as totalScore,"
             + " case when count(qa.questionAttemptId) > 0 then true else false end as markingPending"
             + " from ExamInstanceStudent s join s.examInstance i"
@@ -33,7 +35,7 @@ public interface ExamInstanceStudentRepository extends JpaRepository<ExamInstanc
             + " (com.learnium.model.exam.MarkingStatus.PENDING, com.learnium.model.exam.MarkingStatus.MARKING_PENDING)"
             + " where s.centreId = :centreId and s.user.userId = :userId"
             + " group by i.examInstanceId, i.definitionName, i.definitionKind, i.batch.name, i.opensAt, i.closesAt,"
-            + " i.closedAt, i.maxAttempts, a.attemptId, a.attemptNo, a.status, a.submittedAt, a.totalScore"
+            + " i.closedAt, i.maxAttempts, i.integritySignalsOn, i.cameraMode, a.attemptId, a.attemptNo, a.status, a.submittedAt, a.totalScore"
             + " order by i.opensAt, i.examInstanceId, a.attemptNo")
     List<StudentTestRow> studentTests(UUID centreId, UUID userId);
 }

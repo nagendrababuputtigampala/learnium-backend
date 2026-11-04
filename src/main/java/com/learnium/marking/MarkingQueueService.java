@@ -35,9 +35,21 @@ public class MarkingQueueService {
         this.answers = answers; this.jobs = jobs; this.markingJobs = markingJobs; this.clock = clock; this.webJson = webJson;
     }
 
+    /** Optional paging over the pending answers (applied before grouping); no params returns the whole queue. */
     @Transactional(readOnly = true)
-    public List<QueueGroupDto> queue(LearniumPrincipal caller) {
-        List<QuestionAttempt> rows = answers.markingQueue(caller.centreId(), caller.userId(), admin(caller));
+    public List<QueueGroupDto> queue(LearniumPrincipal caller, Integer page, Integer size) {
+        List<QuestionAttempt> rows;
+        if (page == null && size == null) {
+            rows = answers.markingQueue(caller.centreId(), caller.userId(), admin(caller));
+        } else {
+            int pageNo = page == null ? 0 : page;
+            int pageSize = size == null ? 50 : size;
+            if (pageNo < 0 || pageSize < 1 || pageSize > 100)
+                throw new BusinessException(ErrorCode.VAL_FAILED, "page must be >= 0 and size between 1 and 100");
+            rows = answers.markingQueue(
+                    caller.centreId(), caller.userId(), admin(caller),
+                    org.springframework.data.domain.PageRequest.of(pageNo, pageSize));
+        }
         Map<UUID, BackgroundJob> latest = latest(rows);
         Map<UUID, List<QueueItemDto>> grouped = new LinkedHashMap<>();
         Map<UUID, QuestionAttempt> representatives = new LinkedHashMap<>();
@@ -67,6 +79,9 @@ public class MarkingQueueService {
             throw new BusinessException(ErrorCode.TST_NOT_FOUND);
         if (answer.getMarkingStatus() == MarkingStatus.CONFIRMED)
             throw new BusinessException(ErrorCode.MRK_ALREADY_CONFIRMED);
+        if (answer.getMarkingStatus() != MarkingStatus.PENDING
+                && answer.getMarkingStatus() != MarkingStatus.MARKING_PENDING)
+            throw invalid();
         JsonNode rubric = answer.getExamInstanceQuestion().getPayloadSnapshot().path("rubric");
         if (!rubric.isArray() || rubric.isEmpty() || request == null || request.criteria() == null
                 || request.feedback() != null && request.feedback().length() > 4000)

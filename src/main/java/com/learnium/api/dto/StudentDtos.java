@@ -11,13 +11,16 @@ public final class StudentDtos {
     private StudentDtos() {}
     public record StudentTestDto(UUID instanceId, String definitionName, String kind, String batchName,
             Instant opensAt, Instant closesAt, int maxAttempts, int attemptsUsed,
-            UUID latestAttemptId, String latestAttemptStatus, String state, BigDecimal totalSoFar, boolean markingPending) {}
+            UUID latestAttemptId, String latestAttemptStatus, String state, BigDecimal totalSoFar, boolean markingPending,
+            boolean integritySignalsOn, String cameraMode) {}
     public record AttemptItemDto(UUID itemId, int order, String type, BigDecimal marks, JsonNode payload) {}
     public record SavedAnswerDto(UUID itemId, JsonNode answer, Instant savedAt) {}
     public record AttemptDto(UUID attemptId, UUID instanceId, String definitionName, int attemptNo,
             String status, Instant startedAt, Instant deadlineAt, long remainingSeconds,
-            List<AttemptItemDto> items, List<SavedAnswerDto> answers) {}
+            List<AttemptItemDto> items, List<SavedAnswerDto> answers,
+            boolean integritySignalsOn, String cameraMode) {}
     public record SaveAnswerRequest(@NotNull JsonNode answer) {}
+    public record StartAttemptRequest(String cameraCheckToken) {}
     public record SavedAnswerResponse(UUID itemId, JsonNode answer, Instant savedAt) {}
     public record ResultItemDto(UUID itemId, int order, String type, BigDecimal marks, JsonNode payload,
             JsonNode answer, String state, BigDecimal score, JsonNode solution, String feedback) {}

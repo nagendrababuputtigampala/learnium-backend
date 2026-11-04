@@ -34,7 +34,8 @@ class StudentAttemptServiceTest {
 
     @BeforeEach void setup() {
         service = new StudentAttemptService(assignments, instances, attempts, items, answers,
-                mock(MarkingJobService.class), Clock.fixed(now, ZoneOffset.UTC), new tools.jackson.databind.ObjectMapper());
+                mock(MarkingJobService.class), mock(com.learnium.exam.ProctorService.class),
+                Clock.fixed(now, ZoneOffset.UTC), new tools.jackson.databind.ObjectMapper());
     }
 
     @Test void canonicalAnswersAcceptScalarAndObjectFormsAndRejectEveryMalformedShape() {
@@ -136,6 +137,26 @@ class StudentAttemptServiceTest {
 
         instance.setDefinitionKind("FLASHCARD_PRACTICE");
         assertThatThrownBy(() -> service.start(caller, instance.getExamInstanceId())).isInstanceOf(BusinessException.class);
+    }
+
+    @Test void startAndPracticeRejectUnassignedAndMissingInstances() {
+        UUID instanceId = UUID.randomUUID();
+        when(assignments.findAssigned(centreId, instanceId, userId)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.practice(caller, instanceId))
+                .isInstanceOf(BusinessException.class)
+                .extracting(error -> ((BusinessException) error).getErrorCode())
+                .isEqualTo(com.learnium.common.error.ErrorCode.ATT_NOT_ASSIGNED);
+        var row = mock(com.learnium.model.exam.ExamInstanceStudent.class);
+        when(assignments.findAssigned(centreId, instanceId, userId)).thenReturn(Optional.of(row));
+        when(instances.findById(instanceId)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.start(caller, instanceId))
+                .isInstanceOf(BusinessException.class)
+                .extracting(error -> ((BusinessException) error).getErrorCode())
+                .isEqualTo(com.learnium.common.error.ErrorCode.ATT_NOT_ASSIGNED);
+        assertThatThrownBy(() -> service.practice(caller, instanceId))
+                .isInstanceOf(BusinessException.class)
+                .extracting(error -> ((BusinessException) error).getErrorCode())
+                .isEqualTo(com.learnium.common.error.ErrorCode.ATT_NOT_ASSIGNED);
     }
 
     @Test void invalidWebJsonIsConvertedToTheStandardAnswerValidationError() {

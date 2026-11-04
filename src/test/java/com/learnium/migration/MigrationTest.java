@@ -38,7 +38,7 @@ class MigrationTest {
                 .extracting(MigrationInfo::getVersion)
                 .extracting(Object::toString)
                 .containsExactly(
-                        "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17");
+                        "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18");
         assertThat(applied)
                 .extracting(MigrationInfo::getState)
                 .containsOnly(MigrationState.SUCCESS);
@@ -74,7 +74,9 @@ class MigrationTest {
                         "account_token",
                         "email_outbox",
                         "refresh_token",
-                        "background_job");
+                        "background_job",
+                        "integrity_events",
+                        "proctor_snapshots");
         List<String> actual =
                 jdbcTemplate.queryForList(
                         "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES"
@@ -268,6 +270,58 @@ class MigrationTest {
                     questionAttemptId);
             jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
         }
+    }
+
+    @Test
+    void integrityAndSnapshotTablesEnforceTenancyAndChecksAfterV18() {
+        java.util.UUID centreId = java.util.UUID.randomUUID();
+        java.util.UUID attemptId = java.util.UUID.randomUUID();
+        // The composite tenancy FK rejects an event for a non-existent (centre, attempt) pair:
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> insertIntegrityEventRow(centreId, attemptId, "TAB_HIDDEN"))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
+        try {
+            insertIntegrityEventRow(centreId, attemptId, "TAB_HIDDEN");
+            // The CHECK constraint rejects unknown event types and snapshot reasons:
+            org.assertj.core.api.Assertions.assertThatThrownBy(
+                            () -> insertIntegrityEventRow(centreId, attemptId, "BOGUS"))
+                    .isInstanceOf(org.springframework.dao.DataAccessException.class);
+            org.assertj.core.api.Assertions.assertThatThrownBy(
+                            () -> insertSnapshotRow(centreId, attemptId, "BOGUS"))
+                    .isInstanceOf(org.springframework.dao.DataAccessException.class);
+            insertSnapshotRow(centreId, attemptId, "PERIODIC");
+        } finally {
+            jdbcTemplate.update("DELETE FROM learnium.integrity_events WHERE attempt_id = ?", attemptId);
+            jdbcTemplate.update("DELETE FROM learnium.proctor_snapshots WHERE attempt_id = ?", attemptId);
+            jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
+        }
+    }
+
+    private void insertIntegrityEventRow(java.util.UUID centreId, java.util.UUID attemptId, String type) {
+        jdbcTemplate.update(
+                "INSERT INTO learnium.integrity_events"
+                        + " (event_id, centre_id, attempt_id, event_type, occurred_at, created_at, updated_at)"
+                        + " VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                java.util.UUID.randomUUID(),
+                centreId,
+                attemptId,
+                type);
+    }
+
+    private void insertSnapshotRow(java.util.UUID centreId, java.util.UUID attemptId, String reason) {
+        jdbcTemplate.update(
+                "INSERT INTO learnium.proctor_snapshots"
+                        + " (snapshot_id, centre_id, attempt_id, exam_instance_id, user_id, storage_key,"
+                        + " reason, captured_at, created_at, updated_at)"
+                        + " VALUES (?, ?, ?, ?, ?, 'proctor/test.jpg', ?, CURRENT_TIMESTAMP,"
+                        + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                java.util.UUID.randomUUID(),
+                centreId,
+                attemptId,
+                java.util.UUID.randomUUID(),
+                java.util.UUID.randomUUID(),
+                reason);
     }
 
     private void insertMarkingJobRow(

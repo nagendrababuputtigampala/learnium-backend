@@ -41,6 +41,7 @@ public class StudentTestService {
         return new StudentTestDto(first.getInstanceId(), first.getDefinitionName(), first.getDefinitionKind(),
                 first.getBatchName(), first.getOpensAt(), first.getClosesAt(), first.getMaxAttempts(), attempts.size(),
                 latest == null ? null : latest.getAttemptId(), latest == null ? null : latest.getAttemptStatus().name(), state,
-                submitted ? latest.getTotalScore() : null, submitted && latest.getMarkingPending());
+                submitted ? latest.getTotalScore() : null, submitted && latest.getMarkingPending(),
+                first.getIntegritySignalsOn(), first.getCameraMode().name());
     }
 }

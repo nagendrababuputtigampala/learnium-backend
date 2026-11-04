@@ -60,6 +60,8 @@ class StudentTestServiceTest {
         when(row.getMaxAttempts()).thenReturn(max); when(row.getAttemptNo()).thenReturn(no); when(row.getAttemptStatus()).thenReturn(status);
         when(row.getAttemptId()).thenReturn(no == null ? null : UUID.randomUUID());
         when(row.getSubmittedAt()).thenReturn(submitted); when(row.getTotalScore()).thenReturn(score); when(row.getMarkingPending()).thenReturn(pending);
+        when(row.getIntegritySignalsOn()).thenReturn(false);
+        when(row.getCameraMode()).thenReturn(com.learnium.model.exam.CameraMode.OFF);
         return row;
     }
 }

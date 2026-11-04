@@ -1,5 +1,65 @@
 # Progress — feature/student-flow (M5)
 
+## Part 5 — integrity + camera (feature/integrity-camera, Edison-built, 2026-11-03)
+
+- S1 done: Flyway V18 (integrity_events + proctor_snapshots, composite tenancy
+  FKs, CHECK constraints on type/reason), IntegrityEvent + ProctorSnapshot
+  entities and repositories. Design note: proctor_snapshots.attempt_id is
+  NULLABLE with (exam_instance_id, user_id) NOT NULL — the PRE_TEST camera
+  check happens before an attempt exists, so the row is created against
+  instance+student, carries the hashed check token, and is linked to the
+  attempt when the token is consumed at start. MigrationTest 9 green
+  (V1–V18 in order, tenancy FK + CHECK rejection proven).
+- S2 done: POST /student/attempts/{id}/integrity-events — own attempt only,
+  batch ≤ 20 validated up front, recorded only when the instance has signals
+  ON and the attempt is not invalidated (otherwise accepted + dropped);
+  maintains exam_attempts.integrity_flag_count. IntegrityFlowTest 4 green.
+- S3 done: teacher attempt oversight (AttemptAdminService) —
+  GET /instances/{id}/attempts with live score state + grouped flag counts,
+  GET /attempts/{id}/integrity-events timeline, POST /attempts/{id}/invalidate
+  (idempotent; managing staff + admins only, 404 otherwise). Marking queue and
+  detail now exclude INVALIDATED attempts; a student result for an invalidated
+  attempt reads LRN-ATT-001. AttemptAdminFlowTest 3 green.
+- S4 done: camera check — POST /student/tests/{id}/camera-check stores the
+  PRE_TEST frame via StorageService and returns a 10-minute single-use token
+  (SHA-256 hash only on the snapshot row); camera-ON starts require a live
+  check (new LRN-ATT-004), resume does not, consumption links the snapshot to
+  the attempt. Frames are magic-byte validated (JPEG/PNG/WebP) and capped at
+  2 MB. CameraCheckFlowTest 3 green.
+- S5 done: POST /student/attempts/{id}/snapshots (PERIODIC/EVENT, own
+  in-progress attempt, camera-ON only); teacher GET snapshot list + image
+  stream under /attempts/{id}/snapshots with an audit log line per view;
+  ProctorRetentionJob nightly-purges snapshots older than 30 days (object +
+  row). SnapshotFlowTest 2 green.
+- S6 done (tracker 86): confirm() now requires PENDING/MARKING_PENDING
+  (CONFIRMED keeps LRN-MRK-002, anything else LRN-MRK-001); the marking
+  queue accepts optional page/size params (paging applied to pending answers
+  before grouping; no params = whole queue). MarkingQueueFlowTest 11 green.
+- S7 done (coverage fix round, commit 190b62d): the first from-scratch full
+  run surfaced two test bugs (a pre-Part-5 unit mock missing the new
+  cameraMode stub; the camera fixture's maxAttempts=1 making the exhausted
+  check fire before the camera gate on the burned-token start — fixed by
+  publishing the fixture with 2 attempts) and bundle branch coverage at 96%
+  on the new classes. Added ProctorServiceTest + IntegrityServiceTest +
+  ProctorRetentionJobTest unit tests and flow coverage for the remaining
+  branches (image magic-byte near-misses, snapshot content types,
+  wrong-attempt/unlinked snapshot 404s, staged marking states,
+  AUTO_SUBMITTED, size>100 paging bound, MARKING_PENDING confirm). Removed
+  two dead code paths the gate exposed (the unused unpaged
+  MarkingQueueService.queue overload; a null-request ternary in
+  StudentController that Spring's body handling makes unreachable).
+- Final gate (2026-11-03, from scratch): **656 tests, 0 failures, 41
+  PG-gated skipped, JaCoCo 100% lines + branches — BUILD SUCCESS.**
+  (620 tests on merged dev before Part 5.)
+- Next: frontend gates, then bundles for Nagendra's push. Failing tests: none.
+- Post-PR fix (tracker 85, 2026-11-03): PR #16's CI run finally surfaced the
+  real-PostgreSQL job error — PostgresMigrationTest.insertUser is a pre-M5
+  fixture inserting STUDENT rows without a username, violating V15's
+  ck_user_account_student_username (53 run, 3 errors, all that one helper;
+  every V18 check passed). Fixture now inserts a per-row username derived
+  from the user id. Test-only change; the PG class stays CI-gated locally,
+  so the re-run of the CI job on PR #16 is the proof.
+
 ## Part 4 — student dashboard (2026-11-03)
 
 - Added a student-owned dashboard computed live from final attempt and marking facts;
