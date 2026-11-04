@@ -70,6 +70,12 @@ public class ReportsController {
         return pdf(pdfs.studentPdf(CurrentPrincipal.require()));
     }
 
+    @GetMapping("/api/v1/student/report")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<StudentReportDto> ownReport() {
+        return ResponseEntity.ok(studentReports.latestForStudent(CurrentPrincipal.require()));
+    }
+
     private ResponseEntity<byte[]> pdf(ReportPdfService.PdfFile file) {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)

@@ -100,6 +100,18 @@ class StudentReportPdfFlowTest extends PublishingFixtures {
     }
 
     @Test
+    void studentReadsTheirOwnLatestReportJson() throws Exception {
+        JsonNode read = json(mvc.perform(get("/api/v1/student/report").with(as(student)))
+                .andExpect(status().isOk())
+                .andReturn());
+        assertThat(read.path("facts").path("overall").path("percentage").decimalValue())
+                .isEqualByComparingTo("40.00");
+        UserAccount classmate = user(centre, UserRole.STUDENT);
+        mvc.perform(get("/api/v1/student/report").with(as(classmate))).andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/student/report").with(as(owner))).andExpect(status().isForbidden());
+    }
+
+    @Test
     void downloadsAreScopedAndHidden() throws Exception {
         UserAccount classmate = user(centre, UserRole.STUDENT);
         mvc.perform(get("/api/v1/student/report.pdf").with(as(classmate))).andExpect(status().isNotFound());
