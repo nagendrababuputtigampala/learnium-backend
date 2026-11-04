@@ -17,7 +17,34 @@ links; report = push artefact: snapshot + PDF + WhatsApp summary).
   scoping, pending/invalidated exclusion, weakest-first batch order.
   Frontend: timezone picker on Centre Settings (Canadian zones + UTC,
   unlisted saved zone kept selectable). ER diagram refreshed to V19.
-- S2 next: batch topic report endpoint + page.
+- S2 DONE (5ea15b3 backend; fd87ad7d frontend): GET
+  /batches/{batchId}/topic-report — weakest-first topic rows with heat
+  data, band, confirmed/pending counts and distinct-student counts;
+  staff-only, teachers must actively manage the batch (else LRN-TST-004,
+  no existence leak). Batch topic report page linked from the batches list.
+- S3 DONE (a4bd7d9 backend; b939569f frontend): POST + GET
+  /students/{userId}/report — generation freezes current facts (JSON via a
+  dedicated Jackson-3 codec) into a new student_reports row; reads return
+  the latest snapshot per exact scope (batch or centre-wide), so later
+  marking never moves a shared report (Checkpoint B proves 40% → regen →
+  70%). Scoping: admin centre-wide; teacher must manage the batch / teach
+  the student (teacherManagesStudent membership join). Student report page
+  linked from the roster; dates rendered in the centre timezone.
+- S4 DONE (9ee14e4 + 9af0a7c backend; a81eb504 frontend): branded PDF of
+  the frozen snapshot rendered with PDFBox directly (already the text-
+  extraction dependency; OpenHTMLtoPDF would add a second PDF stack) —
+  Indigo Scholar header/rule, snapshot-only content, centre-timezone
+  dates, multi-page flow. GET /students/{userId}/report.pdf (staff, same
+  scoping) and GET /student/report.pdf + GET /student/report (student's
+  own latest, any scope). Frontend: Download PDF on the staff page and a
+  Progress report card on the student dashboard (renders only when a
+  snapshot exists, never breaks the dashboard).
+- S5 DONE (b21aaa4b frontend): Share on WhatsApp — wa.me link whose text
+  is built from the snapshot (centre, first name, overall %, strongest
+  STRONG topic when present, "PDF attached" line) plus a download-first
+  hint. No public link, no API, no cost.
+- Final gates: pending — full backend verify + frontend suite/coverage/
+  build from scratch, then bundles + PRs.
 
 # Progress — feature/student-flow (M5)
 
