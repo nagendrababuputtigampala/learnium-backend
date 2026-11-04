@@ -51,7 +51,19 @@ public class CentreService {
         centre.setName(request.name());
         centre.setLogoUrl(request.logoUrl());
         centre.setContactEmail(request.contactEmail());
+        if (request.timezone() != null) {
+            centre.setTimezone(validTimezone(request.timezone()));
+        }
         return toDto(centreRepository.save(centre));
+    }
+
+    /** A supplied timezone must be a real IANA zone id; null/absent keeps the current one. */
+    private static String validTimezone(String timezone) {
+        try {
+            return java.time.ZoneId.of(timezone).getId();
+        } catch (java.time.DateTimeException e) {
+            throw new BusinessException(ErrorCode.VAL_FAILED, "Unknown timezone: " + timezone);
+        }
     }
 
     private Centre loadOwnCentre(LearniumPrincipal principal) {
@@ -62,6 +74,11 @@ public class CentreService {
 
     private static CentreDto toDto(Centre centre) {
         return new CentreDto(
-                centre.getCentreId(), centre.getCode(), centre.getName(), centre.getLogoUrl(), centre.getContactEmail());
+                centre.getCentreId(),
+                centre.getCode(),
+                centre.getName(),
+                centre.getLogoUrl(),
+                centre.getContactEmail(),
+                centre.getTimezone());
     }
 }

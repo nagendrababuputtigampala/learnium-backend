@@ -1,3 +1,16 @@
+# Progress — feature/reports (M6)
+
+## M6 — reports (feature/reports, Edison-built, started 2026-11-03)
+Plan: M6-Development-Plan.md (slices S1–S5; realigned scope — no public
+links; report = push artefact: snapshot + PDF + WhatsApp summary).
+
+- S1 in progress: Flyway V19 (centres.timezone default America/Vancouver +
+  student_reports snapshot table, composite tenancy FKs); Centre.timezone on
+  the entity, CentreDto and the admin centre update (ZoneId-validated,
+  LRN-VAL-001 on an unknown zone; absent = keep current); StudentReport
+  entity + repository (latest-per-scope reads). MigrationTest covers V19
+  (version list, table, composite-FK rejection, timezone default).
+
 # Progress — feature/student-flow (M5)
 
 ## Part 5 — integrity + camera (feature/integrity-camera, Edison-built, 2026-11-03)

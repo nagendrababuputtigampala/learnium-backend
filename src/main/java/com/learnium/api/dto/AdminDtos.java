@@ -11,12 +11,14 @@ public final class AdminDtos {
 
     private AdminDtos() {}
 
-    public record CentreDto(UUID centreId, String code, String name, String logoUrl, String contactEmail) {}
+    public record CentreDto(
+            UUID centreId, String code, String name, String logoUrl, String contactEmail, String timezone) {}
 
     public record UpdateCentreRequest(
             @NotBlank(message = "must not be blank") String name,
             @URL(message = "must be a valid URL") String logoUrl,
-            @Email(message = "must be a valid email") String contactEmail) {}
+            @Email(message = "must be a valid email") String contactEmail,
+            @Size(max = 64, message = "must be at most 64 characters") String timezone) {}
 
     public record CreateCentreRequest(
             @NotBlank(message = "must not be blank") String name,
