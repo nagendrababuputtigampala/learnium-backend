@@ -35,7 +35,23 @@
   (CONFIRMED keeps LRN-MRK-002, anything else LRN-MRK-001); the marking
   queue accepts optional page/size params (paging applied to pending answers
   before grouping; no params = whole queue). MarkingQueueFlowTest 11 green.
-- Next: frontend F1–F3, then full gates. Failing tests: none.
+- S7 done (coverage fix round, commit 190b62d): the first from-scratch full
+  run surfaced two test bugs (a pre-Part-5 unit mock missing the new
+  cameraMode stub; the camera fixture's maxAttempts=1 making the exhausted
+  check fire before the camera gate on the burned-token start — fixed by
+  publishing the fixture with 2 attempts) and bundle branch coverage at 96%
+  on the new classes. Added ProctorServiceTest + IntegrityServiceTest +
+  ProctorRetentionJobTest unit tests and flow coverage for the remaining
+  branches (image magic-byte near-misses, snapshot content types,
+  wrong-attempt/unlinked snapshot 404s, staged marking states,
+  AUTO_SUBMITTED, size>100 paging bound, MARKING_PENDING confirm). Removed
+  two dead code paths the gate exposed (the unused unpaged
+  MarkingQueueService.queue overload; a null-request ternary in
+  StudentController that Spring's body handling makes unreachable).
+- Final gate (2026-11-03, from scratch): **656 tests, 0 failures, 41
+  PG-gated skipped, JaCoCo 100% lines + branches — BUILD SUCCESS.**
+  (620 tests on merged dev before Part 5.)
+- Next: frontend gates, then bundles for Nagendra's push. Failing tests: none.
 
 ## Part 4 — student dashboard (2026-11-03)
 
