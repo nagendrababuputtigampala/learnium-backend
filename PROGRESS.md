@@ -43,8 +43,17 @@ links; report = push artefact: snapshot + PDF + WhatsApp summary).
   is built from the snapshot (centre, first name, overall %, strongest
   STRONG topic when present, "PDF attached" line) plus a download-first
   hint. No public link, no API, no cost.
-- Final gates: pending — full backend verify + frontend suite/coverage/
-  build from scratch, then bundles + PRs.
+- Final gates GREEN from scratch (2026-11-03): backend 697 tests,
+  0 failures, 41 real-PostgreSQL tests skipped locally (CI-gated),
+  JaCoCo 100% lines + branches, BUILD SUCCESS. Coverage fix rounds added
+  tests only (backend ca9488b: batch-scope denials incl. the admin
+  batch-scope branch, renderer meta/blank-comment/fit edge cases — fit
+  made package-visible like safe() so its drain branch is unit-testable,
+  blank-username filename fallback; frontend 403a9920: page empty states,
+  no-batch download, no-comment generation, centre-code-less user,
+  two-strong-topics WhatsApp sort). Frontend: 491 tests / 49 files,
+  100% statements/branches/functions/lines, production build green.
+  Bundles + PRs next; tracker tasks 71/29/30/31/46 close at merge.
 
 # Progress — feature/student-flow (M5)
 
