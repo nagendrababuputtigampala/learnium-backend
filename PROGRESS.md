@@ -4,12 +4,20 @@
 Plan: M6-Development-Plan.md (slices S1–S5; realigned scope — no public
 links; report = push artefact: snapshot + PDF + WhatsApp summary).
 
-- S1 in progress: Flyway V19 (centres.timezone default America/Vancouver +
-  student_reports snapshot table, composite tenancy FKs); Centre.timezone on
-  the entity, CentreDto and the admin centre update (ZoneId-validated,
-  LRN-VAL-001 on an unknown zone; absent = keep current); StudentReport
-  entity + repository (latest-per-scope reads). MigrationTest covers V19
-  (version list, table, composite-FK rejection, timezone default).
+- S1 DONE (dbc497c + de685de backend; frontend S1 commit): Flyway V19
+  (centres.timezone default America/Vancouver + student_reports snapshot
+  table, composite tenancy FKs); Centre.timezone on the entity, CentreDto
+  and the admin centre update (ZoneId-validated, LRN-VAL-001 on an unknown
+  zone; absent = keep current); StudentReport entity + repository
+  (latest-per-scope reads). MigrationTest covers V19 (version list, table,
+  composite-FK rejection, timezone default). ReportFactsService computes
+  student + batch facts from attempt facts only (confirmed-only marks,
+  pending excluded from numerator AND denominator, coverage %, dashboard
+  banding); Checkpoint A flow test (ReportFactsFlowTest) proves two-batch
+  scoping, pending/invalidated exclusion, weakest-first batch order.
+  Frontend: timezone picker on Centre Settings (Canadian zones + UTC,
+  unlisted saved zone kept selectable). ER diagram refreshed to V19.
+- S2 next: batch topic report endpoint + page.
 
 # Progress — feature/student-flow (M5)
 
