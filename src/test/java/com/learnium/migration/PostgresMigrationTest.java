@@ -141,11 +141,14 @@ class PostgresMigrationTest {
 
     private UUID insertUser(UUID centreId) {
         UUID id = UUID.randomUUID();
+        // Since V15 a STUDENT row must carry a username (ck_user_account_student_username);
+        // derive a unique one from the id so UNIQUE(centre_id, username) always holds.
         jdbcTemplate.update(
-                "INSERT INTO learnium.user_account (user_id, centre_id, role, created_at, updated_at)"
-                        + " VALUES (?, ?, 'STUDENT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                "INSERT INTO learnium.user_account (user_id, centre_id, username, role, created_at, updated_at)"
+                        + " VALUES (?, ?, ?, 'STUDENT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 id,
-                centreId);
+                centreId,
+                "student." + id.toString().substring(0, 8));
         return id;
     }
 

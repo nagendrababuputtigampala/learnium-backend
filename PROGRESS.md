@@ -52,6 +52,13 @@
   PG-gated skipped, JaCoCo 100% lines + branches — BUILD SUCCESS.**
   (620 tests on merged dev before Part 5.)
 - Next: frontend gates, then bundles for Nagendra's push. Failing tests: none.
+- Post-PR fix (tracker 85, 2026-11-03): PR #16's CI run finally surfaced the
+  real-PostgreSQL job error — PostgresMigrationTest.insertUser is a pre-M5
+  fixture inserting STUDENT rows without a username, violating V15's
+  ck_user_account_student_username (53 run, 3 errors, all that one helper;
+  every V18 check passed). Fixture now inserts a per-row username derived
+  from the user id. Test-only change; the PG class stays CI-gated locally,
+  so the re-run of the CI job on PR #16 is the proof.
 
 ## Part 4 — student dashboard (2026-11-03)
 
