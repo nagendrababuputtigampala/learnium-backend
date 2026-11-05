@@ -59,6 +59,81 @@ public interface QuestionAttemptRepository extends JpaRepository<QuestionAttempt
             + " q.question.topic.topicName, a.user.userId")
     List<DashboardComparisonFact> dashboardComparisonFacts(UUID centreId, UUID studentId);
 
+    /** M6 report facts for one student, optionally scoped to one batch (null = all batches). */
+    @Query("select q.question.topic.topicId as topicId, q.question.topic.topicName as topicName,"
+            + " sum(case when q.markingStatus in (com.learnium.model.exam.MarkingStatus.AUTO, com.learnium.model.exam.MarkingStatus.CONFIRMED) then 1 else 0 end) as confirmedItemCount,"
+            + " sum(case when q.markingStatus = com.learnium.model.exam.MarkingStatus.AUTO and q.correct = true then iq.marks"
+            + " when q.markingStatus = com.learnium.model.exam.MarkingStatus.CONFIRMED then coalesce(q.confirmedScore, 0) else 0 end) as earnedMarks,"
+            + " sum(case when q.markingStatus in (com.learnium.model.exam.MarkingStatus.AUTO, com.learnium.model.exam.MarkingStatus.CONFIRMED) then iq.marks else 0 end) as availableMarks,"
+            + " sum(case when q.markingStatus not in (com.learnium.model.exam.MarkingStatus.AUTO, com.learnium.model.exam.MarkingStatus.CONFIRMED) then 1 else 0 end) as pendingItemCount"
+            + " from QuestionAttempt q join q.attempt a join q.examInstanceQuestion iq"
+            + " where q.centreId = :centreId and a.user.userId = :studentId"
+            + " and (:batchId is null or a.examInstance.batch.batchId = :batchId)"
+            + " and a.status in (com.learnium.model.exam.ExamAttemptStatus.SUBMITTED, com.learnium.model.exam.ExamAttemptStatus.AUTO_SUBMITTED)"
+            + " group by q.question.topic.topicId, q.question.topic.topicName order by q.question.topic.topicName")
+    List<DashboardTopicFact> reportTopicFacts(UUID centreId, UUID studentId, UUID batchId);
+
+    interface ReportAttemptFact {
+        UUID getAttemptId();
+        String getTestName();
+        String getBatchName();
+        java.time.Instant getSubmittedAt();
+        BigDecimal getEarnedMarks();
+        BigDecimal getAvailableMarks();
+        Long getPendingItemCount();
+    }
+
+    /** M6 per-attempt facts for one student (trend/history), oldest first. */
+    @Query("select a.attemptId as attemptId, a.examInstance.definitionName as testName,"
+            + " a.examInstance.batch.name as batchName, a.submittedAt as submittedAt,"
+            + " sum(case when q.markingStatus = com.learnium.model.exam.MarkingStatus.AUTO and q.correct = true then iq.marks"
+            + " when q.markingStatus = com.learnium.model.exam.MarkingStatus.CONFIRMED then coalesce(q.confirmedScore, 0) else 0 end) as earnedMarks,"
+            + " sum(case when q.markingStatus in (com.learnium.model.exam.MarkingStatus.AUTO, com.learnium.model.exam.MarkingStatus.CONFIRMED) then iq.marks else 0 end) as availableMarks,"
+            + " sum(case when q.markingStatus not in (com.learnium.model.exam.MarkingStatus.AUTO, com.learnium.model.exam.MarkingStatus.CONFIRMED) then 1 else 0 end) as pendingItemCount"
+            + " from QuestionAttempt q join q.attempt a join q.examInstanceQuestion iq"
+            + " where q.centreId = :centreId and a.user.userId = :studentId"
+            + " and (:batchId is null or a.examInstance.batch.batchId = :batchId)"
+            + " and a.status in (com.learnium.model.exam.ExamAttemptStatus.SUBMITTED, com.learnium.model.exam.ExamAttemptStatus.AUTO_SUBMITTED)"
+            + " group by a.attemptId, a.examInstance.definitionName, a.examInstance.batch.name, a.submittedAt"
+            + " order by a.submittedAt asc, a.attemptId asc")
+    List<ReportAttemptFact> reportAttemptFacts(UUID centreId, UUID studentId, UUID batchId);
+
+    interface BatchTopicFactRow {
+        UUID getTopicId();
+        String getTopicName();
+        Long getConfirmedItemCount();
+        Long getPendingItemCount();
+        BigDecimal getEarnedMarks();
+        BigDecimal getAvailableMarks();
+    }
+
+    /** M6 per-topic aggregates over every student of one batch. */
+    @Query("select q.question.topic.topicId as topicId, q.question.topic.topicName as topicName,"
+            + " sum(case when q.markingStatus in (com.learnium.model.exam.MarkingStatus.AUTO, com.learnium.model.exam.MarkingStatus.CONFIRMED) then 1 else 0 end) as confirmedItemCount,"
+            + " sum(case when q.markingStatus not in (com.learnium.model.exam.MarkingStatus.AUTO, com.learnium.model.exam.MarkingStatus.CONFIRMED) then 1 else 0 end) as pendingItemCount,"
+            + " sum(case when q.markingStatus = com.learnium.model.exam.MarkingStatus.AUTO and q.correct = true then iq.marks"
+            + " when q.markingStatus = com.learnium.model.exam.MarkingStatus.CONFIRMED then coalesce(q.confirmedScore, 0) else 0 end) as earnedMarks,"
+            + " sum(case when q.markingStatus in (com.learnium.model.exam.MarkingStatus.AUTO, com.learnium.model.exam.MarkingStatus.CONFIRMED) then iq.marks else 0 end) as availableMarks"
+            + " from QuestionAttempt q join q.attempt a join q.examInstanceQuestion iq"
+            + " where q.centreId = :centreId and a.examInstance.batch.batchId = :batchId"
+            + " and a.status in (com.learnium.model.exam.ExamAttemptStatus.SUBMITTED, com.learnium.model.exam.ExamAttemptStatus.AUTO_SUBMITTED)"
+            + " group by q.question.topic.topicId, q.question.topic.topicName")
+    List<BatchTopicFactRow> batchTopicFacts(UUID centreId, UUID batchId);
+
+    interface BatchTopicStudentCount {
+        UUID getTopicId();
+        Long getStudentCount();
+    }
+
+    /** Distinct students with at least one confirmed item per topic in one batch. */
+    @Query("select q.question.topic.topicId as topicId, count(distinct a.user.userId) as studentCount"
+            + " from QuestionAttempt q join q.attempt a"
+            + " where q.centreId = :centreId and a.examInstance.batch.batchId = :batchId"
+            + " and a.status in (com.learnium.model.exam.ExamAttemptStatus.SUBMITTED, com.learnium.model.exam.ExamAttemptStatus.AUTO_SUBMITTED)"
+            + " and q.markingStatus in (com.learnium.model.exam.MarkingStatus.AUTO, com.learnium.model.exam.MarkingStatus.CONFIRMED)"
+            + " group by q.question.topic.topicId")
+    List<BatchTopicStudentCount> batchTopicStudentCounts(UUID centreId, UUID batchId);
+
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("select q from QuestionAttempt q where q.questionAttemptId = :id")
     java.util.Optional<QuestionAttempt> lockForMarking(UUID id);

@@ -13,6 +13,22 @@ import org.springframework.data.repository.query.Param;
 
 public interface BatchMembershipRepository extends JpaRepository<BatchMembership, UUID> {
 
+    /** True when the teacher actively teaches at least one batch the student actively belongs to. */
+    @Query(
+            "select count(m) > 0 from BatchMembership m, BatchMembership s"
+                    + " where m.centreId = :centreId and s.centreId = :centreId"
+                    + " and m.batch = s.batch"
+                    + " and m.user.userId = :teacherId"
+                    + " and m.memberRole = com.learnium.model.user.MemberRole.TEACHER"
+                    + " and m.status = com.learnium.model.user.MembershipStatus.ACTIVE"
+                    + " and s.user.userId = :studentId"
+                    + " and s.memberRole = com.learnium.model.user.MemberRole.STUDENT"
+                    + " and s.status = com.learnium.model.user.MembershipStatus.ACTIVE")
+    boolean teacherManagesStudent(
+            @Param("centreId") UUID centreId,
+            @Param("teacherId") UUID teacherId,
+            @Param("studentId") UUID studentId);
+
     /** Centre-scoped roster read: the centre predicate is mandatory, not caller discipline. */
     @Query(
             "select m from BatchMembership m"

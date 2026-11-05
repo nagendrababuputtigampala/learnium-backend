@@ -38,7 +38,7 @@ class MigrationTest {
                 .extracting(MigrationInfo::getVersion)
                 .extracting(Object::toString)
                 .containsExactly(
-                        "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18");
+                        "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19");
         assertThat(applied)
                 .extracting(MigrationInfo::getState)
                 .containsOnly(MigrationState.SUCCESS);
@@ -76,7 +76,8 @@ class MigrationTest {
                         "refresh_token",
                         "background_job",
                         "integrity_events",
-                        "proctor_snapshots");
+                        "proctor_snapshots",
+                        "student_reports");
         List<String> actual =
                 jdbcTemplate.queryForList(
                         "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES"
@@ -296,6 +297,46 @@ class MigrationTest {
             jdbcTemplate.update("DELETE FROM learnium.proctor_snapshots WHERE attempt_id = ?", attemptId);
             jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
         }
+    }
+
+    @Test
+    void studentReportsAndCentreTimezoneAfterV19() {
+        java.util.UUID centreId = java.util.UUID.randomUUID();
+        java.util.UUID userId = java.util.UUID.randomUUID();
+        // The composite tenancy FK rejects a report for a non-existent (centre, student) pair:
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> insertStudentReportRow(centreId, userId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
+        try {
+            insertStudentReportRow(centreId, userId);
+            // A centre inserted without a timezone gets the V19 default:
+            jdbcTemplate.update(
+                    "INSERT INTO learnium.centres (centre_id, name, code, status, created_at, updated_at)"
+                            + " VALUES (?, 'TZ Centre', 'tzc', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                    centreId);
+            String timezone =
+                    jdbcTemplate.queryForObject(
+                            "SELECT timezone FROM learnium.centres WHERE centre_id = ?", String.class, centreId);
+            org.assertj.core.api.Assertions.assertThat(timezone).isEqualTo("America/Vancouver");
+        } finally {
+            jdbcTemplate.update("DELETE FROM learnium.student_reports WHERE centre_id = ?", centreId);
+            jdbcTemplate.update("DELETE FROM learnium.centres WHERE centre_id = ?", centreId);
+            jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
+        }
+    }
+
+    private void insertStudentReportRow(java.util.UUID centreId, java.util.UUID userId) {
+        jdbcTemplate.update(
+                "INSERT INTO learnium.student_reports"
+                        + " (report_id, centre_id, user_id, facts, generated_by, generated_at,"
+                        + " created_at, updated_at)"
+                        + " VALUES (?, ?, ?, CAST(? AS jsonb), ?, CURRENT_TIMESTAMP,"
+                        + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                java.util.UUID.randomUUID(),
+                centreId,
+                userId,
+                "{\"overall\":{}}",
+                userId);
     }
 
     private void insertIntegrityEventRow(java.util.UUID centreId, java.util.UUID attemptId, String type) {

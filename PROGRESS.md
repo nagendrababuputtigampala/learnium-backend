@@ -1,3 +1,60 @@
+# Progress — feature/reports (M6)
+
+## M6 — reports (feature/reports, Edison-built, started 2026-11-03)
+Plan: M6-Development-Plan.md (slices S1–S5; realigned scope — no public
+links; report = push artefact: snapshot + PDF + WhatsApp summary).
+
+- S1 DONE (dbc497c + de685de backend; frontend S1 commit): Flyway V19
+  (centres.timezone default America/Vancouver + student_reports snapshot
+  table, composite tenancy FKs); Centre.timezone on the entity, CentreDto
+  and the admin centre update (ZoneId-validated, LRN-VAL-001 on an unknown
+  zone; absent = keep current); StudentReport entity + repository
+  (latest-per-scope reads). MigrationTest covers V19 (version list, table,
+  composite-FK rejection, timezone default). ReportFactsService computes
+  student + batch facts from attempt facts only (confirmed-only marks,
+  pending excluded from numerator AND denominator, coverage %, dashboard
+  banding); Checkpoint A flow test (ReportFactsFlowTest) proves two-batch
+  scoping, pending/invalidated exclusion, weakest-first batch order.
+  Frontend: timezone picker on Centre Settings (Canadian zones + UTC,
+  unlisted saved zone kept selectable). ER diagram refreshed to V19.
+- S2 DONE (5ea15b3 backend; fd87ad7d frontend): GET
+  /batches/{batchId}/topic-report — weakest-first topic rows with heat
+  data, band, confirmed/pending counts and distinct-student counts;
+  staff-only, teachers must actively manage the batch (else LRN-TST-004,
+  no existence leak). Batch topic report page linked from the batches list.
+- S3 DONE (a4bd7d9 backend; b939569f frontend): POST + GET
+  /students/{userId}/report — generation freezes current facts (JSON via a
+  dedicated Jackson-3 codec) into a new student_reports row; reads return
+  the latest snapshot per exact scope (batch or centre-wide), so later
+  marking never moves a shared report (Checkpoint B proves 40% → regen →
+  70%). Scoping: admin centre-wide; teacher must manage the batch / teach
+  the student (teacherManagesStudent membership join). Student report page
+  linked from the roster; dates rendered in the centre timezone.
+- S4 DONE (9ee14e4 + 9af0a7c backend; a81eb504 frontend): branded PDF of
+  the frozen snapshot rendered with PDFBox directly (already the text-
+  extraction dependency; OpenHTMLtoPDF would add a second PDF stack) —
+  Indigo Scholar header/rule, snapshot-only content, centre-timezone
+  dates, multi-page flow. GET /students/{userId}/report.pdf (staff, same
+  scoping) and GET /student/report.pdf + GET /student/report (student's
+  own latest, any scope). Frontend: Download PDF on the staff page and a
+  Progress report card on the student dashboard (renders only when a
+  snapshot exists, never breaks the dashboard).
+- S5 DONE (b21aaa4b frontend): Share on WhatsApp — wa.me link whose text
+  is built from the snapshot (centre, first name, overall %, strongest
+  STRONG topic when present, "PDF attached" line) plus a download-first
+  hint. No public link, no API, no cost.
+- Final gates GREEN from scratch (2026-11-03): backend 697 tests,
+  0 failures, 41 real-PostgreSQL tests skipped locally (CI-gated),
+  JaCoCo 100% lines + branches, BUILD SUCCESS. Coverage fix rounds added
+  tests only (backend ca9488b: batch-scope denials incl. the admin
+  batch-scope branch, renderer meta/blank-comment/fit edge cases — fit
+  made package-visible like safe() so its drain branch is unit-testable,
+  blank-username filename fallback; frontend 403a9920: page empty states,
+  no-batch download, no-comment generation, centre-code-less user,
+  two-strong-topics WhatsApp sort). Frontend: 491 tests / 49 files,
+  100% statements/branches/functions/lines, production build green.
+  Bundles + PRs next; tracker tasks 71/29/30/31/46 close at merge.
+
 # Progress — feature/student-flow (M5)
 
 ## Part 5 — integrity + camera (feature/integrity-camera, Edison-built, 2026-11-03)

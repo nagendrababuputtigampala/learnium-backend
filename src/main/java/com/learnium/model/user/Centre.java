@@ -43,6 +43,10 @@ public class Centre extends AuditableEntity {
     @Column(name = "contact_email", length = 255)
     private String contactEmail;
 
+    /** IANA zone id for display times (reports, windows); instants stay UTC in storage. */
+    @Column(name = "timezone", nullable = false, length = 64)
+    private String timezone = "America/Vancouver";
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private CentreStatus status = CentreStatus.ACTIVE;
