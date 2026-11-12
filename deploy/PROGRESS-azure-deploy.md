@@ -12,6 +12,6 @@ volume first (Step 2 revisits).
       Validated: YAML parses; property names checked against
       application.yml. Docker is unavailable on the Edison VM, so
       `docker compose config` runs on the Azure VM at deploy time.
-- [ ] Slice 2: deploy/vm-setup.sh (Docker install, swap, repo clones).
+- [x] Slice 2: deploy/vm-setup.sh (Docker install, swap, repo clones).
 - [ ] Slice 3: deploy/backup.sh + deploy/reset-demo.sh (tracker 56 + 53).
 - [ ] Next: bundle for Nagendra to push; PR to dev via connector.
