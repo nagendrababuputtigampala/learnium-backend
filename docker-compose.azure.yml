@@ -1,0 +1,57 @@
+# Azure VM stack for the Learnium platform — runs ONE environment per
+# invocation. The same file serves both environments on the VM; the stack
+# (compose project) name and the env file decide which one:
+#
+#   Prod (Azure PostgreSQL):  docker compose -p learnium-prod \
+#       -f docker-compose.azure.yml --env-file prod.env up -d --build
+#   Dev  (Neon PostgreSQL):   docker compose -p learnium-dev \
+#       -f docker-compose.azure.yml --env-file dev.env up -d --build
+#
+# Differences from the local docker-compose.yml:
+#   - No postgres service: the database is managed (Azure Flexible Server
+#     for prod, Neon for dev) and reached via DB_URL in the env file.
+#   - No mailpit: real SMTP (Resend) comes from the env file.
+#   - The backend port is NOT published; all traffic goes through the
+#     frontend nginx (which proxies /api/ to the backend service).
+#   - Only the frontend port is published: 80 for prod, 8081 for dev
+#     (FRONTEND_PORT in the stack's env file).
+#   - All configuration and secrets come from the stack env file
+#     (prod.env / dev.env, kept on the VM only, never committed — see
+#     deploy/prod.env.example and deploy/dev.env.example).
+#
+# Layout note (same as local): the frontend builds from the sibling repo
+# ../learnium-frontend — clone both repos side by side on the VM.
+
+services:
+  backend:
+    build: .
+    env_file:
+      - ${ENV_FILE:?Set ENV_FILE in the stack env file (prod.env or dev.env)}
+    volumes:
+      # Uploaded chapter PDFs + proctor snapshots (local storage at
+      # /app/data/files) must survive container replacement. The compose
+      # project name prefixes this volume, so dev and prod never share files.
+      - appfiles:/app/data
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    build:
+      context: ../learnium-frontend
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  appfiles:
