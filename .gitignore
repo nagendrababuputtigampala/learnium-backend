@@ -2,5 +2,8 @@ target/
 __pycache__/
 *.pyc
 .env
+# Filled Azure stack env files live on the VM only — never commit real secrets.
+prod.env
+dev.env
 *.log
 !.mvn/wrapper/maven-wrapper.jar
